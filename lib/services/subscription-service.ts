@@ -18,15 +18,18 @@ export interface Subscription {
   owner_address: string;
   service_name: string;
   wallet_address: string;
+  recipient_address: string;
   amount: string;
   token: string;
   frequency: SubscriptionFrequency;
   status: SubscriptionStatus;
   next_payment_date: string | null;
   last_payment_date: string | null;
+  last_tx_hash?: string;
   total_paid: string;
   payment_count: number;
   chain_id: number;
+  chain?: string;
   memo?: string;
   created_at: string;
   updated_at: string;
@@ -390,7 +393,7 @@ export class SubscriptionService {
   /**
    * Record a successful payment
    */
-  async recordPayment(id: string, amount: string): Promise<Subscription> {
+  async recordPayment(id: string, amount: string, txHash?: string): Promise<Subscription> {
     // Get current subscription
     const { data: subscription, error: getError } = await this.supabase
       .from('subscriptions')
@@ -404,24 +407,44 @@ export class SubscriptionService {
 
     // Calculate next payment date
     const nextPaymentDate = calculateNextPaymentDate(new Date(), subscription.frequency);
-    const newTotalPaid = (parseFloat(subscription.total_paid) + parseFloat(amount)).toString();
+    const newTotalPaid = (parseFloat(subscription.total_paid || '0') + parseFloat(amount)).toString();
+
+    const updateData: Record<string, any> = {
+      last_payment_date: new Date().toISOString(),
+      next_payment_date: nextPaymentDate.toISOString(),
+      total_paid: newTotalPaid,
+      payment_count: (subscription.payment_count || 0) + 1,
+      status: 'active', // Reset from payment_failed if applicable
+      updated_at: new Date().toISOString(),
+    };
+
+    if (txHash) {
+      updateData.last_tx_hash = txHash;
+    }
 
     const { data, error } = await this.supabase
       .from('subscriptions')
-      .update({
-        last_payment_date: new Date().toISOString(),
-        next_payment_date: nextPaymentDate.toISOString(),
-        total_paid: newTotalPaid,
-        payment_count: subscription.payment_count + 1,
-        status: 'active', // Reset from payment_failed if applicable
-        updated_at: new Date().toISOString(),
-      })
+      .update(updateData)
       .eq('id', id)
       .select()
       .single();
 
     if (error) {
       throw new Error(`Failed to record payment: ${error.message}`);
+    }
+
+    // Also record in subscription_payments table for history
+    try {
+      await this.supabase.from('subscription_payments').insert({
+        subscription_id: id,
+        amount: amount,
+        tx_hash: txHash,
+        status: 'completed',
+        created_at: new Date().toISOString(),
+      });
+    } catch (historyError) {
+      // Don't fail if history recording fails
+      console.warn('[SubscriptionService] Failed to record payment history:', historyError);
     }
 
     return data as Subscription;
@@ -431,10 +454,26 @@ export class SubscriptionService {
    * Record a failed payment
    */
   async recordPaymentFailure(id: string, errorMessage: string): Promise<void> {
+    // Get subscription details for notification
+    const { data: subscription, error: getError } = await this.supabase
+      .from('subscriptions')
+      .select('*')
+      .eq('id', id)
+      .single();
+
+    if (getError) {
+      console.error('[SubscriptionService] Failed to get subscription for failure recording:', getError);
+    }
+
+    // Calculate retry date (24 hours from now)
+    const retryDate = new Date();
+    retryDate.setHours(retryDate.getHours() + 24);
+
     const { error } = await this.supabase
       .from('subscriptions')
       .update({
         status: 'payment_failed',
+        next_payment_date: retryDate.toISOString(), // Schedule retry in 24 hours
         updated_at: new Date().toISOString(),
       })
       .eq('id', id);
@@ -443,8 +482,84 @@ export class SubscriptionService {
       throw new Error(`Failed to record payment failure: ${error.message}`);
     }
 
-    // TODO: Schedule retry after 24 hours
-    // TODO: Send notification to user
+    // Record failure in payment history
+    try {
+      await this.supabase.from('subscription_payments').insert({
+        subscription_id: id,
+        amount: subscription?.amount || '0',
+        status: 'failed',
+        error_message: errorMessage,
+        created_at: new Date().toISOString(),
+      });
+    } catch (historyError) {
+      console.warn('[SubscriptionService] Failed to record payment failure history:', historyError);
+    }
+
+    // Send notification to user about payment failure
+    if (subscription) {
+      try {
+        const { notificationService } = await import('./notification-service');
+        await notificationService.send(
+          subscription.owner_address,
+          'subscription_payment', // Use subscription_payment type
+          {
+            title: 'Subscription Payment Failed',
+            body: `Payment for ${subscription.service_name} failed: ${errorMessage}. We will retry in 24 hours.`,
+            data: {
+              subscription_id: id,
+              service_name: subscription.service_name,
+              amount: subscription.amount,
+              token: subscription.token,
+              error: errorMessage,
+              retry_date: retryDate.toISOString(),
+              status: 'failed',
+            },
+          }
+        );
+      } catch (notifyError) {
+        console.warn('[SubscriptionService] Failed to send payment failure notification:', notifyError);
+      }
+    }
+
+    console.log(`[SubscriptionService] Payment failure recorded for ${id}, retry scheduled for ${retryDate.toISOString()}`);
+  }
+
+  /**
+   * Get subscriptions that need retry (payment_failed status with past next_payment_date)
+   */
+  async getRetryDueSubscriptions(limit = 100): Promise<Subscription[]> {
+    const now = new Date().toISOString();
+
+    const { data, error } = await this.supabase
+      .from('subscriptions')
+      .select('*')
+      .eq('status', 'payment_failed')
+      .lte('next_payment_date', now)
+      .order('next_payment_date', { ascending: true })
+      .limit(limit);
+
+    if (error) {
+      throw new Error(`Failed to get retry due subscriptions: ${error.message}`);
+    }
+
+    return (data || []) as Subscription[];
+  }
+
+  /**
+   * Reset subscription status after successful retry
+   */
+  async resetAfterRetry(id: string): Promise<void> {
+    const { error } = await this.supabase
+      .from('subscriptions')
+      .update({
+        status: 'active',
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', id);
+
+    if (error) {
+      throw new Error(`Failed to reset subscription after retry: ${error.message}`);
+    }
   }
 }
 

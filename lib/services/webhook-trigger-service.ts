@@ -56,6 +56,8 @@ export interface SubscriptionEventData {
   status: string;
   next_payment_date?: string;
   created_at: string;
+  error?: string;
+  tx_hash?: string;
 }
 
 // ============================================
@@ -163,6 +165,10 @@ export class WebhookTriggerService {
 
   async triggerSubscriptionCancelled(ownerAddress: string, data: SubscriptionEventData): Promise<void> {
     await this.triggerEvent(ownerAddress, 'subscription.cancelled', data);
+  }
+
+  async triggerSubscriptionPaymentFailed(ownerAddress: string, data: SubscriptionEventData): Promise<void> {
+    await this.triggerEvent(ownerAddress, 'subscription.payment_failed', data);
   }
 }
 

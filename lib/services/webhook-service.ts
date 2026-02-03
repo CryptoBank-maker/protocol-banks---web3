@@ -21,6 +21,7 @@ export type WebhookEvent =
   | 'subscription.created'
   | 'subscription.payment_due'
   | 'subscription.payment_completed'
+  | 'subscription.payment_failed'
   | 'subscription.cancelled';
 
 export interface Webhook {

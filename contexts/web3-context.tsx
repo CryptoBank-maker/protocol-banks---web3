@@ -10,6 +10,7 @@ import {
   getChainId,
   isMetaMaskAvailable,
   switchNetwork as switchWeb3Network,
+  signERC3009Authorization as signERC3009AuthorizationWeb3,
   CHAIN_IDS,
   type ChainType,
 } from "@/lib/web3"
@@ -37,7 +38,13 @@ interface Web3ContextType {
   signer: any | null      // Placeholder for signer
   signMessage: (message: string) => Promise<string>
   sendToken: (to: string, amount: string, token: string) => Promise<string>
-  signERC3009Authorization: (params: any) => Promise<string>
+  signERC3009Authorization: (params: {
+    tokenAddress: string
+    from: string
+    to: string
+    amount: string
+    chainId?: number
+  }) => Promise<{ v: number; r: string; s: string; nonce: string; validAfter: number; validBefore: number }>
   activeChain: ChainType
   setActiveChain: (chain: ChainType) => void
   isConnected: boolean
@@ -487,11 +494,37 @@ export function Web3Provider({ children }: { children: ReactNode }) {
     }
   }, [wallets.EVM])
 
-  const signERC3009Authorization = useCallback(async (params: any): Promise<string> => {
-    // Placeholder - actual implementation would sign EIP-3009 authorization
-    console.log('[v0] signERC3009Authorization called:', params)
-    return `0x${Math.random().toString(16).slice(2)}`
-  }, [])
+  const signERC3009Authorization = useCallback(async (params: {
+    tokenAddress: string
+    from: string
+    to: string
+    amount: string
+    chainId?: number
+  }): Promise<{ v: number; r: string; s: string; nonce: string; validAfter: number; validBefore: number }> => {
+    console.log('[Web3] signERC3009Authorization called:', params)
+
+    if (!wallets.EVM) {
+      throw new Error('Wallet not connected')
+    }
+
+    const targetChainId = params.chainId || chainId
+
+    // Use the real signing implementation from web3.ts
+    const authorization = await signERC3009AuthorizationWeb3(
+      params.tokenAddress,
+      params.from,
+      params.to,
+      params.amount,
+      targetChainId
+    )
+
+    console.log('[Web3] ERC-3009 authorization signed:', {
+      nonce: authorization.nonce,
+      validBefore: authorization.validBefore
+    })
+
+    return authorization
+  }, [wallets.EVM, chainId])
 
   return (
     <Web3Context.Provider

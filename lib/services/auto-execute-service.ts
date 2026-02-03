@@ -11,6 +11,8 @@ import { PaymentProposal, proposalService } from './proposal-service';
 import { budgetService } from './budget-service';
 import { agentService, Agent, AutoExecuteRules } from './agent-service';
 import { notificationService } from './notification-service';
+import { submitBatchPayment } from '@/lib/grpc/payout-bridge';
+import { getTokenAddress, CHAIN_IDS } from '@/lib/web3';
 
 // ============================================
 // Types
@@ -257,23 +259,48 @@ export class AutoExecuteService {
   }
 
   /**
-   * Execute payment via x402 protocol (simulated)
-   * In production, this would call the actual x402 service
+   * Execute payment via payout bridge
+   * Uses Go payout engine or TypeScript fallback for real transactions
    */
   private async executePayment(proposal: PaymentProposal): Promise<string> {
-    // Simulate x402 execution
-    // In production, this would:
-    // 1. Generate x402 authorization
-    // 2. Submit to x402 relayer
-    // 3. Wait for transaction confirmation
-    // 4. Return transaction hash
+    // Use chain_id from proposal or default to Base
+    const chainId = proposal.chain_id || CHAIN_IDS.BASE;
 
-    // For now, generate a mock transaction hash
-    const txHash = `0x${Array.from({ length: 64 }, () => 
-      Math.floor(Math.random() * 16).toString(16)
-    ).join('')}`;
+    // Get token address
+    const tokenAddress = getTokenAddress(chainId, proposal.token || 'USDC');
+    if (!tokenAddress) {
+      throw new Error(`Token ${proposal.token} not supported on chain ${chainId}`);
+    }
 
-    return txHash;
+    try {
+      // Submit payment via payout bridge
+      const result = await submitBatchPayment(
+        proposal.owner_address, // userId
+        proposal.owner_address, // senderAddress (owner is the sender)
+        [
+          {
+            address: proposal.recipient_address,
+            amount: proposal.amount,
+            token: tokenAddress,
+            chainId,
+            vendorName: proposal.reason, // Use reason as vendor name
+          },
+        ],
+        {
+          priority: 'high', // Auto-executed payments should be processed quickly
+        }
+      );
+
+      if (result.status === 'failed') {
+        throw new Error(result.transactions[0]?.error || 'Payment execution failed');
+      }
+
+      // Return the transaction hash or batch ID
+      return result.transactions[0]?.txHash || result.batchId;
+    } catch (error) {
+      console.error('[AutoExecute] Payment execution failed:', error);
+      throw error;
+    }
   }
 
   /**
