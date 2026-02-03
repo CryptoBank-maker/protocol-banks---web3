@@ -491,7 +491,7 @@ export default function VendorsPage() {
                   </form>
                 </DialogContent>
               </Dialog>
-              <div className="sm:hidden fixed bottom-20 right-4 z-50">
+              <div className="sm:hidden fixed bottom-24 right-4 z-40">
                 <Button size="icon" className="rounded-full h-12 w-12 shadow-lg" onClick={() => setDialogOpen(true)}>
                   <Plus className="w-6 h-6" />
                 </Button>
@@ -609,7 +609,7 @@ export default function VendorsPage() {
       </div>
 
       {/* Main Content Area */}
-      <main className="flex-1 container mx-auto p-3 sm:p-4 md:p-6">
+      <main className="flex-1 container mx-auto p-3 sm:p-4 md:p-6 pb-24 md:pb-6">
         <Tabs value={viewMode} onValueChange={(v) => setViewMode(v as any)} className="space-y-4">
           <TabsContent value="graph" className="m-0 border-none p-0 outline-none">
             <div className="min-h-[400px] sm:min-h-[500px] md:min-h-[600px]">

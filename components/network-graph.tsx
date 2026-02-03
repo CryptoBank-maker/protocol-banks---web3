@@ -763,7 +763,7 @@ export function NetworkGraph({
         </svg>
       )}
 
-      <div className="absolute bottom-20 md:bottom-4 left-3 md:left-4 flex flex-col gap-1.5 md:gap-2">
+      <div className="absolute bottom-24 md:bottom-4 left-3 md:left-4 flex flex-col gap-1.5 md:gap-2">
         <button
           onClick={() => setTransform((prev) => ({ ...prev, k: Math.min(prev.k + 0.2, 4) }))}
           className="p-1.5 md:p-2 bg-zinc-900/80 rounded-lg hover:bg-zinc-800 transition-colors"
@@ -797,9 +797,11 @@ export function NetworkGraph({
           </DrawerContent>
         </Drawer>
       ) : (
-        <div className="absolute top-6 right-6 bottom-6 z-20 w-80 bg-zinc-900/90 backdrop-blur-sm rounded-lg border border-zinc-800 overflow-hidden">
-          <DetailPanelContent />
-        </div>
+        selectedNode && (
+          <div className="absolute top-6 right-6 bottom-6 z-20 w-80 bg-zinc-900/90 backdrop-blur-sm rounded-lg border border-zinc-800 overflow-hidden">
+            <DetailPanelContent />
+          </div>
+        )
       )}
     </div>
   )
