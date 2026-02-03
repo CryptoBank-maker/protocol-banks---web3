@@ -86,6 +86,16 @@
     "xlsx": "0.18.5",
     "zod": "3.25.76"
   },
+  "pnpm": {
+    "overrides": {
+      "@noble/hashes": "1.8.0",
+      "@noble/curves": "1.9.7"
+    }
+  },
+  "overrides": {
+    "@noble/hashes": "1.8.0",
+    "@noble/curves": "1.9.7"
+  },
   "devDependencies": {
     "@tailwindcss/postcss": "^4.1.9",
     "@types/jest": "^29.5.12",

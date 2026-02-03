@@ -4,6 +4,10 @@
     {
       "path": "/api/cron/execute-scheduled-payments",
       "schedule": "0 * * * *"
+    },
+    {
+      "path": "/api/cron/budget-reset",
+      "schedule": "30 * * * *"
     }
   ]
 }
