@@ -1,5 +1,5 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { getSupabase } from "@/lib/supabase"
+import { createClient } from "@/lib/supabase/server"
 import { relayerService, isRelayerConfigured } from "@/lib/services/relayer-service"
 import type { Hex, Address } from "viem"
 
@@ -54,7 +54,7 @@ export async function POST(request: NextRequest): Promise<NextResponse<X402Execu
       )
     }
 
-    const supabase = getSupabase()
+    const supabase = await createClient()
 
     // Get the authorization
     const { data: auth, error: fetchError } = await supabase
