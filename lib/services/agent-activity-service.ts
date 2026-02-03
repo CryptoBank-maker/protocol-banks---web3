@@ -1,12 +1,13 @@
 /**
  * Agent Activity Service
- * 
+ *
  * Tracks and reports agent activities for audit and analytics.
- * 
+ *
  * @module lib/services/agent-activity-service
  */
 
 import { randomUUID } from 'crypto';
+import { createClient } from '@/lib/supabase/server';
 
 // ============================================
 // Types
@@ -49,6 +50,20 @@ export interface AgentAnalytics {
 
 const activityStore = new Map<string, AgentActivity>();
 
+// Flag to enable/disable database (for testing)
+let useDatabaseStorage = true;
+
+export function setUseDatabaseStorage(enabled: boolean) {
+  useDatabaseStorage = enabled;
+}
+
+function convertDbActivity(data: any): AgentActivity {
+  return {
+    ...data,
+    created_at: new Date(data.created_at),
+  };
+}
+
 // ============================================
 // Agent Activity Service
 // ============================================
@@ -64,36 +79,108 @@ export class AgentActivityService {
     details: Record<string, any>,
     options?: { ip_address?: string; user_agent?: string }
   ): Promise<AgentActivity> {
-    const activity: AgentActivity = {
-      id: randomUUID(),
+    const activityData = {
       agent_id: agentId,
       owner_address: ownerAddress.toLowerCase(),
       action,
       details,
       ip_address: options?.ip_address,
       user_agent: options?.user_agent,
-      created_at: new Date(),
     };
 
-    activityStore.set(activity.id, activity);
-    return activity;
+    if (useDatabaseStorage) {
+      try {
+        const supabase = await createClient();
+
+        // Set RLS context
+        await supabase.rpc('set_config', {
+          setting: 'app.current_user_address',
+          value: ownerAddress.toLowerCase(),
+        });
+
+        const { data, error } = await supabase
+          .from('agent_activities')
+          .insert(activityData)
+          .select()
+          .single();
+
+        if (error) {
+          console.error('[Activity Service] Insert error:', error);
+          // Don't throw - activity logging should not break the main flow
+          // Fall back to in-memory
+          const activity: AgentActivity = {
+            id: randomUUID(),
+            ...activityData,
+            created_at: new Date(),
+          };
+          activityStore.set(activity.id, activity);
+          return activity;
+        }
+
+        return convertDbActivity(data);
+      } catch (error) {
+        console.error('[Activity Service] Failed to log activity:', error);
+        // Don't throw - fall back to in-memory
+        const activity: AgentActivity = {
+          id: randomUUID(),
+          ...activityData,
+          created_at: new Date(),
+        };
+        activityStore.set(activity.id, activity);
+        return activity;
+      }
+    } else {
+      // Fallback to in-memory storage
+      const activity: AgentActivity = {
+        id: randomUUID(),
+        ...activityData,
+        created_at: new Date(),
+      };
+
+      activityStore.set(activity.id, activity);
+      return activity;
+    }
   }
 
   /**
    * Get activities for an agent
    */
   async getActivities(agentId: string, limit: number = 50): Promise<AgentActivity[]> {
-    const activities: AgentActivity[] = [];
-    
-    for (const activity of activityStore.values()) {
-      if (activity.agent_id === agentId) {
-        activities.push(activity);
-      }
-    }
+    if (useDatabaseStorage) {
+      try {
+        const supabase = await createClient();
 
-    return activities
-      .sort((a, b) => b.created_at.getTime() - a.created_at.getTime())
-      .slice(0, limit);
+        const { data, error } = await supabase
+          .from('agent_activities')
+          .select('*')
+          .eq('agent_id', agentId)
+          .order('created_at', { ascending: false })
+          .limit(limit);
+
+        if (error) {
+          console.error('[Activity Service] Get activities error:', error);
+          return [];
+        }
+
+        return (data || []).map(convertDbActivity);
+      } catch (error) {
+        console.error('[Activity Service] Failed to get activities:', error);
+        return [];
+      }
+    } else {
+      // Fallback to in-memory storage
+      const activities: AgentActivity[] = [];
+
+      for (const activity of activityStore.values()) {
+        if (activity.agent_id === agentId) {
+          activities.push(activity);
+        }
+      }
+
+      return activities
+        .sort((a, b) => b.created_at.getTime() - a.created_at.getTime())
+        .slice(0, limit);
+    }
   }
 
   /**
@@ -101,17 +188,48 @@ export class AgentActivityService {
    */
   async getOwnerActivities(ownerAddress: string, limit: number = 50): Promise<AgentActivity[]> {
     const normalizedOwner = ownerAddress.toLowerCase();
-    const activities: AgentActivity[] = [];
-    
-    for (const activity of activityStore.values()) {
-      if (activity.owner_address === normalizedOwner) {
-        activities.push(activity);
-      }
-    }
 
-    return activities
-      .sort((a, b) => b.created_at.getTime() - a.created_at.getTime())
-      .slice(0, limit);
+    if (useDatabaseStorage) {
+      try {
+        const supabase = await createClient();
+
+        // Set RLS context
+        await supabase.rpc('set_config', {
+          setting: 'app.current_user_address',
+          value: normalizedOwner,
+        });
+
+        const { data, error } = await supabase
+          .from('agent_activities')
+          .select('*')
+          .eq('owner_address', normalizedOwner)
+          .order('created_at', { ascending: false })
+          .limit(limit);
+
+        if (error) {
+          console.error('[Activity Service] Get owner activities error:', error);
+          return [];
+        }
+
+        return (data || []).map(convertDbActivity);
+      } catch (error) {
+        console.error('[Activity Service] Failed to get owner activities:', error);
+        return [];
+      }
+    } else {
+      // Fallback to in-memory storage
+      const activities: AgentActivity[] = [];
+
+      for (const activity of activityStore.values()) {
+        if (activity.owner_address === normalizedOwner) {
+          activities.push(activity);
+        }
+      }
+
+      return activities
+        .sort((a, b) => b.created_at.getTime() - a.created_at.getTime())
+        .slice(0, limit);
+    }
   }
 
   /**
@@ -121,77 +239,197 @@ export class AgentActivityService {
     const normalizedOwner = ownerAddress.toLowerCase();
     const today = new Date();
     today.setHours(0, 0, 0, 0);
-    
+
     const monthStart = new Date(today.getFullYear(), today.getMonth(), 1);
 
-    let totalSpentToday = 0;
-    let totalSpentThisMonth = 0;
-    let pendingProposals = 0;
-    const spendingByAgent = new Map<string, { name: string; amount: number }>();
-    const recipientSpending = new Map<string, { amount: number; count: number }>();
+    if (useDatabaseStorage) {
+      try {
+        const supabase = await createClient();
 
-    for (const activity of activityStore.values()) {
-      if (activity.owner_address !== normalizedOwner) continue;
+        // Set RLS context
+        await supabase.rpc('set_config', {
+          setting: 'app.current_user_address',
+          value: normalizedOwner,
+        });
 
-      if (activity.action === 'payment_executed') {
-        const amount = parseFloat(activity.details.amount || '0');
-        const recipient = activity.details.recipient_address?.toLowerCase();
-        const agentName = activity.details.agent_name || 'Unknown';
+        // Get payment_executed activities for spending analytics
+        const { data: paymentActivities, error: paymentError } = await supabase
+          .from('agent_activities')
+          .select('*')
+          .eq('owner_address', normalizedOwner)
+          .eq('action', 'payment_executed')
+          .gte('created_at', monthStart.toISOString());
 
-        if (activity.created_at >= today) {
-          totalSpentToday += amount;
+        if (paymentError) {
+          console.error('[Activity Service] Analytics payment query error:', paymentError);
         }
-        if (activity.created_at >= monthStart) {
+
+        // Get pending proposals count
+        const { count: pendingCount, error: pendingError } = await supabase
+          .from('payment_proposals')
+          .select('*', { count: 'exact', head: true })
+          .eq('owner_address', normalizedOwner)
+          .eq('status', 'pending');
+
+        if (pendingError) {
+          console.error('[Activity Service] Analytics pending query error:', pendingError);
+        }
+
+        // Get agent counts
+        const { data: agentData, error: agentError } = await supabase
+          .from('agents')
+          .select('status')
+          .eq('owner_address', normalizedOwner);
+
+        if (agentError) {
+          console.error('[Activity Service] Analytics agent query error:', agentError);
+        }
+
+        // Process payment data
+        let totalSpentToday = 0;
+        let totalSpentThisMonth = 0;
+        const spendingByAgent = new Map<string, { name: string; amount: number }>();
+        const recipientSpending = new Map<string, { amount: number; count: number }>();
+
+        for (const activity of paymentActivities || []) {
+          const amount = parseFloat(activity.details?.amount || '0');
+          const recipient = activity.details?.recipient_address?.toLowerCase();
+          const agentName = activity.details?.agent_name || 'Unknown';
+          const createdAt = new Date(activity.created_at);
+
+          if (createdAt >= today) {
+            totalSpentToday += amount;
+          }
           totalSpentThisMonth += amount;
+
+          // Track by agent
+          const agData = spendingByAgent.get(activity.agent_id) || { name: agentName, amount: 0 };
+          agData.amount += amount;
+          spendingByAgent.set(activity.agent_id, agData);
+
+          // Track by recipient
+          if (recipient) {
+            const recData = recipientSpending.get(recipient) || { amount: 0, count: 0 };
+            recData.amount += amount;
+            recData.count += 1;
+            recipientSpending.set(recipient, recData);
+          }
         }
 
-        // Track by agent
-        const agentData = spendingByAgent.get(activity.agent_id) || { name: agentName, amount: 0 };
-        agentData.amount += amount;
-        spendingByAgent.set(activity.agent_id, agentData);
+        const agents = agentData || [];
 
-        // Track by recipient
-        if (recipient) {
-          const recipientData = recipientSpending.get(recipient) || { amount: 0, count: 0 };
-          recipientData.amount += amount;
-          recipientData.count += 1;
-          recipientSpending.set(recipient, recipientData);
+        // Convert maps to arrays
+        const spending_by_agent = Array.from(spendingByAgent.entries())
+          .map(([agent_id, data]) => ({
+            agent_id,
+            agent_name: data.name,
+            amount: data.amount.toString(),
+          }))
+          .sort((a, b) => parseFloat(b.amount) - parseFloat(a.amount))
+          .slice(0, 10);
+
+        const top_recipients = Array.from(recipientSpending.entries())
+          .map(([address, data]) => ({
+            address,
+            amount: data.amount.toString(),
+            count: data.count,
+          }))
+          .sort((a, b) => parseFloat(b.amount) - parseFloat(a.amount))
+          .slice(0, 10);
+
+        return {
+          total_agents: agents.length,
+          active_agents: agents.filter((a) => a.status === 'active').length,
+          total_spent_today: totalSpentToday.toString(),
+          total_spent_this_month: totalSpentThisMonth.toString(),
+          pending_proposals: pendingCount || 0,
+          spending_by_agent,
+          top_recipients,
+        };
+      } catch (error) {
+        console.error('[Activity Service] Failed to get analytics:', error);
+        // Return empty analytics on error
+        return {
+          total_agents: 0,
+          active_agents: 0,
+          total_spent_today: '0',
+          total_spent_this_month: '0',
+          pending_proposals: 0,
+          spending_by_agent: [],
+          top_recipients: [],
+        };
+      }
+    } else {
+      // Fallback to in-memory storage
+      let totalSpentToday = 0;
+      let totalSpentThisMonth = 0;
+      let pendingProposals = 0;
+      const spendingByAgent = new Map<string, { name: string; amount: number }>();
+      const recipientSpending = new Map<string, { amount: number; count: number }>();
+
+      for (const activity of activityStore.values()) {
+        if (activity.owner_address !== normalizedOwner) continue;
+
+        if (activity.action === 'payment_executed') {
+          const amount = parseFloat(activity.details.amount || '0');
+          const recipient = activity.details.recipient_address?.toLowerCase();
+          const agentName = activity.details.agent_name || 'Unknown';
+
+          if (activity.created_at >= today) {
+            totalSpentToday += amount;
+          }
+          if (activity.created_at >= monthStart) {
+            totalSpentThisMonth += amount;
+          }
+
+          // Track by agent
+          const agentData = spendingByAgent.get(activity.agent_id) || { name: agentName, amount: 0 };
+          agentData.amount += amount;
+          spendingByAgent.set(activity.agent_id, agentData);
+
+          // Track by recipient
+          if (recipient) {
+            const recipientData = recipientSpending.get(recipient) || { amount: 0, count: 0 };
+            recipientData.amount += amount;
+            recipientData.count += 1;
+            recipientSpending.set(recipient, recipientData);
+          }
+        }
+
+        if (activity.action === 'proposal_created' && activity.details.status === 'pending') {
+          pendingProposals++;
         }
       }
 
-      if (activity.action === 'proposal_created' && activity.details.status === 'pending') {
-        pendingProposals++;
-      }
+      // Convert maps to arrays
+      const spending_by_agent = Array.from(spendingByAgent.entries())
+        .map(([agent_id, data]) => ({
+          agent_id,
+          agent_name: data.name,
+          amount: data.amount.toString(),
+        }))
+        .sort((a, b) => parseFloat(b.amount) - parseFloat(a.amount))
+        .slice(0, 10);
+
+      const top_recipients = Array.from(recipientSpending.entries())
+        .map(([address, data]) => ({
+          address,
+          amount: data.amount.toString(),
+          count: data.count,
+        }))
+        .sort((a, b) => parseFloat(b.amount) - parseFloat(a.amount))
+        .slice(0, 10);
+
+      return {
+        total_agents: 0,
+        active_agents: 0,
+        total_spent_today: totalSpentToday.toString(),
+        total_spent_this_month: totalSpentThisMonth.toString(),
+        pending_proposals: pendingProposals,
+        spending_by_agent,
+        top_recipients,
+      };
     }
-
-    // Convert maps to arrays
-    const spending_by_agent = Array.from(spendingByAgent.entries())
-      .map(([agent_id, data]) => ({
-        agent_id,
-        agent_name: data.name,
-        amount: data.amount.toString(),
-      }))
-      .sort((a, b) => parseFloat(b.amount) - parseFloat(a.amount))
-      .slice(0, 10);
-
-    const top_recipients = Array.from(recipientSpending.entries())
-      .map(([address, data]) => ({
-        address,
-        amount: data.amount.toString(),
-        count: data.count,
-      }))
-      .sort((a, b) => parseFloat(b.amount) - parseFloat(a.amount))
-      .slice(0, 10);
-
-    return {
-      total_agents: 0, // Would need to query agent service
-      active_agents: 0,
-      total_spent_today: totalSpentToday.toString(),
-      total_spent_this_month: totalSpentThisMonth.toString(),
-      pending_proposals: pendingProposals,
-      spending_by_agent,
-      top_recipients,
-    };
   }
 
   /**

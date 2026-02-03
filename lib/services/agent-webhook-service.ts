@@ -322,17 +322,40 @@ export class AgentWebhookService {
    * Get deliveries for an agent
    */
   async getDeliveries(agentId: string, limit: number = 50): Promise<AgentWebhookDelivery[]> {
-    const deliveries: AgentWebhookDelivery[] = [];
-    
-    for (const delivery of deliveryStore.values()) {
-      if (delivery.agent_id === agentId) {
-        deliveries.push(delivery);
-      }
-    }
+    if (useDatabaseStorage) {
+      try {
+        const supabase = await createClient();
 
-    return deliveries
-      .sort((a, b) => b.created_at.getTime() - a.created_at.getTime())
-      .slice(0, limit);
+        const { data, error } = await supabase
+          .from('agent_webhook_deliveries')
+          .select('*')
+          .eq('agent_id', agentId)
+          .order('created_at', { ascending: false })
+          .limit(limit);
+
+        if (error) {
+          console.error('[Webhook Service] Get deliveries error:', error);
+          return [];
+        }
+
+        return (data || []).map(convertDbDelivery);
+      } catch (error) {
+        console.error('[Webhook Service] Failed to get deliveries:', error);
+        return [];
+      }
+    } else {
+      const deliveries: AgentWebhookDelivery[] = [];
+
+      for (const delivery of deliveryStore.values()) {
+        if (delivery.agent_id === agentId) {
+          deliveries.push(delivery);
+        }
+      }
+
+      return deliveries
+        .sort((a, b) => b.created_at.getTime() - a.created_at.getTime())
+        .slice(0, limit);
+    }
   }
 
   /**
@@ -340,19 +363,43 @@ export class AgentWebhookService {
    */
   async getPendingRetries(): Promise<AgentWebhookDelivery[]> {
     const now = new Date();
-    const pending: AgentWebhookDelivery[] = [];
-    
-    for (const delivery of deliveryStore.values()) {
-      if (
-        delivery.status === 'pending' &&
-        delivery.next_retry_at &&
-        delivery.next_retry_at <= now
-      ) {
-        pending.push(delivery);
-      }
-    }
 
-    return pending;
+    if (useDatabaseStorage) {
+      try {
+        const supabase = await createClient();
+
+        const { data, error } = await supabase
+          .from('agent_webhook_deliveries')
+          .select('*')
+          .eq('status', 'pending')
+          .not('next_retry_at', 'is', null)
+          .lte('next_retry_at', now.toISOString());
+
+        if (error) {
+          console.error('[Webhook Service] Get pending retries error:', error);
+          return [];
+        }
+
+        return (data || []).map(convertDbDelivery);
+      } catch (error) {
+        console.error('[Webhook Service] Failed to get pending retries:', error);
+        return [];
+      }
+    } else {
+      const pending: AgentWebhookDelivery[] = [];
+
+      for (const delivery of deliveryStore.values()) {
+        if (
+          delivery.status === 'pending' &&
+          delivery.next_retry_at &&
+          delivery.next_retry_at <= now
+        ) {
+          pending.push(delivery);
+        }
+      }
+
+      return pending;
+    }
   }
 
   /**

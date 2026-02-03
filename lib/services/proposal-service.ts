@@ -1,13 +1,14 @@
 /**
  * Proposal Service
- * 
+ *
  * Handles payment proposals from AI agents.
  * Supports proposal lifecycle: pending → approved/rejected → executing → executed/failed
- * 
+ *
  * @module lib/services/proposal-service
  */
 
 import { randomUUID } from 'crypto';
+import { createClient } from '@/lib/supabase/server';
 import { notificationService } from './notification-service';
 
 // ============================================
@@ -75,12 +76,29 @@ const VALID_TRANSITIONS: Record<ProposalStatus, ProposalStatus[]> = {
 
 const proposalStore = new Map<string, PaymentProposal>();
 
+// Flag to enable/disable database (for testing)
+let useDatabaseStorage = true;
+
+export function setUseDatabaseStorage(enabled: boolean) {
+  useDatabaseStorage = enabled;
+}
+
 // ============================================
 // Helper Functions
 // ============================================
 
 function isValidTransition(from: ProposalStatus, to: ProposalStatus): boolean {
   return VALID_TRANSITIONS[from]?.includes(to) ?? false;
+}
+
+function convertDbProposal(data: any): PaymentProposal {
+  return {
+    ...data,
+    created_at: new Date(data.created_at),
+    updated_at: new Date(data.updated_at),
+    approved_at: data.approved_at ? new Date(data.approved_at) : undefined,
+    executed_at: data.executed_at ? new Date(data.executed_at) : undefined,
+  };
 }
 
 function validateProposalInput(input: CreateProposalInput): void {
@@ -129,9 +147,7 @@ export class ProposalService {
   async create(input: CreateProposalInput): Promise<PaymentProposal> {
     validateProposalInput(input);
 
-    const now = new Date();
-    const proposal: PaymentProposal = {
-      id: randomUUID(),
+    const proposalData = {
       agent_id: input.agent_id,
       owner_address: input.owner_address.toLowerCase(),
       recipient_address: input.recipient_address.toLowerCase(),
@@ -140,13 +156,50 @@ export class ProposalService {
       chain_id: input.chain_id,
       reason: input.reason,
       metadata: input.metadata,
-      status: 'pending',
+      status: 'pending' as ProposalStatus,
       budget_id: input.budget_id,
-      created_at: now,
-      updated_at: now,
     };
 
-    proposalStore.set(proposal.id, proposal);
+    let proposal: PaymentProposal;
+
+    if (useDatabaseStorage) {
+      try {
+        const supabase = await createClient();
+
+        // Set RLS context
+        await supabase.rpc('set_config', {
+          setting: 'app.current_user_address',
+          value: input.owner_address.toLowerCase(),
+        });
+
+        const { data, error } = await supabase
+          .from('payment_proposals')
+          .insert(proposalData)
+          .select()
+          .single();
+
+        if (error) {
+          console.error('[Proposal Service] Insert error:', error);
+          throw new Error(`Failed to create proposal: ${error.message}`);
+        }
+
+        proposal = convertDbProposal(data);
+      } catch (error) {
+        console.error('[Proposal Service] Failed to create proposal:', error);
+        throw error;
+      }
+    } else {
+      // Fallback to in-memory storage
+      const now = new Date();
+      proposal = {
+        id: randomUUID(),
+        ...proposalData,
+        created_at: now,
+        updated_at: now,
+      };
+
+      proposalStore.set(proposal.id, proposal);
+    }
 
     // Send notification to owner (async, don't block)
     this.sendProposalCreatedNotification(
@@ -209,89 +262,205 @@ export class ProposalService {
    */
   async list(ownerAddress: string, filters?: ProposalFilters): Promise<PaymentProposal[]> {
     const normalizedOwner = ownerAddress.toLowerCase();
-    let proposals: PaymentProposal[] = [];
 
-    for (const proposal of proposalStore.values()) {
-      if (proposal.owner_address === normalizedOwner) {
-        proposals.push(proposal);
+    if (useDatabaseStorage) {
+      try {
+        const supabase = await createClient();
+
+        // Set RLS context
+        await supabase.rpc('set_config', {
+          setting: 'app.current_user_address',
+          value: normalizedOwner,
+        });
+
+        let query = supabase
+          .from('payment_proposals')
+          .select('*')
+          .eq('owner_address', normalizedOwner);
+
+        // Apply filters
+        if (filters?.status) {
+          query = query.eq('status', filters.status);
+        }
+        if (filters?.agentId) {
+          query = query.eq('agent_id', filters.agentId);
+        }
+        if (filters?.startDate) {
+          query = query.gte('created_at', filters.startDate.toISOString());
+        }
+        if (filters?.endDate) {
+          query = query.lte('created_at', filters.endDate.toISOString());
+        }
+
+        // Sort and paginate
+        query = query.order('created_at', { ascending: false });
+
+        const offset = filters?.offset ?? 0;
+        const limit = filters?.limit ?? 50;
+        query = query.range(offset, offset + limit - 1);
+
+        const { data, error } = await query;
+
+        if (error) {
+          console.error('[Proposal Service] List error:', error);
+          throw new Error(`Failed to list proposals: ${error.message}`);
+        }
+
+        return (data || []).map(convertDbProposal);
+      } catch (error) {
+        console.error('[Proposal Service] Failed to list proposals:', error);
+        throw error;
       }
-    }
+    } else {
+      // Fallback to in-memory storage
+      let proposals: PaymentProposal[] = [];
 
-    // Apply filters
-    if (filters?.status) {
-      proposals = proposals.filter(p => p.status === filters.status);
-    }
-    if (filters?.agentId) {
-      proposals = proposals.filter(p => p.agent_id === filters.agentId);
-    }
-    if (filters?.startDate) {
-      proposals = proposals.filter(p => p.created_at >= filters.startDate!);
-    }
-    if (filters?.endDate) {
-      proposals = proposals.filter(p => p.created_at <= filters.endDate!);
-    }
+      for (const proposal of proposalStore.values()) {
+        if (proposal.owner_address === normalizedOwner) {
+          proposals.push(proposal);
+        }
+      }
 
-    // Sort by created_at descending
-    proposals.sort((a, b) => 
-      new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-    );
+      // Apply filters
+      if (filters?.status) {
+        proposals = proposals.filter((p) => p.status === filters.status);
+      }
+      if (filters?.agentId) {
+        proposals = proposals.filter((p) => p.agent_id === filters.agentId);
+      }
+      if (filters?.startDate) {
+        proposals = proposals.filter((p) => p.created_at >= filters.startDate!);
+      }
+      if (filters?.endDate) {
+        proposals = proposals.filter((p) => p.created_at <= filters.endDate!);
+      }
 
-    // Apply pagination
-    const offset = filters?.offset ?? 0;
-    const limit = filters?.limit ?? 50;
-    proposals = proposals.slice(offset, offset + limit);
+      // Sort by created_at descending
+      proposals.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
 
-    return proposals;
+      // Apply pagination
+      const offset = filters?.offset ?? 0;
+      const limit = filters?.limit ?? 50;
+      proposals = proposals.slice(offset, offset + limit);
+
+      return proposals;
+    }
   }
 
   /**
    * List proposals by agent
    */
   async listByAgent(agentId: string, filters?: ProposalFilters): Promise<PaymentProposal[]> {
-    let proposals: PaymentProposal[] = [];
+    if (useDatabaseStorage) {
+      try {
+        const supabase = await createClient();
 
-    for (const proposal of proposalStore.values()) {
-      if (proposal.agent_id === agentId) {
-        proposals.push(proposal);
+        let query = supabase
+          .from('payment_proposals')
+          .select('*')
+          .eq('agent_id', agentId);
+
+        // Apply filters
+        if (filters?.status) {
+          query = query.eq('status', filters.status);
+        }
+        if (filters?.startDate) {
+          query = query.gte('created_at', filters.startDate.toISOString());
+        }
+        if (filters?.endDate) {
+          query = query.lte('created_at', filters.endDate.toISOString());
+        }
+
+        // Sort and paginate
+        query = query.order('created_at', { ascending: false });
+
+        const offset = filters?.offset ?? 0;
+        const limit = filters?.limit ?? 50;
+        query = query.range(offset, offset + limit - 1);
+
+        const { data, error } = await query;
+
+        if (error) {
+          console.error('[Proposal Service] List by agent error:', error);
+          throw new Error(`Failed to list proposals: ${error.message}`);
+        }
+
+        return (data || []).map(convertDbProposal);
+      } catch (error) {
+        console.error('[Proposal Service] Failed to list proposals by agent:', error);
+        throw error;
       }
-    }
+    } else {
+      // Fallback to in-memory storage
+      let proposals: PaymentProposal[] = [];
 
-    // Apply filters
-    if (filters?.status) {
-      proposals = proposals.filter(p => p.status === filters.status);
-    }
-    if (filters?.startDate) {
-      proposals = proposals.filter(p => p.created_at >= filters.startDate!);
-    }
-    if (filters?.endDate) {
-      proposals = proposals.filter(p => p.created_at <= filters.endDate!);
-    }
+      for (const proposal of proposalStore.values()) {
+        if (proposal.agent_id === agentId) {
+          proposals.push(proposal);
+        }
+      }
 
-    // Sort by created_at descending
-    proposals.sort((a, b) => 
-      new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-    );
+      // Apply filters
+      if (filters?.status) {
+        proposals = proposals.filter((p) => p.status === filters.status);
+      }
+      if (filters?.startDate) {
+        proposals = proposals.filter((p) => p.created_at >= filters.startDate!);
+      }
+      if (filters?.endDate) {
+        proposals = proposals.filter((p) => p.created_at <= filters.endDate!);
+      }
 
-    // Apply pagination
-    const offset = filters?.offset ?? 0;
-    const limit = filters?.limit ?? 50;
-    proposals = proposals.slice(offset, offset + limit);
+      // Sort by created_at descending
+      proposals.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
 
-    return proposals;
+      // Apply pagination
+      const offset = filters?.offset ?? 0;
+      const limit = filters?.limit ?? 50;
+      proposals = proposals.slice(offset, offset + limit);
+
+      return proposals;
+    }
   }
 
   /**
    * Get a proposal by ID
    */
   async get(proposalId: string): Promise<PaymentProposal | null> {
-    return proposalStore.get(proposalId) ?? null;
+    if (useDatabaseStorage) {
+      try {
+        const supabase = await createClient();
+
+        const { data, error } = await supabase
+          .from('payment_proposals')
+          .select('*')
+          .eq('id', proposalId)
+          .single();
+
+        if (error) {
+          if (error.code === 'PGRST116') {
+            return null;
+          }
+          console.error('[Proposal Service] Get error:', error);
+          return null;
+        }
+
+        return convertDbProposal(data);
+      } catch (error) {
+        console.error('[Proposal Service] Failed to get proposal:', error);
+        return null;
+      }
+    } else {
+      // Fallback to in-memory storage
+      return proposalStore.get(proposalId) ?? null;
+    }
   }
 
   /**
    * Approve a proposal
    */
   async approve(proposalId: string, ownerAddress: string, agentName?: string): Promise<PaymentProposal> {
-    const proposal = proposalStore.get(proposalId);
+    const proposal = await this.get(proposalId);
     if (!proposal) {
       throw new Error('Proposal not found');
     }
@@ -305,25 +474,66 @@ export class ProposalService {
     }
 
     const now = new Date();
-    const updatedProposal: PaymentProposal = {
-      ...proposal,
-      status: 'approved',
-      approved_at: now,
-      updated_at: now,
+    const updates = {
+      status: 'approved' as ProposalStatus,
+      approved_at: now.toISOString(),
+      updated_at: now.toISOString(),
     };
 
-    proposalStore.set(proposalId, updatedProposal);
+    let updatedProposal: PaymentProposal;
+
+    if (useDatabaseStorage) {
+      try {
+        const supabase = await createClient();
+
+        // Set RLS context
+        await supabase.rpc('set_config', {
+          setting: 'app.current_user_address',
+          value: ownerAddress.toLowerCase(),
+        });
+
+        const { data, error } = await supabase
+          .from('payment_proposals')
+          .update(updates)
+          .eq('id', proposalId)
+          .eq('owner_address', ownerAddress.toLowerCase())
+          .select()
+          .single();
+
+        if (error) {
+          console.error('[Proposal Service] Approve error:', error);
+          throw new Error(`Failed to approve proposal: ${error.message}`);
+        }
+
+        updatedProposal = convertDbProposal(data);
+      } catch (error) {
+        console.error('[Proposal Service] Failed to approve proposal:', error);
+        throw error;
+      }
+    } else {
+      // Fallback to in-memory storage
+      updatedProposal = {
+        ...proposal,
+        status: 'approved',
+        approved_at: now,
+        updated_at: now,
+      };
+
+      proposalStore.set(proposalId, updatedProposal);
+    }
 
     // Send notification (async, don't block)
-    notificationService.notifyAgentProposalApproved(
-      proposal.owner_address,
-      agentName || 'AI Agent',
-      proposal.amount,
-      proposal.token,
-      proposal.id
-    ).catch(err => {
-      console.error('[ProposalService] Failed to send approval notification:', err);
-    });
+    notificationService
+      .notifyAgentProposalApproved(
+        proposal.owner_address,
+        agentName || 'AI Agent',
+        proposal.amount,
+        proposal.token,
+        proposal.id
+      )
+      .catch((err) => {
+        console.error('[ProposalService] Failed to send approval notification:', err);
+      });
 
     return updatedProposal;
   }
@@ -332,7 +542,7 @@ export class ProposalService {
    * Reject a proposal
    */
   async reject(proposalId: string, ownerAddress: string, reason?: string, agentName?: string): Promise<PaymentProposal> {
-    const proposal = proposalStore.get(proposalId);
+    const proposal = await this.get(proposalId);
     if (!proposal) {
       throw new Error('Proposal not found');
     }
@@ -346,26 +556,67 @@ export class ProposalService {
     }
 
     const now = new Date();
-    const updatedProposal: PaymentProposal = {
-      ...proposal,
-      status: 'rejected',
+    const updates = {
+      status: 'rejected' as ProposalStatus,
       rejection_reason: reason,
-      updated_at: now,
+      updated_at: now.toISOString(),
     };
 
-    proposalStore.set(proposalId, updatedProposal);
+    let updatedProposal: PaymentProposal;
+
+    if (useDatabaseStorage) {
+      try {
+        const supabase = await createClient();
+
+        // Set RLS context
+        await supabase.rpc('set_config', {
+          setting: 'app.current_user_address',
+          value: ownerAddress.toLowerCase(),
+        });
+
+        const { data, error } = await supabase
+          .from('payment_proposals')
+          .update(updates)
+          .eq('id', proposalId)
+          .eq('owner_address', ownerAddress.toLowerCase())
+          .select()
+          .single();
+
+        if (error) {
+          console.error('[Proposal Service] Reject error:', error);
+          throw new Error(`Failed to reject proposal: ${error.message}`);
+        }
+
+        updatedProposal = convertDbProposal(data);
+      } catch (error) {
+        console.error('[Proposal Service] Failed to reject proposal:', error);
+        throw error;
+      }
+    } else {
+      // Fallback to in-memory storage
+      updatedProposal = {
+        ...proposal,
+        status: 'rejected',
+        rejection_reason: reason,
+        updated_at: now,
+      };
+
+      proposalStore.set(proposalId, updatedProposal);
+    }
 
     // Send notification (async, don't block)
-    notificationService.notifyAgentProposalRejected(
-      proposal.owner_address,
-      agentName || 'AI Agent',
-      proposal.amount,
-      proposal.token,
-      proposal.id,
-      reason
-    ).catch(err => {
-      console.error('[ProposalService] Failed to send rejection notification:', err);
-    });
+    notificationService
+      .notifyAgentProposalRejected(
+        proposal.owner_address,
+        agentName || 'AI Agent',
+        proposal.amount,
+        proposal.token,
+        proposal.id,
+        reason
+      )
+      .catch((err) => {
+        console.error('[ProposalService] Failed to send rejection notification:', err);
+      });
 
     return updatedProposal;
   }
@@ -374,7 +625,7 @@ export class ProposalService {
    * Start executing a proposal
    */
   async startExecution(proposalId: string): Promise<PaymentProposal> {
-    const proposal = proposalStore.get(proposalId);
+    const proposal = await this.get(proposalId);
     if (!proposal) {
       throw new Error('Proposal not found');
     }
@@ -384,27 +635,55 @@ export class ProposalService {
     }
 
     const now = new Date();
-    const updatedProposal: PaymentProposal = {
-      ...proposal,
-      status: 'executing',
-      updated_at: now,
-    };
 
-    proposalStore.set(proposalId, updatedProposal);
-    return updatedProposal;
+    if (useDatabaseStorage) {
+      try {
+        const supabase = await createClient();
+
+        const { data, error } = await supabase
+          .from('payment_proposals')
+          .update({
+            status: 'executing',
+            updated_at: now.toISOString(),
+          })
+          .eq('id', proposalId)
+          .select()
+          .single();
+
+        if (error) {
+          console.error('[Proposal Service] Start execution error:', error);
+          throw new Error(`Failed to start execution: ${error.message}`);
+        }
+
+        return convertDbProposal(data);
+      } catch (error) {
+        console.error('[Proposal Service] Failed to start execution:', error);
+        throw error;
+      }
+    } else {
+      // Fallback to in-memory storage
+      const updatedProposal: PaymentProposal = {
+        ...proposal,
+        status: 'executing',
+        updated_at: now,
+      };
+
+      proposalStore.set(proposalId, updatedProposal);
+      return updatedProposal;
+    }
   }
 
   /**
    * Mark proposal as executed
    */
   async markExecuted(
-    proposalId: string, 
-    txHash: string, 
+    proposalId: string,
+    txHash: string,
     x402AuthId?: string,
     agentName?: string,
     autoExecuted: boolean = false
   ): Promise<PaymentProposal> {
-    const proposal = proposalStore.get(proposalId);
+    const proposal = await this.get(proposalId);
     if (!proposal) {
       throw new Error('Proposal not found');
     }
@@ -414,29 +693,64 @@ export class ProposalService {
     }
 
     const now = new Date();
-    const updatedProposal: PaymentProposal = {
-      ...proposal,
-      status: 'executed',
-      tx_hash: txHash,
-      x402_authorization_id: x402AuthId,
-      executed_at: now,
-      updated_at: now,
-    };
 
-    proposalStore.set(proposalId, updatedProposal);
+    let updatedProposal: PaymentProposal;
+
+    if (useDatabaseStorage) {
+      try {
+        const supabase = await createClient();
+
+        const { data, error } = await supabase
+          .from('payment_proposals')
+          .update({
+            status: 'executed',
+            tx_hash: txHash,
+            x402_authorization_id: x402AuthId,
+            executed_at: now.toISOString(),
+            updated_at: now.toISOString(),
+          })
+          .eq('id', proposalId)
+          .select()
+          .single();
+
+        if (error) {
+          console.error('[Proposal Service] Mark executed error:', error);
+          throw new Error(`Failed to mark as executed: ${error.message}`);
+        }
+
+        updatedProposal = convertDbProposal(data);
+      } catch (error) {
+        console.error('[Proposal Service] Failed to mark as executed:', error);
+        throw error;
+      }
+    } else {
+      // Fallback to in-memory storage
+      updatedProposal = {
+        ...proposal,
+        status: 'executed',
+        tx_hash: txHash,
+        x402_authorization_id: x402AuthId,
+        executed_at: now,
+        updated_at: now,
+      };
+
+      proposalStore.set(proposalId, updatedProposal);
+    }
 
     // Send notification (async, don't block)
-    notificationService.notifyAgentPaymentExecuted(
-      proposal.owner_address,
-      agentName || 'AI Agent',
-      proposal.amount,
-      proposal.token,
-      proposal.recipient_address,
-      txHash,
-      autoExecuted
-    ).catch(err => {
-      console.error('[ProposalService] Failed to send execution notification:', err);
-    });
+    notificationService
+      .notifyAgentPaymentExecuted(
+        proposal.owner_address,
+        agentName || 'AI Agent',
+        proposal.amount,
+        proposal.token,
+        proposal.recipient_address,
+        txHash,
+        autoExecuted
+      )
+      .catch((err) => {
+        console.error('[ProposalService] Failed to send execution notification:', err);
+      });
 
     return updatedProposal;
   }
@@ -445,7 +759,7 @@ export class ProposalService {
    * Mark proposal as failed
    */
   async markFailed(proposalId: string, reason?: string, agentName?: string): Promise<PaymentProposal> {
-    const proposal = proposalStore.get(proposalId);
+    const proposal = await this.get(proposalId);
     if (!proposal) {
       throw new Error('Proposal not found');
     }
@@ -455,27 +769,60 @@ export class ProposalService {
     }
 
     const now = new Date();
-    const updatedProposal: PaymentProposal = {
-      ...proposal,
-      status: 'failed',
-      rejection_reason: reason,
-      updated_at: now,
-    };
 
-    proposalStore.set(proposalId, updatedProposal);
+    let updatedProposal: PaymentProposal;
+
+    if (useDatabaseStorage) {
+      try {
+        const supabase = await createClient();
+
+        const { data, error } = await supabase
+          .from('payment_proposals')
+          .update({
+            status: 'failed',
+            rejection_reason: reason,
+            updated_at: now.toISOString(),
+          })
+          .eq('id', proposalId)
+          .select()
+          .single();
+
+        if (error) {
+          console.error('[Proposal Service] Mark failed error:', error);
+          throw new Error(`Failed to mark as failed: ${error.message}`);
+        }
+
+        updatedProposal = convertDbProposal(data);
+      } catch (error) {
+        console.error('[Proposal Service] Failed to mark as failed:', error);
+        throw error;
+      }
+    } else {
+      // Fallback to in-memory storage
+      updatedProposal = {
+        ...proposal,
+        status: 'failed',
+        rejection_reason: reason,
+        updated_at: now,
+      };
+
+      proposalStore.set(proposalId, updatedProposal);
+    }
 
     // Send notification (async, don't block)
-    notificationService.notifyAgentPaymentFailed(
-      proposal.owner_address,
-      agentName || 'AI Agent',
-      proposal.amount,
-      proposal.token,
-      proposal.recipient_address,
-      reason || 'Unknown error',
-      proposal.id
-    ).catch(err => {
-      console.error('[ProposalService] Failed to send failure notification:', err);
-    });
+    notificationService
+      .notifyAgentPaymentFailed(
+        proposal.owner_address,
+        agentName || 'AI Agent',
+        proposal.amount,
+        proposal.token,
+        proposal.recipient_address,
+        reason || 'Unknown error',
+        proposal.id
+      )
+      .catch((err) => {
+        console.error('[ProposalService] Failed to send failure notification:', err);
+      });
 
     return updatedProposal;
   }
@@ -485,15 +832,45 @@ export class ProposalService {
    */
   async getPendingCount(ownerAddress: string): Promise<number> {
     const normalizedOwner = ownerAddress.toLowerCase();
-    let count = 0;
 
-    for (const proposal of proposalStore.values()) {
-      if (proposal.owner_address === normalizedOwner && proposal.status === 'pending') {
-        count++;
+    if (useDatabaseStorage) {
+      try {
+        const supabase = await createClient();
+
+        // Set RLS context
+        await supabase.rpc('set_config', {
+          setting: 'app.current_user_address',
+          value: normalizedOwner,
+        });
+
+        const { count, error } = await supabase
+          .from('payment_proposals')
+          .select('*', { count: 'exact', head: true })
+          .eq('owner_address', normalizedOwner)
+          .eq('status', 'pending');
+
+        if (error) {
+          console.error('[Proposal Service] Get pending count error:', error);
+          throw new Error(`Failed to get pending count: ${error.message}`);
+        }
+
+        return count || 0;
+      } catch (error) {
+        console.error('[Proposal Service] Failed to get pending count:', error);
+        throw error;
       }
-    }
+    } else {
+      // Fallback to in-memory storage
+      let count = 0;
 
-    return count;
+      for (const proposal of proposalStore.values()) {
+        if (proposal.owner_address === normalizedOwner && proposal.status === 'pending') {
+          count++;
+        }
+      }
+
+      return count;
+    }
   }
 
   /**

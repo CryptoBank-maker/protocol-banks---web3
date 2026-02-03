@@ -1,13 +1,14 @@
 /**
  * Budget Service
- * 
+ *
  * Manages budget allocation and tracking for AI agents.
  * Supports daily, weekly, monthly, and total budget periods.
- * 
+ *
  * @module lib/services/budget-service
  */
 
 import { randomUUID } from 'crypto';
+import { createClient } from '@/lib/supabase/server';
 
 // ============================================
 // Types
@@ -65,6 +66,13 @@ export interface BudgetAvailability {
 // ============================================
 
 const budgetStore = new Map<string, AgentBudget>();
+
+// Flag to enable/disable database (for testing)
+let useDatabaseStorage = true;
+
+export function setUseDatabaseStorage(enabled: boolean) {
+  useDatabaseStorage = enabled;
+}
 
 // ============================================
 // Helper Functions
@@ -150,8 +158,7 @@ export class BudgetService {
     }
 
     const now = new Date();
-    const budget: AgentBudget = {
-      id: randomUUID(),
+    const budgetData = {
       agent_id: input.agent_id,
       owner_address: input.owner_address.toLowerCase(),
       amount: input.amount,
@@ -160,68 +167,214 @@ export class BudgetService {
       period: input.period,
       used_amount: '0',
       remaining_amount: input.amount,
-      period_start: now,
-      period_end: calculatePeriodEnd(input.period, now),
-      created_at: now,
-      updated_at: now,
+      period_start: now.toISOString(),
+      period_end: calculatePeriodEnd(input.period, now)?.toISOString(),
     };
 
-    budgetStore.set(budget.id, budget);
-    return budget;
+    if (useDatabaseStorage) {
+      try {
+        const supabase = await createClient();
+
+        // Set RLS context
+        await supabase.rpc('set_config', {
+          setting: 'app.current_user_address',
+          value: input.owner_address.toLowerCase(),
+        });
+
+        const { data, error } = await supabase
+          .from('agent_budgets')
+          .insert(budgetData)
+          .select()
+          .single();
+
+        if (error) {
+          console.error('[Budget Service] Insert error:', error);
+          throw new Error(`Failed to create budget: ${error.message}`);
+        }
+
+        return {
+          ...data,
+          period_start: new Date(data.period_start),
+          period_end: data.period_end ? new Date(data.period_end) : undefined,
+          created_at: new Date(data.created_at),
+          updated_at: new Date(data.updated_at),
+        };
+      } catch (error) {
+        console.error('[Budget Service] Failed to create budget:', error);
+        throw error;
+      }
+    } else {
+      // Fallback to in-memory storage
+      const budget: AgentBudget = {
+        id: randomUUID(),
+        ...budgetData,
+        period_start: now,
+        period_end: calculatePeriodEnd(input.period, now),
+        created_at: now,
+        updated_at: now,
+      };
+
+      budgetStore.set(budget.id, budget);
+      return budget;
+    }
   }
 
   /**
    * List all budgets for an agent
    */
   async list(agentId: string): Promise<AgentBudget[]> {
-    const budgets: AgentBudget[] = [];
-    
-    for (const budget of budgetStore.values()) {
-      if (budget.agent_id === agentId) {
-        // Check if period needs reset
-        if (isPeriodExpired(budget)) {
-          const resetBudget = resetBudgetPeriod(budget);
-          budgetStore.set(budget.id, resetBudget);
-          budgets.push(resetBudget);
-        } else {
-          budgets.push(budget);
+    if (useDatabaseStorage) {
+      try {
+        const supabase = await createClient();
+
+        const { data, error } = await supabase
+          .from('agent_budgets')
+          .select('*')
+          .eq('agent_id', agentId)
+          .order('created_at', { ascending: false });
+
+        if (error) {
+          console.error('[Budget Service] List error:', error);
+          throw new Error(`Failed to list budgets: ${error.message}`);
+        }
+
+        // Convert dates and check for expired periods
+        const budgets: AgentBudget[] = [];
+        for (const b of data || []) {
+          let budget: AgentBudget = {
+            ...b,
+            period_start: new Date(b.period_start),
+            period_end: b.period_end ? new Date(b.period_end) : undefined,
+            created_at: new Date(b.created_at),
+            updated_at: new Date(b.updated_at),
+          };
+
+          // Check if period needs reset
+          if (isPeriodExpired(budget)) {
+            const resetBudget = resetBudgetPeriod(budget);
+
+            // Update in database
+            await supabase
+              .from('agent_budgets')
+              .update({
+                used_amount: resetBudget.used_amount,
+                remaining_amount: resetBudget.remaining_amount,
+                period_start: resetBudget.period_start.toISOString(),
+                period_end: resetBudget.period_end?.toISOString(),
+                updated_at: resetBudget.updated_at.toISOString(),
+              })
+              .eq('id', budget.id);
+
+            budgets.push(resetBudget);
+          } else {
+            budgets.push(budget);
+          }
+        }
+
+        return budgets;
+      } catch (error) {
+        console.error('[Budget Service] Failed to list budgets:', error);
+        throw error;
+      }
+    } else {
+      // Fallback to in-memory storage
+      const budgets: AgentBudget[] = [];
+
+      for (const budget of budgetStore.values()) {
+        if (budget.agent_id === agentId) {
+          // Check if period needs reset
+          if (isPeriodExpired(budget)) {
+            const resetBudget = resetBudgetPeriod(budget);
+            budgetStore.set(budget.id, resetBudget);
+            budgets.push(resetBudget);
+          } else {
+            budgets.push(budget);
+          }
         }
       }
-    }
 
-    return budgets.sort((a, b) => 
-      new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-    );
+      return budgets.sort((a, b) =>
+        new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+      );
+    }
   }
 
   /**
    * Get a budget by ID
    */
   async get(budgetId: string): Promise<AgentBudget | null> {
-    const budget = budgetStore.get(budgetId);
-    if (!budget) {
-      return null;
-    }
+    if (useDatabaseStorage) {
+      try {
+        const supabase = await createClient();
 
-    // Check if period needs reset
-    if (isPeriodExpired(budget)) {
-      const resetBudget = resetBudgetPeriod(budget);
-      budgetStore.set(budget.id, resetBudget);
-      return resetBudget;
-    }
+        const { data, error } = await supabase
+          .from('agent_budgets')
+          .select('*')
+          .eq('id', budgetId)
+          .single();
 
-    return budget;
+        if (error) {
+          if (error.code === 'PGRST116') {
+            return null;
+          }
+          console.error('[Budget Service] Get error:', error);
+          return null;
+        }
+
+        let budget: AgentBudget = {
+          ...data,
+          period_start: new Date(data.period_start),
+          period_end: data.period_end ? new Date(data.period_end) : undefined,
+          created_at: new Date(data.created_at),
+          updated_at: new Date(data.updated_at),
+        };
+
+        // Check if period needs reset
+        if (isPeriodExpired(budget)) {
+          const resetBudget = resetBudgetPeriod(budget);
+
+          // Update in database
+          await supabase
+            .from('agent_budgets')
+            .update({
+              used_amount: resetBudget.used_amount,
+              remaining_amount: resetBudget.remaining_amount,
+              period_start: resetBudget.period_start.toISOString(),
+              period_end: resetBudget.period_end?.toISOString(),
+              updated_at: resetBudget.updated_at.toISOString(),
+            })
+            .eq('id', budgetId);
+
+          return resetBudget;
+        }
+
+        return budget;
+      } catch (error) {
+        console.error('[Budget Service] Failed to get budget:', error);
+        return null;
+      }
+    } else {
+      // Fallback to in-memory storage
+      const budget = budgetStore.get(budgetId);
+      if (!budget) {
+        return null;
+      }
+
+      // Check if period needs reset
+      if (isPeriodExpired(budget)) {
+        const resetBudget = resetBudgetPeriod(budget);
+        budgetStore.set(budget.id, resetBudget);
+        return resetBudget;
+      }
+
+      return budget;
+    }
   }
 
   /**
    * Update a budget
    */
   async update(budgetId: string, input: UpdateBudgetInput): Promise<AgentBudget> {
-    const budget = budgetStore.get(budgetId);
-    if (!budget) {
-      throw new Error('Budget not found');
-    }
-
     // Validate amount if provided
     if (input.amount !== undefined) {
       const amountNum = parseFloat(input.amount);
@@ -238,41 +391,131 @@ export class BudgetService {
       }
     }
 
-    const now = new Date();
-    const updatedBudget: AgentBudget = {
-      ...budget,
-      amount: input.amount ?? budget.amount,
-      token: input.token?.toUpperCase() ?? budget.token,
-      chain_id: input.chain_id ?? budget.chain_id,
-      period: input.period ?? budget.period,
-      updated_at: now,
-    };
+    if (useDatabaseStorage) {
+      try {
+        const supabase = await createClient();
 
-    // Recalculate remaining amount if amount changed
-    if (input.amount !== undefined) {
-      const newAmount = BigInt(Math.floor(parseFloat(input.amount) * 1e18));
-      const usedAmount = BigInt(Math.floor(parseFloat(budget.used_amount) * 1e18));
-      const remaining = newAmount - usedAmount;
-      updatedBudget.remaining_amount = (Number(remaining) / 1e18).toString();
+        // Get current budget
+        const { data: currentBudget, error: getError } = await supabase
+          .from('agent_budgets')
+          .select('*')
+          .eq('id', budgetId)
+          .single();
+
+        if (getError) {
+          console.error('[Budget Service] Get budget for update error:', getError);
+          throw new Error('Budget not found');
+        }
+
+        const now = new Date();
+        const updates: Record<string, any> = {
+          updated_at: now.toISOString(),
+        };
+
+        if (input.amount !== undefined) {
+          updates.amount = input.amount;
+
+          // Recalculate remaining amount
+          const newAmount = BigInt(Math.floor(parseFloat(input.amount) * 1e18));
+          const usedAmount = BigInt(Math.floor(parseFloat(currentBudget.used_amount) * 1e18));
+          const remaining = newAmount - usedAmount;
+          updates.remaining_amount = (Number(remaining) / 1e18).toString();
+        }
+
+        if (input.token !== undefined) updates.token = input.token.toUpperCase();
+        if (input.chain_id !== undefined) updates.chain_id = input.chain_id;
+
+        if (input.period !== undefined && input.period !== currentBudget.period) {
+          updates.period = input.period;
+          updates.period_end = calculatePeriodEnd(input.period, new Date(currentBudget.period_start))?.toISOString();
+        }
+
+        const { data, error } = await supabase
+          .from('agent_budgets')
+          .update(updates)
+          .eq('id', budgetId)
+          .select()
+          .single();
+
+        if (error) {
+          console.error('[Budget Service] Update error:', error);
+          throw new Error(`Failed to update budget: ${error.message}`);
+        }
+
+        return {
+          ...data,
+          period_start: new Date(data.period_start),
+          period_end: data.period_end ? new Date(data.period_end) : undefined,
+          created_at: new Date(data.created_at),
+          updated_at: new Date(data.updated_at),
+        };
+      } catch (error) {
+        console.error('[Budget Service] Failed to update budget:', error);
+        throw error;
+      }
+    } else {
+      // Fallback to in-memory storage
+      const budget = budgetStore.get(budgetId);
+      if (!budget) {
+        throw new Error('Budget not found');
+      }
+
+      const now = new Date();
+      const updatedBudget: AgentBudget = {
+        ...budget,
+        amount: input.amount ?? budget.amount,
+        token: input.token?.toUpperCase() ?? budget.token,
+        chain_id: input.chain_id ?? budget.chain_id,
+        period: input.period ?? budget.period,
+        updated_at: now,
+      };
+
+      // Recalculate remaining amount if amount changed
+      if (input.amount !== undefined) {
+        const newAmount = BigInt(Math.floor(parseFloat(input.amount) * 1e18));
+        const usedAmount = BigInt(Math.floor(parseFloat(budget.used_amount) * 1e18));
+        const remaining = newAmount - usedAmount;
+        updatedBudget.remaining_amount = (Number(remaining) / 1e18).toString();
+      }
+
+      // Recalculate period_end if period changed
+      if (input.period !== undefined && input.period !== budget.period) {
+        updatedBudget.period_end = calculatePeriodEnd(input.period, budget.period_start);
+      }
+
+      budgetStore.set(budgetId, updatedBudget);
+      return updatedBudget;
     }
-
-    // Recalculate period_end if period changed
-    if (input.period !== undefined && input.period !== budget.period) {
-      updatedBudget.period_end = calculatePeriodEnd(input.period, budget.period_start);
-    }
-
-    budgetStore.set(budgetId, updatedBudget);
-    return updatedBudget;
   }
 
   /**
    * Delete a budget
    */
   async delete(budgetId: string): Promise<void> {
-    if (!budgetStore.has(budgetId)) {
-      throw new Error('Budget not found');
+    if (useDatabaseStorage) {
+      try {
+        const supabase = await createClient();
+
+        const { error } = await supabase
+          .from('agent_budgets')
+          .delete()
+          .eq('id', budgetId);
+
+        if (error) {
+          console.error('[Budget Service] Delete error:', error);
+          throw new Error(`Failed to delete budget: ${error.message}`);
+        }
+      } catch (error) {
+        console.error('[Budget Service] Failed to delete budget:', error);
+        throw error;
+      }
+    } else {
+      // Fallback to in-memory storage
+      if (!budgetStore.has(budgetId)) {
+        throw new Error('Budget not found');
+      }
+      budgetStore.delete(budgetId);
     }
-    budgetStore.delete(budgetId);
   }
 
   /**
@@ -321,35 +564,92 @@ export class BudgetService {
    * Deduct amount from budget after payment
    */
   async deductBudget(budgetId: string, amount: string): Promise<AgentBudget> {
-    const budget = budgetStore.get(budgetId);
-    if (!budget) {
-      throw new Error('Budget not found');
-    }
-
     const deductAmount = parseFloat(amount);
     if (isNaN(deductAmount) || deductAmount <= 0) {
       throw new Error('amount must be a positive number');
     }
 
-    const currentUsed = parseFloat(budget.used_amount);
-    const currentRemaining = parseFloat(budget.remaining_amount);
+    if (useDatabaseStorage) {
+      try {
+        const supabase = await createClient();
 
-    if (deductAmount > currentRemaining) {
-      throw new Error('Insufficient budget');
+        // Get current budget
+        const { data: budget, error: getError } = await supabase
+          .from('agent_budgets')
+          .select('*')
+          .eq('id', budgetId)
+          .single();
+
+        if (getError) {
+          console.error('[Budget Service] Get budget for deduction error:', getError);
+          throw new Error('Budget not found');
+        }
+
+        const currentUsed = parseFloat(budget.used_amount);
+        const currentRemaining = parseFloat(budget.remaining_amount);
+
+        if (deductAmount > currentRemaining) {
+          throw new Error('Insufficient budget');
+        }
+
+        const newUsed = currentUsed + deductAmount;
+        const newRemaining = currentRemaining - deductAmount;
+
+        // Update budget
+        const { data, error } = await supabase
+          .from('agent_budgets')
+          .update({
+            used_amount: newUsed.toString(),
+            remaining_amount: newRemaining.toString(),
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', budgetId)
+          .select()
+          .single();
+
+        if (error) {
+          console.error('[Budget Service] Deduct error:', error);
+          throw new Error(`Failed to deduct from budget: ${error.message}`);
+        }
+
+        return {
+          ...data,
+          period_start: new Date(data.period_start),
+          period_end: data.period_end ? new Date(data.period_end) : undefined,
+          created_at: new Date(data.created_at),
+          updated_at: new Date(data.updated_at),
+        };
+      } catch (error) {
+        console.error('[Budget Service] Failed to deduct from budget:', error);
+        throw error;
+      }
+    } else {
+      // Fallback to in-memory storage
+      const budget = budgetStore.get(budgetId);
+      if (!budget) {
+        throw new Error('Budget not found');
+      }
+
+      const currentUsed = parseFloat(budget.used_amount);
+      const currentRemaining = parseFloat(budget.remaining_amount);
+
+      if (deductAmount > currentRemaining) {
+        throw new Error('Insufficient budget');
+      }
+
+      const newUsed = currentUsed + deductAmount;
+      const newRemaining = currentRemaining - deductAmount;
+
+      const updatedBudget: AgentBudget = {
+        ...budget,
+        used_amount: newUsed.toString(),
+        remaining_amount: newRemaining.toString(),
+        updated_at: new Date(),
+      };
+
+      budgetStore.set(budgetId, updatedBudget);
+      return updatedBudget;
     }
-
-    const newUsed = currentUsed + deductAmount;
-    const newRemaining = currentRemaining - deductAmount;
-
-    const updatedBudget: AgentBudget = {
-      ...budget,
-      used_amount: newUsed.toString(),
-      remaining_amount: newRemaining.toString(),
-      updated_at: new Date(),
-    };
-
-    budgetStore.set(budgetId, updatedBudget);
-    return updatedBudget;
   }
 
   /**
@@ -357,17 +657,69 @@ export class BudgetService {
    * Returns count of reset budgets
    */
   async resetPeriodBudgets(): Promise<number> {
-    let resetCount = 0;
+    if (useDatabaseStorage) {
+      try {
+        const supabase = await createClient();
 
-    for (const [id, budget] of budgetStore.entries()) {
-      if (isPeriodExpired(budget)) {
-        const resetBudget = resetBudgetPeriod(budget);
-        budgetStore.set(id, resetBudget);
-        resetCount++;
+        // Get all budgets with period_end in the past
+        const { data: expiredBudgets, error } = await supabase
+          .from('agent_budgets')
+          .select('*')
+          .not('period_end', 'is', null)
+          .lt('period_end', new Date().toISOString());
+
+        if (error) {
+          console.error('[Budget Service] Reset period budgets error:', error);
+          throw new Error(`Failed to reset period budgets: ${error.message}`);
+        }
+
+        let resetCount = 0;
+
+        for (const b of expiredBudgets || []) {
+          const budget: AgentBudget = {
+            ...b,
+            period_start: new Date(b.period_start),
+            period_end: b.period_end ? new Date(b.period_end) : undefined,
+            created_at: new Date(b.created_at),
+            updated_at: new Date(b.updated_at),
+          };
+
+          const resetBudget = resetBudgetPeriod(budget);
+
+          // Update in database
+          await supabase
+            .from('agent_budgets')
+            .update({
+              used_amount: resetBudget.used_amount,
+              remaining_amount: resetBudget.remaining_amount,
+              period_start: resetBudget.period_start.toISOString(),
+              period_end: resetBudget.period_end?.toISOString(),
+              updated_at: resetBudget.updated_at.toISOString(),
+            })
+            .eq('id', budget.id);
+
+          resetCount++;
+        }
+
+        return resetCount;
+      } catch (error) {
+        console.error('[Budget Service] Failed to reset period budgets:', error);
+        throw error;
       }
-    }
+    } else {
+      // Fallback to in-memory storage
+      let resetCount = 0;
 
-    return resetCount;
+      for (const [id, budget] of budgetStore.entries()) {
+        if (isPeriodExpired(budget)) {
+          const resetBudget = resetBudgetPeriod(budget);
+          budgetStore.set(id, resetBudget);
+          resetCount++;
+        }
+      }
+
+      return resetCount;
+    }
   }
 
   /**
