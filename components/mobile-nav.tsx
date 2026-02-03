@@ -2,21 +2,22 @@
 
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { Grid3X3, Wallet, CreditCard, ArrowLeftRight, ShoppingBag } from "lucide-react"
+import { Home, Wallet, ArrowLeftRight, Users, Package } from "lucide-react"
 
+// 底部导航 - 5个核心入口
 const navItems = [
-  { href: "/", label: "Home", icon: Wallet },
-  { href: "/balances", label: "Balances", icon: CreditCard },
+  { href: "/", label: "Home", icon: Home },
+  { href: "/balances", label: "Balances", icon: Wallet },
   { href: "/history", label: "Transactions", icon: ArrowLeftRight },
-  { href: "/vendors", label: "Contacts", icon: ShoppingBag },
-  { href: "/products", label: "Products", icon: Grid3X3 },
+  { href: "/vendors", label: "Contacts", icon: Users },
+  { href: "/products", label: "Products", icon: Package },
 ]
 
 export function MobileNav() {
   const pathname = usePathname()
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 z-50 md:hidden bg-background/95 backdrop-blur-lg border-t border-border pb-safe">
+    <nav className="fixed bottom-0 left-0 right-0 z-50 md:hidden bg-background border-t border-border pb-safe shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.1)]">
       <div className="flex items-center justify-around h-16">
         {navItems.map((item) => {
           const Icon = item.icon

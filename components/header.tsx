@@ -15,11 +15,12 @@ import {
 } from "lucide-react"
 import { usePathname } from "next/navigation"
 import Image from "next/image"
+import { useTheme } from "next-themes"
 import { useDemo } from "@/contexts/demo-context"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { SoundSettings } from "@/components/sound-settings"
 import { ThemeToggle } from "@/components/theme-toggle"
 
@@ -36,7 +37,16 @@ const UnifiedWalletButton = dynamic(() => import("./unified-wallet-button").then
 export function Header() {
   const pathname = usePathname()
   const { isDemoMode, toggleDemoMode } = useDemo()
+  const { theme, resolvedTheme } = useTheme()
   const [isOpen, setIsOpen] = useState(false)
+  const [mounted, setMounted] = useState(false)
+
+  useEffect(() => {
+    setMounted(true)
+  }, [])
+
+  // Determine which logo to use based on theme
+  const logoTextSrc = mounted && resolvedTheme === 'light' ? '/logo-text-black.png' : '/logo-text-white.png'
 
   const navItems = [
     { href: "/", label: "Home", icon: Wallet },
@@ -70,7 +80,7 @@ export function Header() {
                     <Image src="/logo.png" alt="Protocol Bank Mark" fill className="object-contain" />
                   </div>
                   <div className="h-5 w-32 relative">
-                    <Image src="/logo-text-white.png" alt="Protocol Bank" fill className="object-contain object-left" />
+                    <Image src={logoTextSrc} alt="Protocol Bank" fill className="object-contain object-left" />
                   </div>
                 </Link>
 
@@ -135,7 +145,7 @@ export function Header() {
               <Image src="/logo.png" alt="Protocol Bank Mark" fill className="object-contain" />
             </div>
             <div className="hidden sm:block h-4 sm:h-5 w-24 sm:w-32 relative">
-              <Image src="/logo-text-white.png" alt="Protocol Bank" fill className="object-contain object-left" />
+              <Image src={logoTextSrc} alt="Protocol Bank" fill className="object-contain object-left" />
             </div>
           </Link>
 
@@ -180,8 +190,8 @@ export function Header() {
             onClick={toggleDemoMode}
             className={`hidden sm:flex ${
               isDemoMode
-                ? "text-white border-white/20 bg-white/5 hover:bg-white/10"
-                : "border-white text-white hover:bg-white/10 bg-transparent"
+                ? "text-primary border-primary/20 bg-primary/5 hover:bg-primary/10"
+                : "border-border text-foreground hover:bg-muted bg-transparent"
             }`}
           >
             {isDemoMode ? (
