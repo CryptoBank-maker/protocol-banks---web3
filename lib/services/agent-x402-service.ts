@@ -489,21 +489,17 @@ export class AgentX402Service {
   async expireStaleAuthorizations(): Promise<number> {
     if (useDatabaseStorage) {
       try {
-        const supabase = await createClient();
+        const result = await prisma.x402Authorization.updateMany({
+          where: {
+            status: { in: ['pending', 'signed'] },
+            valid_before: { lt: new Date() }
+          },
+          data: {
+            status: 'expired'
+          }
+        });
 
-        const { data, error } = await supabase
-          .from('x402_authorizations')
-          .update({ status: 'expired' })
-          .in('status', ['pending', 'signed'])
-          .lt('valid_before', new Date().toISOString())
-          .select('id');
-
-        if (error) {
-          console.error('[x402 Service] Expire stale error:', error);
-          return 0;
-        }
-
-        return data?.length || 0;
+        return result.count;
       } catch {
         return 0;
       }
@@ -531,11 +527,10 @@ export class AgentX402Service {
   ): Promise<void> {
     if (useDatabaseStorage) {
       try {
-        const supabase = await createClient();
-        await supabase
-          .from('x402_authorizations')
-          .update({ status, updated_at: new Date().toISOString() })
-          .eq('id', authorizationId);
+        await prisma.x402Authorization.update({
+          where: { id: authorizationId },
+          data: { status }
+        });
       } catch (error) {
         console.error('[x402 Service] Update status error:', error);
       }
@@ -555,16 +550,13 @@ export class AgentX402Service {
   ): Promise<void> {
     if (useDatabaseStorage) {
       try {
-        const supabase = await createClient();
-        await supabase
-          .from('x402_authorizations')
-          .update({
+        await prisma.x402Authorization.update({
+          where: { id: authorizationId },
+          data: {
             status: 'completed',
             tx_hash: txHash,
-            executed_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
-          })
-          .eq('id', authorizationId);
+          }
+        });
       } catch (error) {
         console.error('[x402 Service] Update completed error:', error);
       }
