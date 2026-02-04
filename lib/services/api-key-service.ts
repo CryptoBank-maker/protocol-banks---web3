@@ -324,16 +324,6 @@ export class APIKeyService {
          throw new Error(`Failed to deactivate: ${error.message}`);
     }
   }
-    const { error } = await this.supabase
-      .from('api_keys')
-      .update({ is_active: false, updated_at: new Date().toISOString() })
-      .eq('id', id)
-      .eq('owner_address', ownerAddress.toLowerCase());
-
-    if (error) {
-      throw new Error(`Failed to deactivate API key: ${error.message}`);
-    }
-  }
 }
 
 // Export singleton instance
