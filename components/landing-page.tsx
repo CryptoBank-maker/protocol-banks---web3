@@ -345,12 +345,12 @@ export function LandingPage({ onConnectWallet, onTryDemo }: LandingPageProps) {
         <div className="grid lg:grid-cols-2 gap-12 lg:gap-20 items-center">
           <div className="order-2 lg:order-1">
             <div className="rounded-2xl border border-white/20 bg-gradient-to-br from-white/80 to-white/40 dark:from-black/40 dark:to-black/20 backdrop-blur-xl overflow-hidden shadow-2xl">
-              <div className="p-1">
-                <img 
-                  src="/screenshots/payment-mesh.png" 
-                  alt="Global Payment Mesh Visualization" 
-                  className="w-full h-auto rounded-xl"
-                />
+              <div className="p-1 bg-gradient-to-br from-primary/5 to-primary/10 min-h-[300px] sm:min-h-[400px] flex items-center justify-center rounded-xl">
+                <div className="text-center p-8">
+                  <Globe className="h-16 w-16 text-primary/30 mx-auto mb-4" />
+                  <p className="text-sm text-muted-foreground">Payment Mesh Visualization</p>
+                  <p className="text-xs text-muted-foreground/60 mt-1">Interactive network graph preview</p>
+                </div>
               </div>
             </div>
           </div>
@@ -447,13 +447,13 @@ export function LandingPage({ onConnectWallet, onTryDemo }: LandingPageProps) {
             </div>
             <div>
               <div className="rounded-2xl border border-white/20 bg-gradient-to-br from-white/80 to-white/40 dark:from-black/40 dark:to-black/20 backdrop-blur-xl overflow-hidden shadow-2xl">
-                <div className="p-1">
-                  <img 
-                    src="/screenshots/batch-payment.png" 
-                    alt="Batch Payment Dashboard" 
-                    className="w-full h-auto rounded-xl"
-                  />
+                <div className="p-1 bg-gradient-to-br from-orange-500/5 to-orange-500/10 min-h-[300px] sm:min-h-[400px] flex items-center justify-center rounded-xl">
+                <div className="text-center p-8">
+                  <Users className="h-16 w-16 text-orange-500/30 mx-auto mb-4" />
+                  <p className="text-sm text-muted-foreground">Batch Payment Dashboard</p>
+                  <p className="text-xs text-muted-foreground/60 mt-1">Multi-recipient payment interface</p>
                 </div>
+              </div>
               </div>
             </div>
           </div>
