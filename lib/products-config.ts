@@ -10,8 +10,7 @@ import {
   Clock,
   Bot,
   Globe,
-  Zap,
-  Shield,
+  BarChart3,
   ArrowRightLeft,
   Home,
   CreditCard,
@@ -46,13 +45,6 @@ export const overviewItems: ProductItem[] = [
     color: "bg-emerald-500/10 text-emerald-500",
   },
   {
-    href: "/history",
-    title: "Transactions",
-    description: "Payment history and activity",
-    icon: ArrowRightLeft,
-    color: "bg-blue-500/10 text-blue-500",
-  },
-  {
     href: "/vendors",
     title: "Contacts",
     description: "Manage suppliers and partners",
@@ -61,7 +53,7 @@ export const overviewItems: ProductItem[] = [
   },
 ]
 
-// 💳 Payments - 支付相关
+// 💳 Payments - 支付
 export const paymentProducts: ProductItem[] = [
   {
     href: "/pay",
@@ -78,16 +70,37 @@ export const paymentProducts: ProductItem[] = [
     color: "bg-orange-500/10 text-orange-500",
   },
   {
+    href: "/subscriptions",
+    title: "Subscriptions",
+    description: "Recurring payments with ERC-3009",
+    icon: Clock,
+    color: "bg-purple-500/10 text-purple-500",
+  },
+  {
+    href: "/history",
+    title: "Transactions",
+    description: "Payment history and activity",
+    icon: ArrowRightLeft,
+    color: "bg-blue-500/10 text-blue-500",
+  },
+  {
+    href: "/analytics",
+    title: "Analytics",
+    description: "Payment analytics and reports",
+    icon: BarChart3,
+    color: "bg-indigo-500/10 text-indigo-500",
+  },
+]
+
+// 📥 Receiving - 收款
+export const receivingProducts: ProductItem[] = [
+  {
     href: "/receive",
     title: "Payment Links",
     description: "Generate QR codes and shareable payment links",
     icon: LinkIcon,
     color: "bg-green-500/10 text-green-500",
   },
-]
-
-// 🛒 Commerce - 商业收款
-export const commerceProducts: ProductItem[] = [
   {
     href: "/checkout",
     title: "Checkout",
@@ -136,13 +149,6 @@ export const defiProducts: ProductItem[] = [
     color: "bg-cyan-500/10 text-cyan-500",
     badge: "Beta",
     badgeColor: "bg-cyan-500/20 text-cyan-500",
-  },
-  {
-    href: "/subscriptions",
-    title: "Subscriptions",
-    description: "Recurring payments with ERC-3009",
-    icon: Clock,
-    color: "bg-purple-500/10 text-purple-500",
   },
 ]
 

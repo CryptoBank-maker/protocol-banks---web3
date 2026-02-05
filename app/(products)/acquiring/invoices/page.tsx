@@ -29,6 +29,8 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { Switch } from "@/components/ui/switch";
+import { Separator } from "@/components/ui/separator";
 import {
   Loader2,
   Plus,
@@ -43,9 +45,15 @@ import {
   QrCode,
   Download,
   RefreshCw,
+  Settings,
+  Receipt,
+  Link as LinkIcon,
+  ChevronRight,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { QRCodeSVG } from "qrcode.react";
+import Image from "next/image";
+import { useDemo } from "@/contexts/demo-context";
 
 interface Invoice {
   id: string;
@@ -67,7 +75,130 @@ interface Invoice {
   metadata?: any;
 }
 
+const InvoicePreview = ({ data, isDemoMode }: { data: any, isDemoMode?: boolean }) => {
+  const date = new Date();
+  const dueDate = new Date();
+  dueDate.setHours(dueDate.getHours() + parseInt(data.expiresIn));
+
+  return (
+    <Card className="w-full bg-white text-black shadow-lg overflow-hidden border-0 relative">
+      {isDemoMode && (
+        <div className="absolute top-6 right-[-40px] rotate-45 bg-amber-400 text-amber-900 font-bold px-12 py-1 shadow-sm z-10 text-xs">
+          TEST MODE
+        </div>
+      )}
+      <div className="p-8 space-y-8">
+        {/* Header */}
+        <div className="flex justify-between items-start">
+          <div className="space-y-4">
+            <div className="flex items-center gap-2">
+              <div className="bg-black text-white p-2 rounded-lg">
+                <div className="h-6 w-6 relative flex items-center justify-center">
+                  <Image src="/icon.svg" width={20} height={20} alt="Logo" className="brightness-0 invert" />
+                </div>
+              </div>
+              <span className="font-bold text-xl tracking-tight">Protocol Bank</span>
+            </div>
+            {/* Merchant Info */}
+            <div className="text-sm text-gray-500 mt-4">
+              <p className="font-medium text-black">{data.merchantName || (isDemoMode ? "Test Merchant" : "Merchant Name")}</p>
+              {isDemoMode && <p className="text-xs text-amber-600 mt-1">Simulated Merchant Account</p>}
+            </div>
+          </div>
+          <div className="text-right space-y-1">
+            <h2 className="text-sm font-medium text-gray-500 uppercase tracking-wider">Invoice</h2>
+            <p className="font-mono text-lg font-bold">{isDemoMode ? "TEST-0001" : "INV-0001"}</p> 
+            {isDemoMode && <span className="text-xs bg-slate-100 text-slate-600 px-2 py-0.5 rounded">Not a real invoice</span>}
+          </div>
+        </div>
+
+        {/* Dates & Bill To */}
+        <div className="grid grid-cols-2 gap-8">
+          <div className="space-y-4">
+            <div>
+              <p className="text-xs text-gray-500 uppercase font-medium">Bill to</p>
+              <p className="font-medium mt-1">{data.customerName || (isDemoMode ? "Test Customer" : "Customer Name")}</p>
+              <p className="text-sm text-gray-500">{data.customerEmail || (isDemoMode ? "test@example.com" : "customer@email.com")}</p>
+            </div>
+            {!isDemoMode && data.recipientAddress && (
+              <div className="pt-2">
+                 <p className="text-xs text-gray-500 uppercase font-medium">Pay to wallet</p>
+                 <p className="font-mono text-xs text-gray-600 truncate max-w-[200px]">{data.recipientAddress}</p>
+              </div>
+            )}
+            {isDemoMode && (
+              <div className="pt-2 p-2 bg-amber-50 rounded border border-amber-100">
+                 <p className="text-xs text-amber-800 font-medium">Test Wallet Address</p>
+                 <p className="font-mono text-xs text-amber-600 truncate">0xTest...Wallet123</p>
+              </div>
+            )}
+          </div>
+          <div className="space-y-2 text-right">
+             <div className="flex justify-between">
+                <span className="text-sm text-gray-500">Date due</span>
+                <span className="font-medium">{dueDate.toLocaleDateString()}</span>
+             </div>
+             <div className="flex justify-between">
+                <span className="text-sm text-gray-500">Invoice date</span>
+                <span className="font-medium">{date.toLocaleDateString()}</span>
+             </div>
+          </div>
+        </div>
+
+        {/* Line Items */}
+        <div className="mt-8">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-gray-200">
+                <th className="text-left font-medium text-gray-500 pb-3">Description</th>
+                <th className="text-right font-medium text-gray-500 pb-3">Amount</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr className="border-b border-gray-100">
+                <td className="py-4 font-medium">
+                  {data.description || (isDemoMode ? "Test Details: Consulting Services" : "Service Description")}
+                  {data.lineItems.length > 0 && <span className="text-xs text-gray-400 ml-2">({data.lineItems.length} items)</span>}
+                </td>
+                <td className="py-4 text-right">
+                  ${data.amountFiat || "0.00"}
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        {/* Totals */}
+        <div className="flex flex-col items-end gap-2 pt-4">
+          <div className="w-1/2 space-y-2">
+            <div className="flex justify-between text-sm">
+              <span className="text-gray-500">Subtotal</span>
+              <span>${data.amountFiat || "0.00"}</span>
+            </div>
+            <div className="flex justify-between text-sm">
+              <span className="text-gray-500">Amount due</span>
+              <span className="font-bold text-lg">${data.amountFiat || "0.00"} {data.fiatCurrency}</span>
+            </div>
+          </div>
+        </div>
+        
+        {/* Footer */}
+        <div className="pt-8 border-t border-gray-100 flex items-center justify-between text-xs text-gray-400">
+           <div className="flex items-center gap-1">
+             <span className={`inline-block w-2 h-2 rounded-full ${isDemoMode ? "bg-amber-400" : "bg-green-500"}`}></span>
+             <span>Protocol Bank {isDemoMode ? "Test Environment" : "Secure Payment"}</span>
+           </div>
+           <div>
+             {data.enablePostPaymentInvoice && <span>PDF Invoice Enabled</span>}
+           </div>
+        </div>
+      </div>
+    </Card>
+  );
+};
+
 export default function InvoicesPage() {
+  const { isDemoMode } = useDemo();
   const { toast } = useToast();
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
@@ -86,18 +217,22 @@ export default function InvoicesPage() {
 
   const [formData, setFormData] = useState({
     recipientAddress: "",
-    amount: "",
-    amountFiat: "",
+    amount: "99.00",
+    amountFiat: "99.00",
     fiatCurrency: "USD",
     token: "USDC",
-    description: "",
-    merchantName: "",
+    description: "Business credits",
+    merchantName: "Protocol Bank",
     expiresIn: "24", // hours
     // Customer info
     customerName: "",
     customerEmail: "",
     // Line items
     lineItems: [] as { description: string; quantity: number; price: number }[],
+    // Settings
+    enableConfirmationPage: true,
+    enablePostPaymentInvoice: true,
+    customMessage: "",
   });
 
   useEffect(() => {
@@ -117,7 +252,7 @@ export default function InvoicesPage() {
           fiat_currency: "USD",
           token: "USDC",
           description: "Consulting Services - January 2024",
-          merchant_name: "Protocol Banks",
+          merchant_name: "Protocol Bank",
           status: "paid",
           signature: "abc123",
           tx_hash: "0xabc...def",
@@ -134,7 +269,7 @@ export default function InvoicesPage() {
           fiat_currency: "USD",
           token: "USDC",
           description: "Software License - Annual",
-          merchant_name: "Protocol Banks",
+          merchant_name: "Protocol Bank",
           status: "pending",
           signature: "def456",
           expires_at: new Date(Date.now() + 86400000).toISOString(),
@@ -167,6 +302,8 @@ export default function InvoicesPage() {
           customerName: formData.customerName,
           customerEmail: formData.customerEmail,
           lineItems: formData.lineItems,
+          enableConfirmationPage: formData.enableConfirmationPage,
+          enablePostPaymentInvoice: formData.enablePostPaymentInvoice,
         },
       };
 
@@ -208,16 +345,19 @@ export default function InvoicesPage() {
   const resetForm = () => {
     setFormData({
       recipientAddress: "",
-      amount: "",
-      amountFiat: "",
+      amount: "99.00",
+      amountFiat: "99.00",
       fiatCurrency: "USD",
       token: "USDC",
-      description: "",
-      merchantName: "",
+      description: "Business credits",
+      merchantName: "Protocol Bank",
       expiresIn: "24",
       customerName: "",
       customerEmail: "",
       lineItems: [],
+      enableConfirmationPage: true,
+      enablePostPaymentInvoice: true,
+      customMessage: "",
     });
     setShowCreateForm(false);
   };
@@ -347,38 +487,52 @@ export default function InvoicesPage() {
 
       {/* Create Form */}
       {showCreateForm && (
-        <Card className="mb-8">
-          <CardHeader>
-            <CardTitle>Create New Invoice</CardTitle>
-            <CardDescription>
-              Generate a professional invoice with crypto payment option
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <form onSubmit={handleCreate}>
-              <Tabs defaultValue="details" className="w-full">
-                <TabsList className="mb-4">
-                  <TabsTrigger value="details">Invoice Details</TabsTrigger>
-                  <TabsTrigger value="payment">Payment Info</TabsTrigger>
-                  <TabsTrigger value="customer">Customer</TabsTrigger>
-                </TabsList>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
+          <Card className="h-fit">
+            <CardHeader>
+              <CardTitle>Create New Invoice</CardTitle>
+              <CardDescription>
+                Details for your crypto payment invoice
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <form onSubmit={handleCreate}>
+                <Tabs defaultValue="details" className="w-full">
+                  <TabsList className="grid w-full grid-cols-4 mb-4">
+                    <TabsTrigger value="details">Details</TabsTrigger>
+                    <TabsTrigger value="payment">Payment</TabsTrigger>
+                    <TabsTrigger value="customer">Client</TabsTrigger>
+                    <TabsTrigger value="settings">Settings</TabsTrigger>
+                  </TabsList>
 
-                <TabsContent value="details" className="space-y-4">
-                  <div className="grid grid-cols-2 gap-4">
+                  <TabsContent value="details" className="space-y-4">
                     <div className="space-y-2">
-                      <Label htmlFor="merchantName">Your Business Name *</Label>
+                      <Label htmlFor="merchantName">Business Name *</Label>
                       <Input
                         id="merchantName"
                         value={formData.merchantName}
                         onChange={(e) =>
                           setFormData({ ...formData, merchantName: e.target.value })
                         }
-                        placeholder="Your Company"
+                        placeholder="Protocol Bank"
                         required
                       />
                     </div>
                     <div className="space-y-2">
-                      <Label htmlFor="expiresIn">Payment Due</Label>
+                      <Label htmlFor="description">Description *</Label>
+                      <Textarea
+                        id="description"
+                        value={formData.description}
+                        onChange={(e) =>
+                          setFormData({ ...formData, description: e.target.value })
+                        }
+                        placeholder="Project consultation, Web3 development, etc."
+                        rows={3}
+                        required
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="expiresIn">Expires In</Label>
                       <Select
                         value={formData.expiresIn}
                         onValueChange={(v) =>
@@ -397,123 +551,96 @@ export default function InvoicesPage() {
                         </SelectContent>
                       </Select>
                     </div>
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="description">Description *</Label>
-                    <Textarea
-                      id="description"
-                      value={formData.description}
-                      onChange={(e) =>
-                        setFormData({ ...formData, description: e.target.value })
-                      }
-                      placeholder="Services rendered, products sold, etc."
-                      rows={3}
-                      required
-                    />
-                  </div>
-                </TabsContent>
+                  </TabsContent>
 
-                <TabsContent value="payment" className="space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="recipientAddress">
-                      Receive Payment To (Wallet Address) *
-                    </Label>
-                    <Input
-                      id="recipientAddress"
-                      value={formData.recipientAddress}
-                      onChange={(e) =>
-                        setFormData({
-                          ...formData,
-                          recipientAddress: e.target.value,
-                        })
-                      }
-                      placeholder="0x..."
-                      required
-                    />
-                  </div>
-
-                  <div className="grid grid-cols-3 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="amountFiat">Fiat Amount</Label>
-                      <Input
-                        id="amountFiat"
-                        type="number"
-                        step="0.01"
-                        value={formData.amountFiat}
-                        onChange={(e) =>
-                          setFormData({
-                            ...formData,
-                            amountFiat: e.target.value,
-                            amount: e.target.value, // Sync for now
-                          })
-                        }
-                        placeholder="100.00"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="fiatCurrency">Fiat Currency</Label>
-                      <Select
-                        value={formData.fiatCurrency}
-                        onValueChange={(v) =>
-                          setFormData({ ...formData, fiatCurrency: v })
-                        }
-                      >
-                        <SelectTrigger>
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="USD">USD</SelectItem>
-                          <SelectItem value="EUR">EUR</SelectItem>
-                          <SelectItem value="GBP">GBP</SelectItem>
-                          <SelectItem value="CNY">CNY</SelectItem>
-                          <SelectItem value="JPY">JPY</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="amount">Crypto Amount *</Label>
-                      <div className="flex gap-2">
-                        <Input
-                          id="amount"
-                          type="number"
-                          step="0.000001"
-                          value={formData.amount}
-                          onChange={(e) =>
-                            setFormData({ ...formData, amount: e.target.value })
-                          }
-                          placeholder="100.00"
-                          className="flex-1"
-                          required
-                        />
+                  <TabsContent value="payment" className="space-y-4">
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="amountFiat">Amount</Label>
+                        <div className="relative">
+                          <span className="absolute left-3 top-2.5 text-muted-foreground">$</span>
+                          <Input
+                            id="amountFiat"
+                            type="number"
+                            step="0.01"
+                            value={formData.amountFiat}
+                            onChange={(e) =>
+                              setFormData({
+                                ...formData,
+                                amountFiat: e.target.value,
+                                amount: e.target.value,
+                              })
+                            }
+                            className="pl-7"
+                            placeholder="0.00"
+                          />
+                        </div>
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="fiatCurrency">Currency</Label>
                         <Select
-                          value={formData.token}
+                          value={formData.fiatCurrency}
                           onValueChange={(v) =>
-                            setFormData({ ...formData, token: v })
+                            setFormData({ ...formData, fiatCurrency: v })
                           }
                         >
-                          <SelectTrigger className="w-24">
+                          <SelectTrigger>
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
-                            <SelectItem value="USDC">USDC</SelectItem>
-                            <SelectItem value="USDT">USDT</SelectItem>
-                            <SelectItem value="DAI">DAI</SelectItem>
+                            <SelectItem value="USD">USD - US Dollar</SelectItem>
+                            <SelectItem value="EUR">EUR - Euro</SelectItem>
+                            <SelectItem value="GBP">GBP - British Pound</SelectItem>
                           </SelectContent>
                         </Select>
                       </div>
                     </div>
-                  </div>
 
-                  <div className="p-4 bg-muted/30 rounded-lg">
-                    <p className="text-sm text-muted-foreground">
-                      Dual currency pricing: Show both fiat and crypto amounts to
-                      your customers for better transparency.
-                    </p>
-                  </div>
-                </TabsContent>
+                    <div className="space-y-2">
+                      <Label htmlFor="token">Settlement Token</Label>
+                      <Select
+                        value={formData.token}
+                        onValueChange={(v) =>
+                          setFormData({ ...formData, token: v })
+                        }
+                      >
+                        <SelectTrigger>
+                          <div className="flex items-center gap-2">
+                            <div className="h-5 w-5 rounded-full bg-primary/20 flex items-center justify-center text-[10px] font-bold text-primary">
+                              {formData.token[0]}
+                            </div>
+                            <SelectValue />
+                          </div>
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="USDC">USDC (USD Coin)</SelectItem>
+                          <SelectItem value="USDT">USDT (Tether)</SelectItem>
+                          <SelectItem value="DAI">DAI</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
 
-                <TabsContent value="customer" className="space-y-4">
-                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="recipientAddress">
+                        Wallet Address *
+                      </Label>
+                      <Input
+                        id="recipientAddress"
+                        value={formData.recipientAddress}
+                        onChange={(e) =>
+                          setFormData({
+                            ...formData,
+                            recipientAddress: e.target.value,
+                          })
+                        }
+                        placeholder="0x..."
+                        className="font-mono text-xs"
+                        required
+                      />
+                    </div>
+                  </TabsContent>
+
+                  <TabsContent value="customer" className="space-y-4">
                     <div className="space-y-2">
                       <Label htmlFor="customerName">Customer Name</Label>
                       <Input
@@ -522,7 +649,7 @@ export default function InvoicesPage() {
                         onChange={(e) =>
                           setFormData({ ...formData, customerName: e.target.value })
                         }
-                        placeholder="John Doe"
+                        placeholder="Client Name"
                       />
                     </div>
                     <div className="space-y-2">
@@ -537,35 +664,68 @@ export default function InvoicesPage() {
                             customerEmail: e.target.value,
                           })
                         }
-                        placeholder="customer@example.com"
+                        placeholder="name@company.com"
                       />
                     </div>
-                  </div>
-                  <p className="text-sm text-muted-foreground">
-                    Customer information will be included on the invoice for
-                    record-keeping purposes.
-                  </p>
-                </TabsContent>
-              </Tabs>
+                  </TabsContent>
 
-              <div className="flex gap-2 mt-6">
-                <Button type="submit" disabled={creating}>
-                  {creating ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Creating...
-                    </>
-                  ) : (
-                    "Create Invoice"
-                  )}
-                </Button>
-                <Button type="button" variant="outline" onClick={resetForm}>
-                  Cancel
-                </Button>
-              </div>
-            </form>
-          </CardContent>
-        </Card>
+                  <TabsContent value="settings" className="space-y-6 pt-2">
+                    <div className="flex items-center justify-between space-x-4">
+                      <Label htmlFor="confirmation-page" className="flex flex-col space-y-1 cursor-pointer">
+                        <span>Confirmation Page</span>
+                        <span className="font-normal text-xs text-muted-foreground">Show a branded success message after payment</span>
+                      </Label>
+                      <Switch 
+                        id="confirmation-page"
+                        checked={formData.enableConfirmationPage}
+                        onCheckedChange={(c) => setFormData({...formData, enableConfirmationPage: c})}
+                      />
+                    </div>
+                    <Separator />
+                    <div className="flex items-center justify-between space-x-4">
+                      <Label htmlFor="post-payment-invoice" className="flex flex-col space-y-1 cursor-pointer">
+                        <span>Post-payment Invoice</span>
+                        <span className="font-normal text-xs text-muted-foreground">Generate a downloadable PDF invoice after payment</span>
+                      </Label>
+                      <Switch 
+                        id="post-payment-invoice" 
+                        checked={formData.enablePostPaymentInvoice}
+                        onCheckedChange={(c) => setFormData({...formData, enablePostPaymentInvoice: c})}
+                      />
+                    </div>
+                  </TabsContent>
+                </Tabs>
+
+                <div className="flex gap-2 mt-8">
+                  <Button type="submit" disabled={creating} className="w-full">
+                    {creating ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Creating Invoice...
+                      </>
+                    ) : (
+                      "Create Invoice"
+                    )}
+                  </Button>
+                  <Button type="button" variant="outline" onClick={resetForm}>
+                    Clear
+                  </Button>
+                </div>
+              </form>
+            </CardContent>
+          </Card>
+
+          <div className="flex flex-col space-y-4">
+             <div className="flex items-center justify-between px-1">
+                <Label className="text-muted-foreground">Live Preview</Label>
+                <div className="flex items-center gap-2">
+                   <div className="h-2 w-2 rounded-full bg-green-500 animate-pulse" />
+                   <span className="text-xs text-muted-foreground">Updates automatically</span>
+                </div>
+             </div>
+             <InvoicePreview data={formData} isDemoMode={isDemoMode} />
+          </div>
+        </div>
       )}
 
       {/* Created Invoice Success */}

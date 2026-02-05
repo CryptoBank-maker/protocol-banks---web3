@@ -6,12 +6,13 @@ import { cn } from "@/lib/utils"
 import {
   overviewItems,
   paymentProducts,
-  commerceProducts,
+  receivingProducts,
   defiProducts,
   advancedProducts,
   ProductItem
 } from "@/lib/products-config"
 import { Button } from "@/components/ui/button"
+import { Badge } from "@/components/ui/badge"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Separator } from "@/components/ui/separator"
 
@@ -32,13 +33,19 @@ function SidebarSection({ title, items }: { title: string, items: ProductItem[] 
               variant={isActive ? "secondary" : "ghost"}
               className={cn(
                 "w-full justify-start font-normal h-9",
-                isActive && "font-medium"
+                isActive && "font-medium",
+                item.disabled && "opacity-50 pointer-events-none"
               )}
               asChild
             >
-              <Link href={item.href}>
+              <Link href={item.disabled ? "#" : item.href}>
                 <item.icon className={cn("mr-2 h-4 w-4", item.color.split(" ")[1])} />
-                {item.title}
+                <span className="flex-1 text-left">{item.title}</span>
+                {item.badge && (
+                  <Badge variant="secondary" className={cn("ml-auto text-[10px] px-1.5 py-0 h-4", item.badgeColor)}>
+                    {item.badge}
+                  </Badge>
+                )}
               </Link>
             </Button>
           )
@@ -56,7 +63,8 @@ export function ProductsSidebar() {
           <SidebarSection title="Overview" items={overviewItems} />
           <Separator className="mx-4 mb-4 w-auto" />
           <SidebarSection title="Payments" items={paymentProducts} />
-          <SidebarSection title="Commerce" items={commerceProducts} />
+          <SidebarSection title="Receiving" items={receivingProducts} />
+          <Separator className="mx-4 mb-4 w-auto" />
           <SidebarSection title="DeFi" items={defiProducts} />
           <SidebarSection title="Advanced" items={advancedProducts} />
         </ScrollArea>
