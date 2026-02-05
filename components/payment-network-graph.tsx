@@ -135,7 +135,7 @@ export default function PaymentNetworkGraph() {
         ctx.stroke()
       })
 
-      // Draw Nodes (Rectangles as requested)
+      // Draw Nodes (Circles for network visualization)
       nodes.forEach((node) => {
         // Physics update (gentle float)
         if (node.id !== 0) {
@@ -151,15 +151,29 @@ export default function PaymentNetworkGraph() {
           if (node.y > canvas.height - margin) node.vy -= 0.01
         }
 
+        // Draw circle centered at x,y
+        ctx.beginPath()
+        ctx.arc(node.x, node.y, node.size, 0, Math.PI * 2)
         ctx.fillStyle = COLORS[node.type]
-        // Draw rectangle centered at x,y
-        ctx.fillRect(node.x - node.size / 2, node.y - node.size / 2, node.size, node.size)
+        ctx.fill()
 
         // Glow effect for Prime nodes
         if (node.type === "prime") {
           ctx.shadowColor = COLORS.prime
-          ctx.shadowBlur = 10
-          ctx.fillRect(node.x - node.size / 2, node.y - node.size / 2, node.size, node.size)
+          ctx.shadowBlur = 15
+          ctx.beginPath()
+          ctx.arc(node.x, node.y, node.size, 0, Math.PI * 2)
+          ctx.fill()
+          ctx.shadowBlur = 0
+        }
+
+        // Glow effect for Internal (Treasury) node
+        if (node.type === "internal") {
+          ctx.shadowColor = COLORS.internal
+          ctx.shadowBlur = 20
+          ctx.beginPath()
+          ctx.arc(node.x, node.y, node.size, 0, Math.PI * 2)
+          ctx.fill()
           ctx.shadowBlur = 0
         }
       })
@@ -176,8 +190,10 @@ export default function PaymentNetworkGraph() {
           const px = source.x + (target.x - source.x) * progress
           const py = source.y + (target.y - source.y) * progress
 
+          ctx.beginPath()
+          ctx.arc(px, py, 2, 0, Math.PI * 2)
           ctx.fillStyle = "#ffffff"
-          ctx.fillRect(px - 1, py - 1, 2, 2)
+          ctx.fill()
         }
       })
 
@@ -205,15 +221,15 @@ export default function PaymentNetworkGraph() {
       {/* Overlay UI similar to reference image */}
       <div className="absolute top-6 left-6 z-10 pointer-events-none">
         <div className="flex items-center gap-2 mb-2">
-          <div className="w-3 h-3 bg-cyan-500 rounded-sm"></div>
+          <div className="w-3 h-3 bg-cyan-500 rounded-full"></div>
           <span className="text-xs text-cyan-500 font-mono uppercase tracking-wider">Prime Wallets</span>
         </div>
         <div className="flex items-center gap-2 mb-2">
-          <div className="w-3 h-3 bg-teal-500 rounded-sm"></div>
+          <div className="w-3 h-3 bg-teal-500 rounded-full"></div>
           <span className="text-xs text-teal-500 font-mono uppercase tracking-wider">Sub-Wallets</span>
         </div>
         <div className="flex items-center gap-2">
-          <div className="w-3 h-3 bg-white rounded-sm"></div>
+          <div className="w-3 h-3 bg-white rounded-full"></div>
           <span className="text-xs text-gray-400 font-mono uppercase tracking-wider">Vendors</span>
         </div>
       </div>

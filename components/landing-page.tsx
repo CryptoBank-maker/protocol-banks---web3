@@ -353,10 +353,8 @@ export function LandingPage({ onConnectWallet, onTryDemo }: LandingPageProps) {
         <div className="grid lg:grid-cols-2 gap-12 lg:gap-20 items-center">
           <div className="order-2 lg:order-1">
             <Link href="/analytics" className="block group">
-              <div className="rounded-2xl border border-white/20 bg-black overflow-hidden shadow-2xl hover:border-primary/30 transition-all cursor-pointer">
-                <div className="h-[350px] sm:h-[420px]">
-                  <PaymentNetworkGraph />
-                </div>
+              <div className="rounded-2xl overflow-hidden shadow-2xl hover:shadow-primary/20 transition-all cursor-pointer">
+                <PaymentNetworkGraph />
               </div>
               <p className="text-center text-xs text-muted-foreground mt-3 group-hover:text-primary transition-colors">
                 Click to explore full Network Atlas →
