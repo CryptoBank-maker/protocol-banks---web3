@@ -2,9 +2,9 @@
 
 import Link from "next/link"
 import Image from "next/image"
-import dynamic from "next/dynamic"
 import { Button } from "@/components/ui/button"
 import { BatchPaymentDemo } from "@/components/batch-payment-demo"
+import { NetworkGraphDemo } from "@/components/network-graph-demo"
 import {
   ArrowRight,
   Shield,
@@ -25,12 +25,6 @@ import {
   PieChart,
   Check,
 } from "lucide-react"
-
-// Dynamic import for canvas-based component
-const PaymentNetworkGraph = dynamic(
-  () => import("@/components/payment-network-graph"),
-  { ssr: false }
-)
 
 interface LandingPageProps {
   onConnectWallet: () => void
@@ -61,37 +55,56 @@ export function LandingPage({ onConnectWallet, onTryDemo }: LandingPageProps) {
               from { transform: translateY(0); }
               to { transform: translateY(60px); }
             }
+            /* Light mode — dark lines on light bg */
+            .water-base-layer {
+              background: linear-gradient(160deg, transparent 20%, rgba(0,0,0,0.03) 50%, rgba(0,0,0,0.06) 75%, transparent 100%);
+            }
+            .water-layer-1 {
+              background: repeating-linear-gradient(30deg, transparent 0px, transparent 28px, rgba(0,0,0,0.03) 30px, rgba(0,0,0,0.10) 32px, rgba(0,0,0,0.03) 34px, transparent 35px);
+            }
+            .water-layer-2 {
+              background: repeating-linear-gradient(30deg, transparent 0px, transparent 42px, rgba(0,0,0,0.02) 44px, rgba(0,0,0,0.07) 48px, rgba(0,0,0,0.02) 50px, transparent 52px);
+            }
+            /* Dark mode — white lines on dark bg */
+            :is(.dark) .water-base-layer {
+              background: linear-gradient(160deg, transparent 20%, rgba(255,255,255,0.03) 50%, rgba(255,255,255,0.06) 75%, transparent 100%);
+            }
+            :is(.dark) .water-layer-1 {
+              background: repeating-linear-gradient(30deg, transparent 0px, transparent 28px, rgba(255,255,255,0.04) 30px, rgba(255,255,255,0.12) 32px, rgba(255,255,255,0.04) 34px, transparent 35px);
+            }
+            :is(.dark) .water-layer-2 {
+              background: repeating-linear-gradient(30deg, transparent 0px, transparent 42px, rgba(255,255,255,0.03) 44px, rgba(255,255,255,0.08) 48px, rgba(255,255,255,0.03) 50px, transparent 52px);
+            }
           `}</style>
           {/* Frosted glass base layer */}
           <div
-            className="absolute inset-0"
+            className="absolute inset-0 water-base-layer"
             style={{
-              background: 'linear-gradient(160deg, transparent 20%, rgba(255,255,255,0.03) 50%, rgba(255,255,255,0.06) 75%, transparent 100%)',
               backdropFilter: 'blur(0.5px)',
               WebkitBackdropFilter: 'blur(0.5px)',
             }}
           />
           {/* Layer 1 — visible diagonal bands with soft glass edges */}
           <div
+            className="water-layer-1"
             style={{
               position: 'absolute',
               top: '-50%',
               left: '-50%',
               width: '200%',
               height: '200%',
-              background: 'repeating-linear-gradient(30deg, transparent 0px, transparent 28px, rgba(255,255,255,0.04) 30px, rgba(255,255,255,0.12) 32px, rgba(255,255,255,0.04) 34px, transparent 35px)',
               animation: 'diagonalFlow 2s linear infinite',
             }}
           />
           {/* Layer 2 — wider softer bands for depth */}
           <div
+            className="water-layer-2"
             style={{
               position: 'absolute',
               top: '-50%',
               left: '-50%',
               width: '200%',
               height: '200%',
-              background: 'repeating-linear-gradient(30deg, transparent 0px, transparent 42px, rgba(255,255,255,0.03) 44px, rgba(255,255,255,0.08) 48px, rgba(255,255,255,0.03) 50px, transparent 52px)',
               animation: 'diagonalFlowSlow 3.5s linear infinite',
             }}
           />
@@ -353,8 +366,8 @@ export function LandingPage({ onConnectWallet, onTryDemo }: LandingPageProps) {
         <div className="grid lg:grid-cols-2 gap-12 lg:gap-20 items-center">
           <div className="order-2 lg:order-1">
             <Link href="/analytics" className="block group">
-              <div className="rounded-2xl overflow-hidden shadow-2xl hover:shadow-primary/20 transition-all cursor-pointer">
-                <PaymentNetworkGraph />
+              <div className="rounded-2xl border border-border overflow-hidden shadow-2xl hover:shadow-primary/20 hover:border-primary/30 transition-all cursor-pointer">
+                <NetworkGraphDemo />
               </div>
               <p className="text-center text-xs text-muted-foreground mt-3 group-hover:text-primary transition-colors">
                 Click to explore full Network Atlas →
