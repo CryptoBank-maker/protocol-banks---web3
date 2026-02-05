@@ -30,6 +30,54 @@ export function LandingPage({ onConnectWallet, onTryDemo }: LandingPageProps) {
       {/* Hero Section */}
       <section className="relative overflow-hidden">
         <div className="absolute inset-0 bg-gradient-to-b from-primary/5 via-transparent to-transparent" />
+
+        {/* Abstract Water Flow — Right */}
+        <div
+          className="absolute right-0 top-0 bottom-0 w-[40%] hidden lg:block pointer-events-none"
+          style={{
+            maskImage: 'linear-gradient(to bottom, transparent, black 15%, black 85%, transparent)',
+            WebkitMaskImage: 'linear-gradient(to bottom, transparent, black 15%, black 85%, transparent)'
+          }}
+        >
+          <style jsx global>{`
+            @keyframes flowDown {
+              from { stroke-dashoffset: 0; }
+              to { stroke-dashoffset: -800; }
+            }
+          `}</style>
+          <svg
+            className="w-full h-full text-foreground"
+            viewBox="0 0 200 600"
+            preserveAspectRatio="none"
+            fill="none"
+          >
+            <path
+              d="M40,0 Q50,150 38,300 T42,600"
+              stroke="currentColor" strokeWidth="1.5" opacity="0.07"
+              strokeDasharray="40 80" strokeLinecap="round"
+              style={{ animation: 'flowDown 7s linear infinite' }}
+            />
+            <path
+              d="M90,0 Q80,200 92,400 T88,600"
+              stroke="currentColor" strokeWidth="1" opacity="0.05"
+              strokeDasharray="30 100" strokeLinecap="round"
+              style={{ animation: 'flowDown 9s linear infinite' }}
+            />
+            <path
+              d="M135,0 Q145,180 132,360 T138,600"
+              stroke="currentColor" strokeWidth="1.2" opacity="0.06"
+              strokeDasharray="45 70" strokeLinecap="round"
+              style={{ animation: 'flowDown 6s linear infinite' }}
+            />
+            <path
+              d="M170,0 Q162,160 174,320 T168,600"
+              stroke="currentColor" strokeWidth="0.8" opacity="0.04"
+              strokeDasharray="25 95" strokeLinecap="round"
+              style={{ animation: 'flowDown 10s linear infinite' }}
+            />
+          </svg>
+        </div>
+
         <div className="container mx-auto px-4 pt-16 pb-20 sm:pt-24 sm:pb-28 md:pt-32 md:pb-36 relative">
           <div className="max-w-4xl">
             <h1 className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-bold tracking-tight leading-[1.1]">

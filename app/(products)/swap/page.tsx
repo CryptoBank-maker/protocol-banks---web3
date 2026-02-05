@@ -2,8 +2,6 @@
 
 import { CrossChainSwap } from "@/components/cross-chain-swap"
 import { useUserType } from "@/contexts/user-type-context"
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
-import { AlertTriangle } from "lucide-react"
 
 export default function SwapPage() {
   const { isWeb2User, translateTerm } = useUserType()
@@ -11,19 +9,6 @@ export default function SwapPage() {
   return (
     <main className="min-h-screen bg-gradient-to-b from-background to-muted/20">
       <div className="container mx-auto px-4 py-8">
-        <Alert
-          variant="destructive"
-          className="mb-6 border-amber-500/50 bg-amber-500/10 text-amber-700 dark:text-amber-400"
-        >
-          <AlertTriangle className="h-4 w-4" />
-          <AlertTitle className="font-semibold">{isWeb2User ? "Test Mode" : "Testnet Environment"}</AlertTitle>
-          <AlertDescription>
-            {isWeb2User
-              ? "This currency exchange feature is currently in test mode. Please do not use real funds or rely on this for actual transactions."
-              : "This cross-chain swap is running on a test API key. Do NOT use for production transactions. All routes and quotes are for demonstration purposes only."}
-          </AlertDescription>
-        </Alert>
-
         {/* Page Header */}
         <div className="text-center mb-8">
           <h1 className="text-3xl font-bold mb-2">

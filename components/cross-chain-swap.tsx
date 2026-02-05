@@ -31,7 +31,6 @@ import {
   Shield,
   Search,
   X,
-  AlertTriangle,
 } from "lucide-react"
 import {
   rangoService,
@@ -481,16 +480,6 @@ export function CrossChainSwap({
     )
   }
 
-  // Test Mode Alert
-  const renderTestModeAlert = () => (
-    <Alert variant="warning" className="mb-4">
-      <AlertTriangle className="h-4 w-4 text-amber-500" />
-      <AlertDescription className="text-amber-500 dark:text-amber-300">
-        You are in test mode. Transactions will not be executed.
-      </AlertDescription>
-    </Alert>
-  )
-
   // Web2 Simplified UI
   if (isWeb2User && mode === "full") {
     return (
@@ -498,11 +487,10 @@ export function CrossChainSwap({
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Shield className="h-5 w-5 text-primary" />
-            {translateTerm("Cross-Chain Swap")}
+            <span className="truncate">{translateTerm("Cross-Chain Swap")}</span>
           </CardTitle>
-          <CardDescription>{translateTerm("Exchange currencies automatically at the best rate")}</CardDescription>
+          <CardDescription className="truncate">{translateTerm("Exchange currencies automatically at the best rate")}</CardDescription>
         </CardHeader>
-        {renderTestModeAlert()}
         <CardContent className="space-y-6">
           {/* From Section */}
           <div className="space-y-3">
@@ -626,15 +614,14 @@ export function CrossChainSwap({
   return (
     <div className="grid gap-6 lg:grid-cols-2">
       {/* Left: Swap Form */}
-      <Card>
+      <Card className="overflow-hidden">
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Zap className="h-5 w-5 text-primary" />
-            Cross-Chain Swap
+          <CardTitle className="flex items-center gap-2 truncate">
+            <Zap className="h-5 w-5 text-primary flex-shrink-0" />
+            <span className="truncate">Cross-Chain Swap</span>
           </CardTitle>
-          <CardDescription>Swap tokens across any blockchain with best price routing</CardDescription>
+          <CardDescription className="truncate">Swap tokens across any blockchain with best price routing</CardDescription>
         </CardHeader>
-        {renderTestModeAlert()}
         <CardContent className="space-y-6">
           {/* From Section */}
           <div className="p-4 rounded-xl bg-muted/50 space-y-4">
