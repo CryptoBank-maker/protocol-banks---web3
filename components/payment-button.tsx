@@ -13,7 +13,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Badge } from "@/components/ui/badge"
 import { Loader2, CheckCircle2, XCircle, Wallet, CreditCard } from "lucide-react"
-import { useWeb3 } from "@/contexts/web3-context"
+import { useUnifiedWallet } from "@/hooks/use-unified-wallet"
 import { useToast } from "@/hooks/use-toast"
 import { cn } from "@/lib/utils"
 
@@ -66,7 +66,7 @@ export function PaymentButton({
   size = "default",
   disabled = false,
 }: PaymentButtonProps) {
-  const { isConnected, connectWallet, wallets, activeChain, sendToken } = useWeb3()
+  const { isConnected, connectWallet, wallets, activeChain, sendToken } = useUnifiedWallet()
   const { toast } = useToast()
 
   const [isOpen, setIsOpen] = useState(false)

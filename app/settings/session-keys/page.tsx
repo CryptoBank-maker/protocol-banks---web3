@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { useWeb3 } from "@/contexts/web3-context"
+import { useUnifiedWallet } from "@/hooks/use-unified-wallet"
 import { useDemo } from "@/contexts/demo-context"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -94,7 +94,7 @@ const CHAIN_NAMES: Record<number, string> = {
 }
 
 export default function SessionKeysPage() {
-  const { address, chainId } = useWeb3()
+  const { address, chainId } = useUnifiedWallet()
   const { isDemoMode } = useDemo()
   const { toast } = useToast()
   const [sessionKeys, setSessionKeys] = useState<SessionKey[]>([])

@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { AnimatePresence } from "framer-motion"
-import { useWeb3 } from "@/contexts/web3-context"
+import { useUnifiedWallet } from "@/hooks/use-unified-wallet"
 import { useUserType } from "@/contexts/user-type-context"
 import { useAuth } from "@/contexts/auth-provider"
 import { useAppKit, useAppKitAccount } from "@reown/appkit/react"
@@ -33,7 +33,7 @@ export function AuthGateway({ isOpen, onClose, onSuccess }: AuthGatewayProps) {
     address: string
   } | null>(null)
 
-  const { connectWallet, isConnected: isWeb3Connected } = useWeb3()
+  const { connectWallet, isConnected: isWeb3Connected } = useUnifiedWallet()
   const { setUserType } = useUserType()
   const { open: openAppKit } = useAppKit()
   const { isConnected: isReownConnected } = useAppKitAccount()

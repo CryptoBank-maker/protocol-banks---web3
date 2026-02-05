@@ -27,7 +27,7 @@ import {
   PieChart,
   BarChart3,
 } from "lucide-react"
-import { useWeb3 } from "@/contexts/web3-context"
+import { useUnifiedWallet } from "@/hooks/use-unified-wallet"
 import { getSupabase } from "@/lib/supabase"
 import { formatFee } from "@/lib/protocol-fees"
 
@@ -62,7 +62,7 @@ interface FeeConfig {
 }
 
 export default function AdminFeesPage() {
-  const { address, isConnected } = useWeb3()
+  const { address, isConnected } = useUnifiedWallet()
   const [loading, setLoading] = useState(true)
   const [stats, setStats] = useState<FeeStats | null>(null)
   const [recentFees, setRecentFees] = useState<ProtocolFeeRecord[]>([])

@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { useWeb3 } from "@/contexts/web3-context"
+import { useUnifiedWallet } from "@/hooks/use-unified-wallet"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -40,7 +40,7 @@ import { Users, Plus, Trash2, UserPlus, Shield, Eye, Crown } from "lucide-react"
 import type { Team, TeamMember, TeamRole } from "@/types/team"
 
 export default function TeamPage() {
-  const { address } = useWeb3()
+  const { address } = useUnifiedWallet()
   const { toast } = useToast()
   const [teams, setTeams] = useState<Team[]>([])
   const [selectedTeam, setSelectedTeam] = useState<Team | null>(null)

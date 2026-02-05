@@ -1,7 +1,7 @@
 "use client"
 
 import { useCallback, useState } from "react"
-import { useWeb3 } from "@/contexts/web3-context"
+import { useUnifiedWallet } from "@/hooks/use-unified-wallet"
 
 export interface AuditLogEntry {
   id: string
@@ -51,7 +51,7 @@ export interface UseAuditLogReturn {
 }
 
 export function useAuditLog(): UseAuditLogReturn {
-  const { wallets, activeChain } = useWeb3()
+  const { wallets, activeChain } = useUnifiedWallet()
   const [isLogging, setIsLogging] = useState(false)
   const [isFetching, setIsFetching] = useState(false)
   const [logs, setLogs] = useState<AuditLogEntry[]>([])

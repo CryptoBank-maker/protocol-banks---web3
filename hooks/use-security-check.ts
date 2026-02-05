@@ -5,7 +5,7 @@ import {
   performPreTransactionCheck,
   type PreTransactionCheckResult,
 } from "@/lib/security/web3-security"
-import { useWeb3 } from "@/contexts/web3-context"
+import { useUnifiedWallet } from "@/hooks/use-unified-wallet"
 
 export interface TransactionDetails {
   type: "transfer" | "swap" | "bridge" | "approve"
@@ -30,7 +30,7 @@ export interface UseSecurityCheckReturn {
 }
 
 export function useSecurityCheck(): UseSecurityCheckReturn {
-  const { isConnected } = useWeb3()
+  const { isConnected } = useUnifiedWallet()
   const [isChecking, setIsChecking] = useState(false)
   const [securityResult, setSecurityResult] = useState<PreTransactionCheckResult | null>(null)
   const [transactionDetails, setTransactionDetails] = useState<TransactionDetails | null>(null)

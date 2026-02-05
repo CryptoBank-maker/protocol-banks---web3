@@ -13,6 +13,7 @@ import { webhookTriggerService, type SubscriptionEventData } from "@/lib/service
 import { submitBatchPayment } from "@/lib/grpc/payout-bridge"
 import { getTokenAddress, CHAIN_IDS } from "@/lib/web3"
 import { createClient } from "@/lib/supabase/client"
+import { decryptSessionKey } from "@/lib/security/encryption"
 
 // ============================================
 // Types
@@ -83,9 +84,16 @@ async function getActiveSessionKey(
     return null
   }
 
+  // Decrypt the private key from storage
+  const privateKey = decryptSessionKey(data.encrypted_private_key)
+  if (!privateKey) {
+    console.error("[SubscriptionExecute] Failed to decrypt session key for", ownerAddress)
+    return null
+  }
+
   return {
     sessionKeyAddress: data.session_key_address,
-    privateKey: data.encrypted_private_key, // In production, decrypt this
+    privateKey,
   }
 }
 

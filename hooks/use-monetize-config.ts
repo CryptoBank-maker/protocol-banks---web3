@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useCallback, useEffect } from "react"
-import { useWeb3 } from "@/contexts/web3-context"
+import { useUnifiedWallet } from "@/hooks/use-unified-wallet"
 import { useToast } from "@/hooks/use-toast"
 import { getSupabase } from "@/lib/supabase"
 
@@ -96,7 +96,7 @@ const DEFAULT_CONFIG: MonetizeConfig = {
 }
 
 export function useMonetizeConfig(): UseMonetizeConfigReturn {
-  const { address } = useWeb3()
+  const { address } = useUnifiedWallet()
   const { toast } = useToast()
   const [config, setConfig] = useState<MonetizeConfig>(DEFAULT_CONFIG)
   const [apiKeys, setApiKeys] = useState<APIKey[]>([])

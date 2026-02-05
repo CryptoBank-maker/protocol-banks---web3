@@ -51,6 +51,61 @@ export function generateIntegrityHash(
   return createHash("sha256").update(data).digest("hex").substring(0, 32)
 }
 
+// ============================================
+// Server-side session key encryption (AES-256-GCM)
+// ============================================
+
+function getSessionKeyEncryptionKey(): Buffer {
+  const secret = process.env.SESSION_KEY_ENCRYPTION_SECRET || process.env.SUPABASE_SERVICE_ROLE_KEY
+  if (!secret) {
+    throw new Error("SESSION_KEY_ENCRYPTION_SECRET or SUPABASE_SERVICE_ROLE_KEY must be configured for session key encryption")
+  }
+  return createHash("sha256").update(secret).digest()
+}
+
+/**
+ * Encrypt a session key private key for storage at rest.
+ * Format: base64(iv[12] + authTag[16] + ciphertext)
+ */
+export function encryptSessionKey(privateKey: string): string {
+  const key = getSessionKeyEncryptionKey()
+  const iv = randomBytes(12)
+  const cipher = createCipheriv("aes-256-gcm", key, iv)
+
+  let encrypted = cipher.update(privateKey, "utf8", "hex")
+  encrypted += cipher.final("hex")
+  const authTag = cipher.getAuthTag()
+
+  // iv (12) + authTag (16) + ciphertext
+  const combined = Buffer.concat([iv, authTag, Buffer.from(encrypted, "hex")])
+  return combined.toString("base64")
+}
+
+/**
+ * Decrypt a session key private key from storage.
+ * Returns null if decryption fails (key rotated, corrupted, etc.)
+ */
+export function decryptSessionKey(encryptedData: string): string | null {
+  try {
+    const key = getSessionKeyEncryptionKey()
+    const combined = Buffer.from(encryptedData, "base64")
+
+    const iv = combined.subarray(0, 12)
+    const authTag = combined.subarray(12, 28)
+    const ciphertext = combined.subarray(28)
+
+    const decipher = createDecipheriv("aes-256-gcm", key, iv)
+    decipher.setAuthTag(authTag)
+
+    let decrypted = decipher.update(ciphertext.toString("hex"), "hex", "utf8")
+    decrypted += decipher.final("utf8")
+    return decrypted
+  } catch (error) {
+    console.error("[SessionKey] Decryption failed:", error)
+    return null
+  }
+}
+
 // Client-side encryption using Web Crypto API (for browser)
 export async function clientEncrypt(data: string, password: string): Promise<string> {
   if (typeof window === "undefined") return data

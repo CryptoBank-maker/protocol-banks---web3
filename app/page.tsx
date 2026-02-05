@@ -2,13 +2,13 @@
 
 import { useEffect, useRef } from "react"
 import { useRouter } from "next/navigation"
-import { useWeb3 } from "@/contexts/web3-context"
+import { useUnifiedWallet } from "@/hooks/use-unified-wallet"
 import { useDemo } from "@/contexts/demo-context"
 import { LandingPage } from "@/components/landing-page"
 
 export default function HomePage() {
   const router = useRouter()
-  const { isConnected, connectWallet } = useWeb3()
+  const { isConnected, connectWallet } = useUnifiedWallet()
   const { toggleDemoMode } = useDemo()
   const connectingRef = useRef(false)
 

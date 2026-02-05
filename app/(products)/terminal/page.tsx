@@ -30,7 +30,7 @@ import {
   Delete,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { useWeb3 } from "@/contexts/web3-context";
+import { useUnifiedWallet } from "@/hooks/use-unified-wallet";
 import { getTokenAddress, ERC20_ABI, CHAIN_IDS, RPC_URLS } from "@/lib/web3";
 import { ethers } from "ethers";
 import { QRCodeSVG } from "qrcode.react";

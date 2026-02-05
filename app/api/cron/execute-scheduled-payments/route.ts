@@ -8,13 +8,11 @@ import { scheduledPaymentService } from '@/lib/services/scheduled-payment-servic
  */
 export async function GET(request: NextRequest) {
   try {
-    // Verify cron secret (for production security)
-    const authHeader = request.headers.get('authorization');
-    const cronSecret = process.env.CRON_SECRET;
-
-    // In development, allow requests without secret
-    if (process.env.NODE_ENV === 'production' && cronSecret) {
-      if (authHeader !== `Bearer ${cronSecret}`) {
+    // Verify cron secret in production
+    if (process.env.NODE_ENV === 'production') {
+      const authHeader = request.headers.get('authorization');
+      const cronSecret = process.env.CRON_SECRET;
+      if (!cronSecret || authHeader !== `Bearer ${cronSecret}`) {
         return NextResponse.json(
           { error: 'Unauthorized' },
           { status: 401 }

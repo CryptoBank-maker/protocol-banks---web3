@@ -518,6 +518,7 @@ export default function AgentsPage() {
                   <TableHead>Name</TableHead>
                   <TableHead>API Key</TableHead>
                   <TableHead>Auto-Execute</TableHead>
+                  <TableHead>Budget</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Last Active</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
@@ -534,6 +535,15 @@ export default function AgentsPage() {
                             {agent.description}
                           </div>
                         )}
+                        {agent.allowed_tokens && agent.allowed_tokens.length > 0 && (
+                          <div className="flex gap-1 mt-1">
+                            {agent.allowed_tokens.map((token) => (
+                              <Badge key={token} variant="outline" className="text-xs px-1.5 py-0">
+                                {token}
+                              </Badge>
+                            ))}
+                          </div>
+                        )}
                       </div>
                     </TableCell>
                     <TableCell className="font-mono text-sm">{agent.api_key_prefix}...</TableCell>
@@ -547,9 +557,29 @@ export default function AgentsPage() {
                       )}
                     </TableCell>
                     <TableCell>
-                      <Badge 
+                      {agent.budget ? (
+                        <div className="text-sm">
+                          <div className="font-medium">${Number(agent.budget.remaining).toLocaleString()} left</div>
+                          <div className="text-muted-foreground text-xs">
+                            ${Number(agent.budget.spent).toLocaleString()} / ${Number(agent.budget.total).toLocaleString()}
+                          </div>
+                          <div className="mt-1 h-1.5 w-full bg-muted rounded-full overflow-hidden">
+                            <div
+                              className="h-full bg-primary rounded-full"
+                              style={{
+                                width: `${Math.min(100, (Number(agent.budget.spent) / Number(agent.budget.total)) * 100)}%`,
+                              }}
+                            />
+                          </div>
+                        </div>
+                      ) : (
+                        <span className="text-sm text-muted-foreground">--</span>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      <Badge
                         variant={
-                          agent.status === 'active' ? 'default' : 
+                          agent.status === 'active' ? 'default' :
                           agent.status === 'paused' ? 'secondary' : 'destructive'
                         }
                       >

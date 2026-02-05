@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { useWeb3 } from "@/contexts/web3-context"
+import { useUnifiedWallet } from "@/hooks/use-unified-wallet"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -56,7 +56,7 @@ const CONTRACT_TYPES = [
 ]
 
 export default function ContractsPage() {
-  const { address, isConnected } = useWeb3()
+  const { address, isConnected } = useUnifiedWallet()
   const [contracts, setContracts] = useState<ContractDeployment[]>([])
   const [loading, setLoading] = useState(true)
   const [dialogOpen, setDialogOpen] = useState(false)

@@ -3,12 +3,12 @@
 import { useState, useEffect } from "react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
-import { useWeb3 } from "@/contexts/web3-context"
+import { useUnifiedWallet } from "@/hooks/use-unified-wallet"
 import { useUserType } from "@/contexts/user-type-context"
 import { Wallet, Send, Receipt, ArrowRight, CreditCard, Building2, Users, BarChart3 } from "lucide-react"
 
 export function WelcomeGuide() {
-  const { isConnected, wallet } = useWeb3()
+  const { isConnected, address: wallet } = useUnifiedWallet()
   const { isWeb2User } = useUserType()
   const [showGuide, setShowGuide] = useState(false)
   const [currentStep, setCurrentStep] = useState(0)

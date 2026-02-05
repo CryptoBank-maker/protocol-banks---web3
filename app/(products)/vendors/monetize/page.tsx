@@ -19,7 +19,7 @@ import {
 import { useToast } from "@/hooks/use-toast"
 import { useMonetizeConfig } from "@/hooks/use-monetize-config"
 import { UsageChart } from "@/components/usage-chart"
-import { useWeb3 } from "@/contexts/web3-context"
+import { useUnifiedWallet } from "@/hooks/use-unified-wallet"
 import { useDemo } from "@/contexts/demo-context"
 import {
   DollarSign,
@@ -77,7 +77,7 @@ interface PricingTier {
 
 export default function MonetizePage() {
   const { toast } = useToast()
-  const { wallets, isConnected } = useWeb3()
+  const { wallets, isConnected } = useUnifiedWallet()
   const { isDemoMode } = useDemo()
   const [loading, setLoading] = useState(true)
   const [apiKeys, setApiKeys] = useState<APIKey[]>([])

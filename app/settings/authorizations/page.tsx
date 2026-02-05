@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { useWeb3 } from "@/contexts/web3-context"
+import { useUnifiedWallet } from "@/hooks/use-unified-wallet"
 import { useDemo } from "@/contexts/demo-context"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -124,7 +124,7 @@ const STATUS_COLORS: Record<string, string> = {
 }
 
 export default function AuthorizationsPage() {
-  const { address } = useWeb3()
+  const { address } = useUnifiedWallet()
   const { isDemoMode } = useDemo()
   const { toast } = useToast()
   const [authorizations, setAuthorizations] = useState<Authorization[]>([])

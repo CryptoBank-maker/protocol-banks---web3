@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Loader2, AlertCircle, Clock, Wallet, ShieldCheck, Gift } from "lucide-react";
-import { useWeb3 } from "@/contexts/web3-context";
+import { useUnifiedWallet } from "@/hooks/use-unified-wallet";
 import { useToast } from "@/hooks/use-toast";
 import { QRCodeSVG } from "qrcode.react";
 import { sendToken, getTokenAddress, getTokenBalance } from "@/lib/web3";
@@ -39,7 +39,7 @@ function PaymentLinkContent() {
   const params = useParams();
   const router = useRouter();
   const { toast } = useToast();
-  const { isConnected, wallets, chainId } = useWeb3();
+  const { isConnected, wallets, chainId } = useUnifiedWallet();
 
   const linkId = params.linkId as string;
 

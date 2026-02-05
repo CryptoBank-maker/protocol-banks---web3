@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { useWeb3 } from "@/contexts/web3-context"
+import { useUnifiedWallet } from "@/hooks/use-unified-wallet"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -34,7 +34,7 @@ interface SystemStatus {
 }
 
 export default function AdminDashboard() {
-  const { address, isConnected } = useWeb3()
+  const { address, isConnected } = useUnifiedWallet()
   const [loading, setLoading] = useState(true)
   const [systemStatus, setSystemStatus] = useState<SystemStatus[]>([])
   const [recentAlerts, setRecentAlerts] = useState<any[]>([])

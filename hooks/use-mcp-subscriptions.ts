@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useCallback, useEffect } from "react"
-import { useWeb3 } from "@/contexts/web3-context"
+import { useUnifiedWallet } from "@/hooks/use-unified-wallet"
 import { useToast } from "@/hooks/use-toast"
 import { getSupabase } from "@/lib/supabase"
 
@@ -110,7 +110,7 @@ const MCP_PROVIDERS: MCPProvider[] = [
 ]
 
 export function useMCPSubscriptions(): UseMCPSubscriptionsReturn {
-  const { address } = useWeb3()
+  const { address } = useUnifiedWallet()
   const { toast } = useToast()
   const [subscriptions, setSubscriptions] = useState<MCPSubscription[]>([])
   const [loading, setLoading] = useState(true)

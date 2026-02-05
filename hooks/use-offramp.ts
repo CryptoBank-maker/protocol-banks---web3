@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useCallback } from "react"
-import { useWeb3 } from "@/contexts/web3-context"
+import { useUnifiedWallet } from "@/hooks/use-unified-wallet"
 import { useToast } from "@/hooks/use-toast"
 import {
   getOffRampQuote,
@@ -31,7 +31,7 @@ export interface UseOffRampReturn {
  * Hook for off-ramp (crypto to fiat) operations
  */
 export function useOffRamp(): UseOffRampReturn {
-  const { address, chainId } = useWeb3()
+  const { address, chainId } = useUnifiedWallet()
   const { toast } = useToast()
   const [quote, setQuote] = useState<OffRampQuote | null>(null)
   const [transaction, setTransaction] = useState<OffRampTransaction | null>(null)

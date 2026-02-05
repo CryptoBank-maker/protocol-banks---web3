@@ -17,7 +17,7 @@ import {
   Building2,
   User,
 } from "lucide-react"
-import { useWeb3 } from "@/contexts/web3-context"
+import { useUnifiedWallet } from "@/hooks/use-unified-wallet"
 import {
   getFeeStats,
   getMonthlyFeeSummary,
@@ -30,7 +30,7 @@ import {
 } from "@/lib/protocol-fees"
 
 export default function FeesPage() {
-  const { address, isConnected } = useWeb3()
+  const { address, isConnected } = useUnifiedWallet()
   const [loading, setLoading] = useState(true)
   const [stats, setStats] = useState<{
     totalFeesCollected: number

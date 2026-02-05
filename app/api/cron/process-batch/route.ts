@@ -12,10 +12,13 @@ export const maxDuration = 60; // 60 seconds (Pro plan limit usually, optimize c
 export const dynamic = 'force-dynamic';
 
 export async function GET(req: NextRequest) {
-  // Security: Verify CRON secret if needed (Vercel automatically protects crons, but good practice)
-  const authHeader = req.headers.get('authorization');
-  if (process.env.CRON_SECRET && authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
-    // allowing execution for internal testing if needed, or stick to Vercel protection
+  // Security: Verify CRON secret in production
+  if (process.env.NODE_ENV === 'production') {
+    const authHeader = req.headers.get('authorization');
+    const cronSecret = process.env.CRON_SECRET;
+    if (!cronSecret || authHeader !== `Bearer ${cronSecret}`) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
   }
 
   try {

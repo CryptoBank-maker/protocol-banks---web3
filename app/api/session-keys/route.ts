@@ -7,6 +7,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
 import { generatePrivateKey, privateKeyToAccount } from "viem/accounts"
+import { encryptSessionKey } from "@/lib/security/encryption"
 
 interface CreateSessionKeyRequest {
   chain_id: number
@@ -116,9 +117,8 @@ export async function POST(request: NextRequest) {
     const privateKey = generatePrivateKey()
     const account = privateKeyToAccount(privateKey)
 
-    // In production, encrypt the private key before storing
-    // For now, we'll store it as-is (should use proper encryption)
-    const encryptedPrivateKey = privateKey // TODO: Encrypt with user's PIN or master key
+    // Encrypt the private key with AES-256-GCM before storing
+    const encryptedPrivateKey = encryptSessionKey(privateKey)
 
     // Insert session key
     const { data: sessionKey, error } = await supabase

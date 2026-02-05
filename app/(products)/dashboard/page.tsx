@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useMemo } from "react"
 import Link from "next/link"
-import { useWeb3 } from "@/contexts/web3-context"
+import { useUnifiedWallet } from "@/hooks/use-unified-wallet"
 import { useDemo } from "@/contexts/demo-context"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -67,7 +67,7 @@ function formatDate(dateStr: string) {
 }
 
 export default function DashboardPage() {
-  const { isConnected, wallet } = useWeb3()
+  const { isConnected, address: wallet } = useUnifiedWallet()
   const { isDemoMode, setWalletConnected } = useDemo()
   const { balance, loading: balanceLoading } = useBalance({ isDemoMode, walletAddress: wallet || undefined })
   const { payments, loading: paymentsLoading } = usePaymentHistory({

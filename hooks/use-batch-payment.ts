@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useCallback } from "react"
-import { useWeb3 } from "@/contexts/web3-context"
+import { useUnifiedWallet } from "@/hooks/use-unified-wallet"
 import { useDemo } from "@/contexts/demo-context"
 import { useToast } from "@/hooks/use-toast"
 import type { PaymentRecipient } from "@/types"
@@ -65,7 +65,7 @@ const initialState: BatchPaymentState = {
 }
 
 export function useBatchPayment(): UseBatchPaymentReturn {
-  const { wallets } = useWeb3()
+  const { wallets } = useUnifiedWallet()
   const { isDemoMode } = useDemo()
   const { toast } = useToast()
   const [state, setState] = useState<BatchPaymentState>(initialState)

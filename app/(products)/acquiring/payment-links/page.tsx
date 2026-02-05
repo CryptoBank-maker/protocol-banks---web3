@@ -37,6 +37,7 @@ import {
   Gift,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { useDemo } from "@/contexts/demo-context";
 import { QRCodeSVG } from "qrcode.react";
 
 interface PaymentLink {
@@ -69,7 +70,83 @@ interface PaymentLink {
   asset_amount?: string;
 }
 
+// Demo payment links shown when no wallet is connected
+const DEMO_PAYMENT_LINKS: PaymentLink[] = [
+  {
+    id: "demo-link-001",
+    link_id: "PL-A1B2C3",
+    merchant_id: "demo-merchant-001",
+    title: "Monthly Subscription",
+    description: "Premium plan - monthly recurring payment for Protocol Coffee loyalty program",
+    amount: 9.99,
+    currency: "USD",
+    token: "USDC",
+    recipient_address: "0x742d35Cc6634C0532925a3b844Bc9e7595f2bD18",
+    amount_type: "fixed",
+    status: "active",
+    total_payments: 23,
+    total_amount: 229.77,
+    created_at: new Date(Date.now() - 45 * 86400000).toISOString(),
+    brand_color: "#3B82F6",
+  },
+  {
+    id: "demo-link-002",
+    link_id: "PL-D4E5F6",
+    merchant_id: "demo-merchant-002",
+    title: "One-time Payment",
+    description: "Web3 Design Studio - custom design package payment",
+    amount: 250,
+    currency: "USD",
+    token: "USDC",
+    recipient_address: "0x8Ba1f109551bD432803012645Ac136ddd64DBA72",
+    amount_type: "fixed",
+    status: "active",
+    total_payments: 8,
+    total_amount: 2000,
+    created_at: new Date(Date.now() - 20 * 86400000).toISOString(),
+    brand_color: "#8B5CF6",
+  },
+  {
+    id: "demo-link-003",
+    link_id: "PL-G7H8I9",
+    merchant_id: "demo-merchant-003",
+    title: "Donation",
+    description: "Support DeFi education - any amount welcome",
+    amount: null,
+    currency: "USD",
+    token: "USDC",
+    recipient_address: "0xdD2FD4581271e230360230F9337D5c0430Bf44C0",
+    amount_type: "customer_input",
+    min_amount: 1,
+    max_amount: 10000,
+    status: "active",
+    total_payments: 156,
+    total_amount: 4830.50,
+    created_at: new Date(Date.now() - 60 * 86400000).toISOString(),
+    brand_color: "#10B981",
+  },
+  {
+    id: "demo-link-004",
+    link_id: "PL-J1K2L3",
+    merchant_id: "demo-merchant-001",
+    title: "Event Ticket",
+    description: "Web3 Builder Meetup - Early bird ticket",
+    amount: 50,
+    currency: "USD",
+    token: "USDT",
+    recipient_address: "0x742d35Cc6634C0532925a3b844Bc9e7595f2bD18",
+    amount_type: "fixed",
+    expires_at: new Date(Date.now() - 86400000).toISOString(),
+    status: "expired",
+    total_payments: 42,
+    total_amount: 2100,
+    created_at: new Date(Date.now() - 90 * 86400000).toISOString(),
+    brand_color: "#F59E0B",
+  },
+];
+
 export default function PaymentLinksPage() {
+  const { isDemoMode } = useDemo();
   const { toast } = useToast();
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
@@ -106,8 +183,13 @@ export default function PaymentLinksPage() {
   });
 
   useEffect(() => {
-    loadLinks();
-  }, []);
+    if (isDemoMode) {
+      setLinks(DEMO_PAYMENT_LINKS);
+      setLoading(false);
+    } else {
+      loadLinks();
+    }
+  }, [isDemoMode]);
 
   const loadLinks = async () => {
     try {
@@ -281,6 +363,17 @@ export default function PaymentLinksPage() {
           Create Payment Link
         </Button>
       </div>
+
+      {/* Demo Mode Banner */}
+      {isDemoMode && (
+        <Card className="mb-6 border-blue-500/20 bg-blue-500/5">
+          <CardContent className="pt-6 pb-4">
+            <p className="text-sm text-blue-500">
+              You are viewing demo payment links. Connect your wallet to manage real payment links.
+            </p>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Create Form */}
       {showCreateForm && (

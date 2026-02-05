@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { useWeb3 } from "@/contexts/web3-context"
+import { useUnifiedWallet } from "@/hooks/use-unified-wallet"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -29,7 +29,7 @@ interface UsageMetrics {
 }
 
 export default function BillingPage() {
-  const { address } = useWeb3()
+  const { address } = useUnifiedWallet()
   const { toast } = useToast()
   const [plans, setPlans] = useState<SubscriptionPlan[]>([])
   const [subscription, setSubscription] = useState<UserSubscription | null>(null)

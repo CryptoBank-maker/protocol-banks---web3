@@ -21,7 +21,7 @@ import {
 import { useToast } from "@/hooks/use-toast"
 import { useMCPSubscriptions } from "@/hooks/use-mcp-subscriptions"
 import { SubscriptionCard } from "@/components/subscription-card"
-import { useWeb3 } from "@/contexts/web3-context"
+import { useUnifiedWallet } from "@/hooks/use-unified-wallet"
 import { useDemo } from "@/contexts/demo-context"
 import {
   Zap,
@@ -111,7 +111,7 @@ const MCP_PROVIDERS: MCPProvider[] = [
 
 export default function MCPSubscriptionsPage() {
   const { toast } = useToast()
-  const { wallets, isConnected } = useWeb3()
+  const { wallets, isConnected } = useUnifiedWallet()
   const { isDemoMode } = useDemo()
   const [subscriptions, setSubscriptions] = useState<MCPSubscription[]>([])
   const [loading, setLoading] = useState(true)

@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { useWeb3 } from "@/contexts/web3-context"
+import { useUnifiedWallet } from "@/hooks/use-unified-wallet"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -25,7 +25,7 @@ import { useWebhooks, WEBHOOK_EVENTS, type WebhookDelivery } from "@/hooks/use-w
 import { WebhookIcon, Plus, Copy, Trash2, ChevronDown, AlertTriangle, CheckCircle, XCircle, Clock, Play } from "lucide-react"
 
 export default function WebhooksPage() {
-  const { wallets } = useWeb3()
+  const { wallets } = useUnifiedWallet()
   const address = wallets.EVM
   const { toast } = useToast()
   

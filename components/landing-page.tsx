@@ -414,11 +414,11 @@ export function LandingPage({ onConnectWallet, onTryDemo }: LandingPageProps) {
                     { name: "Base", logo: "/networks/base.png" },
                     { name: "BSC", logo: "/networks/bnb.png" },
                     { name: "Avalanche", logo: "/networks/avax.png" },
-                    { name: "HashKey Chain", logo: "/networks/hsk.png" },
+                    { name: "HashKey", logo: "/networks/hsk.png" },
                     { name: "Solana", logo: "/networks/solana.png" },
                     { name: "Tron", logo: "/networks/tron.png" },
                     { name: "Bitcoin", icon: "Bitcoin", color: "#F7931A" },
-                    { name: "ZetaChain", color: "#005741" },
+                    { name: "Zeta", color: "#005741" },
                     // Repeat list to ensure smooth seamless loop
                     { name: "Ethereum", logo: "/networks/eth.png" },
                     { name: "Polygon", logo: "/networks/polygon.png" },
@@ -427,11 +427,11 @@ export function LandingPage({ onConnectWallet, onTryDemo }: LandingPageProps) {
                     { name: "Base", logo: "/networks/base.png" },
                     { name: "BSC", logo: "/networks/bnb.png" },
                     { name: "Avalanche", logo: "/networks/avax.png" },
-                    { name: "HashKey Chain", logo: "/networks/hsk.png" },
+                    { name: "HashKey", logo: "/networks/hsk.png" },
                     { name: "Solana", logo: "/networks/solana.png" },
                     { name: "Tron", logo: "/networks/tron.png" },
                     { name: "Bitcoin", icon: "Bitcoin", color: "#F7931A" },
-                    { name: "ZetaChain", color: "#005741" },
+                    { name: "Zeta", color: "#005741" },
                   ].map((chain, i) => (
                     <div
                       key={`${chain.name}-${i}`}

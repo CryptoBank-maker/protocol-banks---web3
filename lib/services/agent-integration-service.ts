@@ -7,6 +7,7 @@
  * @module lib/services/agent-integration-service
  */
 
+import crypto from 'crypto';
 import { proposalService, PaymentProposal } from './proposal-service';
 import { autoExecuteService, AutoExecuteResult } from './auto-execute-service';
 import { agentX402Service, X402ExecutionResult } from './agent-x402-service';
@@ -99,7 +100,7 @@ export class AgentIntegrationService {
       const agent = await agentService.getById(proposalInput.agent_id);
       if (agent?.webhook_url) {
         // Generate a temporary webhook secret for delivery
-        const webhookSecret = agent.webhook_secret_hash || 'default-secret';
+        const webhookSecret = agent.webhook_secret_hash || crypto.randomUUID();
         await agentWebhookService.trigger(
           agent.id,
           agent.webhook_url,
@@ -142,7 +143,7 @@ export class AgentIntegrationService {
 
         // Trigger webhook for payment executed
         if (agent?.webhook_url) {
-          const webhookSecret = agent.webhook_secret_hash || 'default-secret';
+          const webhookSecret = agent.webhook_secret_hash || crypto.randomUUID();
           await agentWebhookService.trigger(
             agent.id,
             agent.webhook_url,
@@ -233,7 +234,7 @@ export class AgentIntegrationService {
 
       // Trigger webhook
       if (agent?.webhook_url) {
-        const webhookSecret = agent.webhook_secret_hash || 'default-secret';
+        const webhookSecret = agent.webhook_secret_hash || crypto.randomUUID();
         await agentWebhookService.trigger(
           agent.id,
           agent.webhook_url,
@@ -280,7 +281,7 @@ export class AgentIntegrationService {
 
         // Trigger webhook
         if (agent?.webhook_url) {
-          const webhookSecret = agent.webhook_secret_hash || 'default-secret';
+          const webhookSecret = agent.webhook_secret_hash || crypto.randomUUID();
           await agentWebhookService.trigger(
             agent.id,
             agent.webhook_url,
@@ -332,7 +333,7 @@ export class AgentIntegrationService {
 
         // Trigger webhook
         if (agent?.webhook_url) {
-          const webhookSecret = agent.webhook_secret_hash || 'default-secret';
+          const webhookSecret = agent.webhook_secret_hash || crypto.randomUUID();
           await agentWebhookService.trigger(
             agent.id,
             agent.webhook_url,
@@ -404,7 +405,7 @@ export class AgentIntegrationService {
 
     // Trigger webhook
     if (agent?.webhook_url) {
-      const webhookSecret = agent.webhook_secret_hash || 'default-secret';
+      const webhookSecret = agent.webhook_secret_hash || crypto.randomUUID();
       await agentWebhookService.trigger(
         agent.id,
         agent.webhook_url,

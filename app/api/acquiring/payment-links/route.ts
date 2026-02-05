@@ -42,9 +42,20 @@ function generateLinkId(): string {
   return `PL-${Date.now().toString(36).toUpperCase()}-${crypto.randomBytes(4).toString("hex").toUpperCase()}`
 }
 
+// Singleton random fallback generated once per instance (never use a static default)
+let _fallbackSecret: string | null = null
+function getPaymentLinkSecret(): string {
+  const configured = process.env.PAYMENT_LINK_SECRET
+  if (configured) return configured
+  if (!_fallbackSecret) {
+    _fallbackSecret = crypto.randomBytes(32).toString("hex")
+    console.warn("[PaymentLinks] PAYMENT_LINK_SECRET not configured — using random per-instance secret. Links will NOT survive redeployments.")
+  }
+  return _fallbackSecret
+}
+
 function generateSignature(data: string): string {
-  const secret = process.env.PAYMENT_LINK_SECRET || "default-secret"
-  return crypto.createHmac("sha256", secret).update(data).digest("hex").slice(0, 16)
+  return crypto.createHmac("sha256", getPaymentLinkSecret()).update(data).digest("hex").slice(0, 16)
 }
 
 function buildPaymentUrl(linkId: string, recipientAddress: string, amount: string | null, token: string, title: string, signature: string) {

@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useCallback, useMemo } from "react"
-import { useWeb3 } from "@/contexts/web3-context"
+import { useUnifiedWallet } from "@/hooks/use-unified-wallet"
 import { useToast } from "@/hooks/use-toast"
 import { X402Client, type X402PaymentRequest } from "@/lib/x402-client"
 import { CHAIN_IDS } from "@/lib/web3"
@@ -26,7 +26,7 @@ export interface UseX402Return {
  * Automatically handles HTTP 402 responses with payment flow
  */
 export function useX402(options: UseX402Options = {}): UseX402Return {
-  const { address, chainId } = useWeb3()
+  const { address, chainId } = useUnifiedWallet()
   const { toast } = useToast()
   const [pendingPayment, setPendingPayment] = useState<X402PaymentRequest | null>(null)
   const [isProcessing, setIsProcessing] = useState(false)
