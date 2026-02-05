@@ -17,6 +17,11 @@ import {
   ChevronRight,
   Play,
   Bitcoin,
+  ArrowLeftRight,
+  Wallet,
+  Receipt,
+  PieChart,
+  Check,
 } from "lucide-react"
 
 interface LandingPageProps {
@@ -33,12 +38,10 @@ export function LandingPage({ onConnectWallet, onTryDemo }: LandingPageProps) {
 
         {/* Diagonal Water Flow — Right */}
         <div
-          className="absolute right-0 top-0 bottom-0 w-[50%] hidden lg:block pointer-events-none overflow-hidden"
+          className="absolute right-0 top-0 bottom-0 w-[55%] hidden lg:block pointer-events-none overflow-hidden"
           style={{
-            maskImage: 'linear-gradient(to left, black 40%, transparent), linear-gradient(to bottom, transparent 2%, black 12%, black 88%, transparent 98%)',
-            WebkitMaskImage: 'linear-gradient(to left, black 40%, transparent), linear-gradient(to bottom, transparent 2%, black 12%, black 88%, transparent 98%)',
-            maskComposite: 'intersect',
-            WebkitMaskComposite: 'source-in',
+            maskImage: 'linear-gradient(to left, black 50%, transparent)',
+            WebkitMaskImage: 'linear-gradient(to left, black 50%, transparent)',
           }}
         >
           <style jsx global>{`
@@ -51,7 +54,16 @@ export function LandingPage({ onConnectWallet, onTryDemo }: LandingPageProps) {
               to { transform: translateY(60px); }
             }
           `}</style>
-          {/* Layer 1 — primary diagonal lines */}
+          {/* Frosted glass base layer */}
+          <div
+            className="absolute inset-0"
+            style={{
+              background: 'linear-gradient(160deg, transparent 20%, rgba(255,255,255,0.03) 50%, rgba(255,255,255,0.06) 75%, transparent 100%)',
+              backdropFilter: 'blur(0.5px)',
+              WebkitBackdropFilter: 'blur(0.5px)',
+            }}
+          />
+          {/* Layer 1 — visible diagonal bands with soft glass edges */}
           <div
             style={{
               position: 'absolute',
@@ -59,11 +71,11 @@ export function LandingPage({ onConnectWallet, onTryDemo }: LandingPageProps) {
               left: '-50%',
               width: '200%',
               height: '200%',
-              background: 'repeating-linear-gradient(30deg, transparent 0px, transparent 34px, rgba(255,255,255,0.05) 34px, rgba(255,255,255,0.05) 35px)',
+              background: 'repeating-linear-gradient(30deg, transparent 0px, transparent 28px, rgba(255,255,255,0.04) 30px, rgba(255,255,255,0.12) 32px, rgba(255,255,255,0.04) 34px, transparent 35px)',
               animation: 'diagonalFlow 2s linear infinite',
             }}
           />
-          {/* Layer 2 — secondary, wider spacing */}
+          {/* Layer 2 — wider softer bands for depth */}
           <div
             style={{
               position: 'absolute',
@@ -71,7 +83,7 @@ export function LandingPage({ onConnectWallet, onTryDemo }: LandingPageProps) {
               left: '-50%',
               width: '200%',
               height: '200%',
-              background: 'repeating-linear-gradient(30deg, transparent 0px, transparent 51px, rgba(255,255,255,0.03) 51px, rgba(255,255,255,0.03) 52px)',
+              background: 'repeating-linear-gradient(30deg, transparent 0px, transparent 42px, rgba(255,255,255,0.03) 44px, rgba(255,255,255,0.08) 48px, rgba(255,255,255,0.03) 50px, transparent 52px)',
               animation: 'diagonalFlowSlow 3.5s linear infinite',
             }}
           />
@@ -137,128 +149,314 @@ export function LandingPage({ onConnectWallet, onTryDemo }: LandingPageProps) {
         <div className="max-w-2xl mb-12 sm:mb-16">
           <p className="text-sm font-medium text-primary mb-3 uppercase tracking-wider">Products</p>
           <h2 className="text-3xl sm:text-4xl font-bold tracking-tight">
-            A fully integrated suite of crypto payment products
+            Complete crypto treasury infrastructure
           </h2>
           <p className="mt-4 text-lg text-muted-foreground leading-relaxed">
-            Every tool your business needs to accept payments, manage funds, and scale operations onchain.
+            Everything your business needs to send, receive, and manage funds onchain.
             Start with one product and add more as you grow.
           </p>
         </div>
 
-        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className="grid md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
+          {/* Send & Pay */}
+          <Link href="/pay" className="group">
+            <div className="p-5 rounded-2xl border border-white/20 bg-white/60 dark:bg-black/20 backdrop-blur-xl hover:border-primary/30 hover:shadow-xl hover:shadow-primary/10 transition-all h-full">
+              <div className="p-2.5 rounded-lg bg-blue-500/10 w-fit mb-3">
+                <ArrowRight className="h-5 w-5 text-blue-500" />
+              </div>
+              <h3 className="text-base font-semibold mb-1.5 group-hover:text-primary transition-colors">
+                Send & Pay
+              </h3>
+              <p className="text-sm text-muted-foreground leading-relaxed">
+                Send crypto payments to any address. Support multi-chain transfers with real-time confirmation.
+              </p>
+            </div>
+          </Link>
+
+          {/* Receive */}
+          <Link href="/receive" className="group">
+            <div className="p-5 rounded-2xl border border-white/20 bg-white/60 dark:bg-black/20 backdrop-blur-xl hover:border-primary/30 hover:shadow-xl hover:shadow-primary/10 transition-all h-full">
+              <div className="p-2.5 rounded-lg bg-green-500/10 w-fit mb-3">
+                <Wallet className="h-5 w-5 text-green-500" />
+              </div>
+              <h3 className="text-base font-semibold mb-1.5 group-hover:text-primary transition-colors">
+                Receive
+              </h3>
+              <p className="text-sm text-muted-foreground leading-relaxed">
+                Generate payment links and QR codes. Accept payments on any chain with instant notifications.
+              </p>
+            </div>
+          </Link>
+
           {/* Batch Payments */}
           <Link href="/batch-payment" className="group">
-            <div className="p-6 rounded-2xl border border-white/20 bg-white/60 dark:bg-black/20 backdrop-blur-xl hover:border-primary/30 hover:shadow-xl hover:shadow-primary/10 transition-all h-full">
-              <div className="p-3 rounded-lg bg-blue-500/10 w-fit mb-4">
-                <Users className="h-6 w-6 text-blue-500" />
+            <div className="p-5 rounded-2xl border border-white/20 bg-white/60 dark:bg-black/20 backdrop-blur-xl hover:border-primary/30 hover:shadow-xl hover:shadow-primary/10 transition-all h-full">
+              <div className="p-2.5 rounded-lg bg-orange-500/10 w-fit mb-3">
+                <Users className="h-5 w-5 text-orange-500" />
               </div>
-              <h3 className="text-lg font-semibold mb-2 group-hover:text-primary transition-colors">
+              <h3 className="text-base font-semibold mb-1.5 group-hover:text-primary transition-colors">
                 Batch Payments
               </h3>
               <p className="text-sm text-muted-foreground leading-relaxed">
-                Send to hundreds of recipients in one session. Upload Excel/CSV, auto-validate addresses,
-                and process payroll at scale with concurrent execution.
+                Send to hundreds of recipients at once. Upload CSV, auto-validate, and execute payroll at scale.
               </p>
-              <div className="mt-4 flex items-center text-sm text-primary opacity-0 group-hover:opacity-100 transition-opacity">
-                Learn more <ArrowRight className="ml-1 h-4 w-4" />
-              </div>
             </div>
           </Link>
 
-          {/* Gasless x402 */}
+          {/* Swap */}
+          <Link href="/swap" className="group">
+            <div className="p-5 rounded-2xl border border-white/20 bg-white/60 dark:bg-black/20 backdrop-blur-xl hover:border-primary/30 hover:shadow-xl hover:shadow-primary/10 transition-all h-full">
+              <div className="p-2.5 rounded-lg bg-purple-500/10 w-fit mb-3">
+                <ArrowLeftRight className="h-5 w-5 text-purple-500" />
+              </div>
+              <h3 className="text-base font-semibold mb-1.5 group-hover:text-primary transition-colors">
+                Swap
+              </h3>
+              <p className="text-sm text-muted-foreground leading-relaxed">
+                Exchange tokens across 70+ chains. Rango aggregates 100+ DEXs for best prices.
+              </p>
+            </div>
+          </Link>
+
+          {/* Gasless Checkout */}
           <Link href="/checkout" className="group">
-            <div className="p-6 rounded-2xl border border-white/20 bg-white/60 dark:bg-black/20 backdrop-blur-xl hover:border-primary/30 hover:shadow-xl hover:shadow-primary/10 transition-all h-full">
-              <div className="p-3 rounded-lg bg-yellow-500/10 w-fit mb-4">
-                <Zap className="h-6 w-6 text-yellow-500" />
+            <div className="p-5 rounded-2xl border border-white/20 bg-white/60 dark:bg-black/20 backdrop-blur-xl hover:border-primary/30 hover:shadow-xl hover:shadow-primary/10 transition-all h-full">
+              <div className="p-2.5 rounded-lg bg-yellow-500/10 w-fit mb-3">
+                <Zap className="h-5 w-5 text-yellow-500" />
               </div>
-              <h3 className="text-lg font-semibold mb-2 group-hover:text-primary transition-colors">
-                Gasless Checkout (x402)
+              <h3 className="text-base font-semibold mb-1.5 group-hover:text-primary transition-colors">
+                Gasless Checkout
               </h3>
               <p className="text-sm text-muted-foreground leading-relaxed">
-                Accept USDC payments without requiring your users to hold gas tokens.
-                ERC-3009 authorization separates signing from execution for a seamless UX.
+                Accept USDC without gas tokens. x402 protocol separates signing from execution.
               </p>
-              <div className="mt-4 flex items-center text-sm text-primary opacity-0 group-hover:opacity-100 transition-opacity">
-                Learn more <ArrowRight className="ml-1 h-4 w-4" />
-              </div>
-            </div>
-          </Link>
-
-          {/* Cross-Chain */}
-          <Link href="/omnichain" className="group">
-            <div className="p-6 rounded-2xl border border-white/20 bg-white/60 dark:bg-black/20 backdrop-blur-xl hover:border-primary/30 hover:shadow-xl hover:shadow-primary/10 transition-all h-full">
-              <div className="p-3 rounded-lg bg-green-500/10 w-fit mb-4">
-                <Globe className="h-6 w-6 text-green-500" />
-              </div>
-              <h3 className="text-lg font-semibold mb-2 group-hover:text-primary transition-colors">
-                Cross-Chain Transfers
-              </h3>
-              <p className="text-sm text-muted-foreground leading-relaxed">
-                Move USDC natively between chains via Circle CCTP. No bridge risk,
-                no slippage, no wrapped tokens. Burn-and-mint for 1:1 efficiency.
-              </p>
-              <div className="mt-4 flex items-center text-sm text-primary opacity-0 group-hover:opacity-100 transition-opacity">
-                Learn more <ArrowRight className="ml-1 h-4 w-4" />
-              </div>
             </div>
           </Link>
 
           {/* Subscriptions */}
           <Link href="/subscriptions" className="group">
-            <div className="p-6 rounded-2xl border border-white/20 bg-white/60 dark:bg-black/20 backdrop-blur-xl hover:border-primary/30 hover:shadow-xl hover:shadow-primary/10 transition-all h-full">
-              <div className="p-3 rounded-lg bg-purple-500/10 w-fit mb-4">
-                <RefreshCw className="h-6 w-6 text-purple-500" />
+            <div className="p-5 rounded-2xl border border-white/20 bg-white/60 dark:bg-black/20 backdrop-blur-xl hover:border-primary/30 hover:shadow-xl hover:shadow-primary/10 transition-all h-full">
+              <div className="p-2.5 rounded-lg bg-pink-500/10 w-fit mb-3">
+                <RefreshCw className="h-5 w-5 text-pink-500" />
               </div>
-              <h3 className="text-lg font-semibold mb-2 group-hover:text-primary transition-colors">
-                Subscriptions & Billing
+              <h3 className="text-base font-semibold mb-1.5 group-hover:text-primary transition-colors">
+                Subscriptions
               </h3>
               <p className="text-sm text-muted-foreground leading-relaxed">
-                Enable recurring onchain payments. Set billing cycles, manage subscriber budgets,
-                and automate collection with programmable authorization.
+                Recurring onchain payments. Set billing cycles and automate collection.
               </p>
-              <div className="mt-4 flex items-center text-sm text-primary opacity-0 group-hover:opacity-100 transition-opacity">
-                Learn more <ArrowRight className="ml-1 h-4 w-4" />
-              </div>
             </div>
           </Link>
 
           {/* AI Agents */}
           <Link href="/agents" className="group">
-            <div className="p-6 rounded-2xl border border-white/20 bg-white/60 dark:bg-black/20 backdrop-blur-xl hover:border-primary/30 hover:shadow-xl hover:shadow-primary/10 transition-all h-full">
-              <div className="p-3 rounded-lg bg-orange-500/10 w-fit mb-4">
-                <Bot className="h-6 w-6 text-orange-500" />
+            <div className="p-5 rounded-2xl border border-white/20 bg-white/60 dark:bg-black/20 backdrop-blur-xl hover:border-primary/30 hover:shadow-xl hover:shadow-primary/10 transition-all h-full">
+              <div className="p-2.5 rounded-lg bg-cyan-500/10 w-fit mb-3">
+                <Bot className="h-5 w-5 text-cyan-500" />
               </div>
-              <h3 className="text-lg font-semibold mb-2 group-hover:text-primary transition-colors">
-                AI Agent Commerce
+              <h3 className="text-base font-semibold mb-1.5 group-hover:text-primary transition-colors">
+                AI Agents
               </h3>
               <p className="text-sm text-muted-foreground leading-relaxed">
-                Give your AI agents autonomous spending power with session keys and budget constraints.
-                Secure, auditable, and revocable at any time.
+                Autonomous spending with session keys. Budget controls and instant revocation.
               </p>
-              <div className="mt-4 flex items-center text-sm text-primary opacity-0 group-hover:opacity-100 transition-opacity">
-                Learn more <ArrowRight className="ml-1 h-4 w-4" />
-              </div>
             </div>
           </Link>
 
-          {/* Multi-Sig */}
-          <Link href="/multisig" className="group">
-            <div className="p-6 rounded-2xl border border-white/20 bg-white/60 dark:bg-black/20 backdrop-blur-xl hover:border-primary/30 hover:shadow-xl hover:shadow-primary/10 transition-all h-full">
-              <div className="p-3 rounded-lg bg-cyan-500/10 w-fit mb-4">
-                <Layers className="h-6 w-6 text-cyan-500" />
+          {/* Omnichain */}
+          <Link href="/omnichain" className="group">
+            <div className="p-5 rounded-2xl border border-white/20 bg-white/60 dark:bg-black/20 backdrop-blur-xl hover:border-primary/30 hover:shadow-xl hover:shadow-primary/10 transition-all h-full">
+              <div className="p-2.5 rounded-lg bg-emerald-500/10 w-fit mb-3">
+                <Globe className="h-5 w-5 text-emerald-500" />
               </div>
-              <h3 className="text-lg font-semibold mb-2 group-hover:text-primary transition-colors">
-                Multi-Signature Wallets
+              <h3 className="text-base font-semibold mb-1.5 group-hover:text-primary transition-colors">
+                Omnichain Vault
               </h3>
               <p className="text-sm text-muted-foreground leading-relaxed">
-                Safe protocol integration with configurable thresholds. Require 2-of-3, 3-of-5,
-                or custom approval workflows before any transaction executes.
+                One address for all chains. Manage BTC, ETH, SOL from a unified interface.
               </p>
-              <div className="mt-4 flex items-center text-sm text-primary opacity-0 group-hover:opacity-100 transition-opacity">
-                Learn more <ArrowRight className="ml-1 h-4 w-4" />
-              </div>
             </div>
           </Link>
+
+          {/* Split Payments */}
+          <Link href="/split-payments" className="group">
+            <div className="p-5 rounded-2xl border border-white/20 bg-white/60 dark:bg-black/20 backdrop-blur-xl hover:border-primary/30 hover:shadow-xl hover:shadow-primary/10 transition-all h-full">
+              <div className="p-2.5 rounded-lg bg-indigo-500/10 w-fit mb-3">
+                <PieChart className="h-5 w-5 text-indigo-500" />
+              </div>
+              <h3 className="text-base font-semibold mb-1.5 group-hover:text-primary transition-colors">
+                Split Payments
+              </h3>
+              <p className="text-sm text-muted-foreground leading-relaxed">
+                Distribute funds by percentage. Perfect for royalties, revenue sharing, and teams.
+              </p>
+            </div>
+          </Link>
+
+          {/* Invoicing */}
+          <Link href="/acquiring/invoices" className="group">
+            <div className="p-5 rounded-2xl border border-white/20 bg-white/60 dark:bg-black/20 backdrop-blur-xl hover:border-primary/30 hover:shadow-xl hover:shadow-primary/10 transition-all h-full">
+              <div className="p-2.5 rounded-lg bg-slate-500/10 w-fit mb-3">
+                <Receipt className="h-5 w-5 text-slate-500" />
+              </div>
+              <h3 className="text-base font-semibold mb-1.5 group-hover:text-primary transition-colors">
+                Invoicing
+              </h3>
+              <p className="text-sm text-muted-foreground leading-relaxed">
+                Create and send professional crypto invoices. Track payment status in real-time.
+              </p>
+            </div>
+          </Link>
+
+          {/* Terminal */}
+          <Link href="/terminal" className="group">
+            <div className="p-5 rounded-2xl border border-white/20 bg-white/60 dark:bg-black/20 backdrop-blur-xl hover:border-primary/30 hover:shadow-xl hover:shadow-primary/10 transition-all h-full">
+              <div className="p-2.5 rounded-lg bg-gray-500/10 w-fit mb-3">
+                <CreditCard className="h-5 w-5 text-gray-500" />
+              </div>
+              <h3 className="text-base font-semibold mb-1.5 group-hover:text-primary transition-colors">
+                POS Terminal
+              </h3>
+              <p className="text-sm text-muted-foreground leading-relaxed">
+                Accept in-person crypto payments. Full-screen mode for retail checkout.
+              </p>
+            </div>
+          </Link>
+
+          {/* Analytics */}
+          <Link href="/analytics" className="group">
+            <div className="p-5 rounded-2xl border border-white/20 bg-white/60 dark:bg-black/20 backdrop-blur-xl hover:border-primary/30 hover:shadow-xl hover:shadow-primary/10 transition-all h-full">
+              <div className="p-2.5 rounded-lg bg-rose-500/10 w-fit mb-3">
+                <Layers className="h-5 w-5 text-rose-500" />
+              </div>
+              <h3 className="text-base font-semibold mb-1.5 group-hover:text-primary transition-colors">
+                Analytics
+              </h3>
+              <p className="text-sm text-muted-foreground leading-relaxed">
+                Track transactions, volumes, and trends. Export reports for accounting.
+              </p>
+            </div>
+          </Link>
+        </div>
+      </section>
+
+      {/* Feature Showcase 1: Global Payment Mesh */}
+      <section className="container mx-auto px-4 py-20 sm:py-28">
+        <div className="grid lg:grid-cols-2 gap-12 lg:gap-20 items-center">
+          <div className="order-2 lg:order-1">
+            <div className="rounded-2xl border border-white/20 bg-gradient-to-br from-white/80 to-white/40 dark:from-black/40 dark:to-black/20 backdrop-blur-xl overflow-hidden shadow-2xl">
+              <div className="p-1">
+                <img 
+                  src="/screenshots/payment-mesh.png" 
+                  alt="Global Payment Mesh Visualization" 
+                  className="w-full h-auto rounded-xl"
+                />
+              </div>
+            </div>
+          </div>
+          <div className="order-1 lg:order-2">
+            <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-primary/10 text-primary text-sm font-medium mb-4">
+              <Globe className="h-4 w-4" />
+              <span>Network Visualization</span>
+            </div>
+            <h2 className="text-3xl sm:text-4xl font-bold tracking-tight mb-4">
+              Global Payment Mesh
+            </h2>
+            <p className="text-lg text-muted-foreground leading-relaxed mb-6">
+              Visualize your entire payment network in real-time. See how funds flow across chains, 
+              wallets, and vendors in an interactive 3D graph. Identify patterns, track settlements, 
+              and understand your treasury's global footprint at a glance.
+            </p>
+            <ul className="space-y-3">
+              <li className="flex items-start gap-3">
+                <div className="p-1 rounded-full bg-green-500/10 mt-0.5">
+                  <Check className="h-4 w-4 text-green-500" />
+                </div>
+                <span className="text-muted-foreground">Real-time transaction flow visualization</span>
+              </li>
+              <li className="flex items-start gap-3">
+                <div className="p-1 rounded-full bg-green-500/10 mt-0.5">
+                  <Check className="h-4 w-4 text-green-500" />
+                </div>
+                <span className="text-muted-foreground">Multi-chain network topology mapping</span>
+              </li>
+              <li className="flex items-start gap-3">
+                <div className="p-1 rounded-full bg-green-500/10 mt-0.5">
+                  <Check className="h-4 w-4 text-green-500" />
+                </div>
+                <span className="text-muted-foreground">Interactive zoom, filter, and time-travel controls</span>
+              </li>
+            </ul>
+            <div className="mt-8">
+              <Link href="/analytics">
+                <Button size="lg" className="group">
+                  Explore Network Graph
+                  <ArrowRight className="ml-2 h-4 w-4 group-hover:translate-x-1 transition-transform" />
+                </Button>
+              </Link>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Feature Showcase 2: Batch Payment */}
+      <section className="border-y border-border bg-muted/20">
+        <div className="container mx-auto px-4 py-20 sm:py-28">
+          <div className="grid lg:grid-cols-2 gap-12 lg:gap-20 items-center">
+            <div>
+              <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-orange-500/10 text-orange-500 text-sm font-medium mb-4">
+                <Users className="h-4 w-4" />
+                <span>Payroll & Operations</span>
+              </div>
+              <h2 className="text-3xl sm:text-4xl font-bold tracking-tight mb-4">
+                Batch Payment Dashboard
+              </h2>
+              <p className="text-lg text-muted-foreground leading-relaxed mb-6">
+                Manage hundreds of vendors, contractors, and suppliers from a single interface. 
+                Upload spreadsheets, validate addresses automatically, and execute mass payouts 
+                with just one click. Perfect for payroll, grants, and vendor settlements.
+              </p>
+              <ul className="space-y-3">
+                <li className="flex items-start gap-3">
+                  <div className="p-1 rounded-full bg-green-500/10 mt-0.5">
+                    <Check className="h-4 w-4 text-green-500" />
+                  </div>
+                  <span className="text-muted-foreground">CSV/Excel upload with auto-validation</span>
+                </li>
+                <li className="flex items-start gap-3">
+                  <div className="p-1 rounded-full bg-green-500/10 mt-0.5">
+                    <Check className="h-4 w-4 text-green-500" />
+                  </div>
+                  <span className="text-muted-foreground">ENS & address book resolution</span>
+                </li>
+                <li className="flex items-start gap-3">
+                  <div className="p-1 rounded-full bg-green-500/10 mt-0.5">
+                    <Check className="h-4 w-4 text-green-500" />
+                  </div>
+                  <span className="text-muted-foreground">Concurrent execution with real-time progress tracking</span>
+                </li>
+              </ul>
+              <div className="mt-8">
+                <Link href="/batch-payment">
+                  <Button size="lg" className="group">
+                    Start Batch Payment
+                    <ArrowRight className="ml-2 h-4 w-4 group-hover:translate-x-1 transition-transform" />
+                  </Button>
+                </Link>
+              </div>
+            </div>
+            <div>
+              <div className="rounded-2xl border border-white/20 bg-gradient-to-br from-white/80 to-white/40 dark:from-black/40 dark:to-black/20 backdrop-blur-xl overflow-hidden shadow-2xl">
+                <div className="p-1">
+                  <img 
+                    src="/screenshots/batch-payment.png" 
+                    alt="Batch Payment Dashboard" 
+                    className="w-full h-auto rounded-xl"
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       </section>
 

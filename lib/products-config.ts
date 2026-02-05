@@ -34,8 +34,8 @@ export interface ProductItem {
 // Overview
 export const overviewItems: ProductItem[] = [
   {
-    href: "/",
-    title: "Home",
+    href: "/dashboard",
+    title: "Dashboard",
     description: "Dashboard overview",
     icon: Home,
   },

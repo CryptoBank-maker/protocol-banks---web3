@@ -158,8 +158,8 @@ export function Header() {
           )}
         </div>
 
-        {/* Desktop Navigation */}
-        <nav className="hidden md:flex items-center gap-1">
+        {/* Desktop Navigation — Apple glassmorphism */}
+        <nav className="hidden md:flex items-center gap-1.5">
           {navItems
             .filter((item) => item.href !== "/products")
             .map((item) => {
@@ -167,16 +167,29 @@ export function Header() {
               const isActive = isActivePath(item.href)
               return (
                 <Link key={item.href} href={item.href}>
-                  <Button
-                    variant={isActive ? "secondary" : "ghost"}
-                    size="sm"
-                    className={`gap-1.5 text-xs ${
-                      isActive ? "font-medium" : "text-muted-foreground"
+                  <button
+                    className={`relative flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-all duration-200 ${
+                      isActive
+                        ? "text-foreground"
+                        : "text-muted-foreground hover:text-foreground"
                     }`}
+                    style={{
+                      background: isActive
+                        ? "rgba(255,255,255,0.12)"
+                        : "rgba(255,255,255,0.04)",
+                      backdropFilter: "blur(20px) saturate(1.4)",
+                      WebkitBackdropFilter: "blur(20px) saturate(1.4)",
+                      border: isActive
+                        ? "0.5px solid rgba(255,255,255,0.18)"
+                        : "0.5px solid rgba(255,255,255,0.06)",
+                      boxShadow: isActive
+                        ? "0 2px 12px rgba(0,0,0,0.08)"
+                        : "none",
+                    }}
                   >
-                    <Icon className="h-3.5 w-3.5" />
+                    <Icon className="h-4.5 w-4.5" style={{ width: 18, height: 18 }} />
                     {item.label}
-                  </Button>
+                  </button>
                 </Link>
               )
             })}
@@ -185,6 +198,7 @@ export function Header() {
         <div className="flex items-center gap-2 shrink-0">
           <SoundSettings />
           <ThemeToggle />
+          <UnifiedWalletButton />
           <Button
             variant="outline"
             size="sm"
@@ -207,7 +221,6 @@ export function Header() {
               </>
             )}
           </Button>
-          <UnifiedWalletButton />
         </div>
       </div>
     </header>
