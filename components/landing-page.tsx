@@ -384,7 +384,7 @@ export function LandingPage({ onConnectWallet, onTryDemo }: LandingPageProps) {
             </p>
           </div>
           
-          <div className="relative w-full max-w-7xl mx-auto px-4 sm:px-8 lg:px-12">
+          <div className="relative w-full mx-auto">
             <style jsx global>{`
               @keyframes marquee {
                 0% { transform: translateX(0); }
@@ -401,8 +401,8 @@ export function LandingPage({ onConnectWallet, onTryDemo }: LandingPageProps) {
             <div 
               className="flex overflow-hidden relative"
               style={{ 
-                maskImage: 'linear-gradient(to right, transparent, black 10%, black 90%, transparent)', 
-                WebkitMaskImage: 'linear-gradient(to right, transparent, black 10%, black 90%, transparent)' 
+                maskImage: 'linear-gradient(to right, transparent, black 3%, black 97%, transparent)', 
+                WebkitMaskImage: 'linear-gradient(to right, transparent, black 3%, black 97%, transparent)' 
               }}
             >
                <div className="flex animate-marquee gap-6 sm:gap-8 items-center py-6">

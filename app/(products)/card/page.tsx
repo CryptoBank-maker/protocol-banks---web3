@@ -3,6 +3,7 @@
 import type React from "react"
 
 import { useState, useRef } from "react"
+import Image from "next/image"
 import { useUnifiedWallet } from "@/hooks/use-unified-wallet"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -78,7 +79,7 @@ function LiquidMetalCard({
   const lightY = mousePosition.y * 100
 
   return (
-    <div className="perspective-1000 cursor-pointer" style={{ perspective: "1000px" }} onClick={onFlip}>
+    <div className="cursor-pointer" style={{ perspective: "1000px" }} onClick={onFlip}>
       <div
         ref={cardRef}
         onMouseMove={handleMouseMove}
@@ -90,154 +91,80 @@ function LiquidMetalCard({
           transform: `rotateX(${rotateX}deg) rotateY(${isFlipped ? 180 + rotateY : rotateY}deg)`,
         }}
       >
-        {/* Front of card - Updated to dark indigo theme */}
+        {/* Front — frosted glass */}
         <div className="absolute inset-0 rounded-3xl overflow-hidden" style={{ backfaceVisibility: "hidden" }}>
-          {/* Base gradient - dark with subtle indigo */}
-          <div className="absolute inset-0 bg-gradient-to-br from-[#0a0a0f] via-[#0f0a1a] to-[#050510]" />
-
-          {/* Metallic shimmer layer */}
+          {/* Glass base — semi-transparent dark with blur */}
           <div
-            className="absolute inset-0 opacity-60"
+            className="absolute inset-0"
             style={{
-              background: `
-                radial-gradient(
-                  ellipse 80% 50% at ${lightX}% ${lightY}%,
-                  rgba(255,255,255,0.12) 0%,
-                  transparent 50%
-                ),
-                linear-gradient(
-                  135deg,
-                  rgba(255,255,255,0.08) 0%,
-                  transparent 50%,
-                  rgba(255,255,255,0.04) 100%
-                )
-              `,
+              background: "linear-gradient(135deg, rgba(255,255,255,0.08) 0%, rgba(255,255,255,0.02) 50%, rgba(255,255,255,0.06) 100%)",
+              backdropFilter: "blur(40px)",
+              WebkitBackdropFilter: "blur(40px)",
             }}
           />
 
-          {/* Liquid metal reflection - indigo tones */}
+          {/* Subtle noise texture */}
+          <div
+            className="absolute inset-0 opacity-[0.03]"
+            style={{
+              backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E")`,
+            }}
+          />
+
+          {/* Moving light reflection */}
           <div
             className="absolute inset-0 transition-opacity duration-300"
             style={{
-              opacity: isHovering ? 0.7 : 0.3,
-              background: `
-                radial-gradient(
-                  circle at ${lightX}% ${lightY}%,
-                  rgba(99,102,241,0.4) 0%,
-                  rgba(139,92,246,0.2) 30%,
-                  transparent 60%
-                )
-              `,
+              opacity: isHovering ? 0.6 : 0.2,
+              background: `radial-gradient(
+                ellipse 60% 40% at ${lightX}% ${lightY}%,
+                rgba(255,255,255,0.15) 0%,
+                transparent 60%
+              )`,
             }}
           />
 
-          {/* Subtle holographic effect - muted */}
-          <div
-            className="absolute inset-0 opacity-20 mix-blend-overlay"
-            style={{
-              background: `
-                linear-gradient(
-                  ${45 + (mousePosition.x - 0.5) * 30}deg,
-                  rgba(139,92,246,0.3) 0%,
-                  rgba(99,102,241,0.3) 50%,
-                  rgba(168,85,247,0.3) 100%
-                )
-              `,
-            }}
-          />
-
-          {/* Card border */}
-          <div className="absolute inset-0 rounded-3xl border border-white/10" />
+          {/* Edge highlight */}
           <div
             className="absolute inset-0 rounded-3xl transition-opacity duration-300"
             style={{
-              opacity: isHovering ? 1 : 0,
-              boxShadow: `
-                inset 0 0 30px rgba(99,102,241,0.1),
-                0 0 40px rgba(99,102,241,0.15)
-              `,
+              border: "1px solid rgba(255,255,255,0.15)",
+              boxShadow: isHovering
+                ? "inset 0 0 40px rgba(255,255,255,0.04), 0 8px 60px rgba(99,102,241,0.12)"
+                : "inset 0 0 20px rgba(255,255,255,0.02)",
             }}
           />
 
-          {/* Card content */}
+          {/* Card content — logo only + Mastercard outline */}
           <div className="relative h-full p-8 flex flex-col justify-between z-10">
-            {/* Top row */}
-            <div className="flex justify-between items-start">
-              <div className="flex flex-col">
-                <span className="text-2xl font-bold text-white/90 tracking-tight">Protocol</span>
-                <span className="text-sm text-primary/80 -mt-1">Bank</span>
-              </div>
-              <div className="flex items-center gap-3">
-                <Badge
-                  variant="outline"
-                  className="border-white/20 bg-white/5 text-white/60 text-[10px] uppercase tracking-wider"
-                >
-                  {userCard?.type || "Debit"}
-                </Badge>
-                {userCard?.status === "frozen" && <Snowflake className="w-4 h-4 text-primary" />}
-              </div>
+            {/* Logo — top left */}
+            <div className="flex items-start">
+              <Image
+                src="/logo-text-white.png"
+                alt="Protocol Banks"
+                width={160}
+                height={40}
+                className="opacity-80"
+                style={{ objectFit: "contain", objectPosition: "left" }}
+              />
             </div>
 
-            {/* Middle - Chip and contactless */}
-            <div className="flex items-center gap-6">
-              <div className="relative">
-                <div className="w-14 h-11 rounded-lg bg-gradient-to-br from-[#d4af37] via-[#f4d03f] to-[#c9a227] shadow-lg overflow-hidden">
-                  <div className="absolute inset-1 grid grid-cols-4 grid-rows-3 gap-[2px]">
-                    {[...Array(12)].map((_, i) => (
-                      <div key={i} className="bg-[#8b7355]/40 rounded-[1px]" />
-                    ))}
-                  </div>
-                  <div className="absolute inset-0 bg-gradient-to-tr from-transparent via-white/20 to-transparent" />
-                </div>
-              </div>
+            {/* Spacer */}
+            <div className="flex-1" />
 
-              <div className="w-10 h-10 rounded-full border border-white/15 bg-white/5 flex items-center justify-center">
-                <svg viewBox="0 0 24 24" className="w-5 h-5 text-white/50">
-                  <path
-                    fill="currentColor"
-                    d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8z"
-                    opacity="0.3"
-                  />
-                  <path
-                    fill="currentColor"
-                    d="M7.5 12c0-2.48 2.02-4.5 4.5-4.5v-2c-3.58 0-6.5 2.92-6.5 6.5s2.92 6.5 6.5 6.5v-2c-2.48 0-4.5-2.02-4.5-4.5z"
-                  />
-                  <path
-                    fill="currentColor"
-                    d="M12 8.5c1.93 0 3.5 1.57 3.5 3.5s-1.57 3.5-3.5 3.5v2c3.04 0 5.5-2.46 5.5-5.5S15.04 6.5 12 6.5v2z"
-                  />
-                  <circle fill="currentColor" cx="12" cy="12" r="2" />
-                </svg>
-              </div>
-            </div>
-
-            {/* Card number */}
-            <div className="space-y-1">
-              <div className="font-mono text-2xl tracking-[0.25em] text-white/90 font-medium">
-                {showDetails ? "4532 7891 2345" : "•••• •••• ••••"} {userCard?.last4 || "4289"}
-              </div>
-            </div>
-
-            {/* Bottom row */}
-            <div className="flex justify-between items-end">
-              <div>
-                <div className="text-[10px] text-white/30 uppercase tracking-widest mb-1">Card Holder</div>
-                <div className="text-base text-white/90 font-medium tracking-wide">
-                  {userCard?.cardholderName || "YOUR NAME"}
-                </div>
-              </div>
-              <div className="text-right">
-                <div className="text-[10px] text-white/30 uppercase tracking-widest mb-1">Valid Thru</div>
-                <div className="text-base text-white/90 font-mono">
-                  {userCard?.expiryMonth || "12"}/{userCard?.expiryYear || "28"}
-                </div>
-              </div>
-              <div className="text-white/70 font-bold text-xl italic tracking-tight">VISA</div>
+            {/* Bottom row — Mastercard outline, bottom right */}
+            <div className="flex justify-end items-end">
+              <svg width="56" height="36" viewBox="0 0 56 36" fill="none" xmlns="http://www.w3.org/2000/svg">
+                {/* Left circle */}
+                <circle cx="20" cy="18" r="14" stroke="rgba(255,255,255,0.3)" strokeWidth="1.2" fill="none" />
+                {/* Right circle */}
+                <circle cx="36" cy="18" r="14" stroke="rgba(255,255,255,0.3)" strokeWidth="1.2" fill="none" />
+              </svg>
             </div>
           </div>
         </div>
 
-        {/* Back of card */}
+        {/* Back — frosted glass */}
         <div
           className="absolute inset-0 rounded-3xl overflow-hidden"
           style={{
@@ -245,51 +172,74 @@ function LiquidMetalCard({
             transform: "rotateY(180deg)",
           }}
         >
-          <div className="absolute inset-0 bg-gradient-to-br from-[#050510] via-[#0f0a1a] to-[#0a0a0f]" />
+          {/* Glass base */}
           <div
-            className="absolute inset-0 opacity-30"
+            className="absolute inset-0"
             style={{
-              background: `
-                radial-gradient(
-                  ellipse 80% 50% at ${100 - lightX}% ${lightY}%,
-                  rgba(99,102,241,0.2) 0%,
-                  transparent 50%
-                )
-              `,
+              background: "linear-gradient(135deg, rgba(255,255,255,0.06) 0%, rgba(255,255,255,0.02) 50%, rgba(255,255,255,0.08) 100%)",
+              backdropFilter: "blur(40px)",
+              WebkitBackdropFilter: "blur(40px)",
             }}
           />
 
-          <div className="relative h-full flex flex-col z-10">
-            <div className="w-full h-14 bg-gradient-to-r from-[#1a1a1a] via-[#2a2a2a] to-[#1a1a1a] mt-8 shadow-inner" />
+          {/* Moving light */}
+          <div
+            className="absolute inset-0 transition-opacity duration-300"
+            style={{
+              opacity: isHovering ? 0.4 : 0.15,
+              background: `radial-gradient(
+                ellipse 60% 40% at ${100 - lightX}% ${lightY}%,
+                rgba(255,255,255,0.12) 0%,
+                transparent 60%
+              )`,
+            }}
+          />
 
-            <div className="flex-1 px-8 py-6 flex flex-col justify-between">
+          {/* Border */}
+          <div
+            className="absolute inset-0 rounded-3xl"
+            style={{ border: "1px solid rgba(255,255,255,0.12)" }}
+          />
+
+          <div className="relative h-full flex flex-col z-10">
+            {/* Magnetic stripe */}
+            <div className="w-full h-12 bg-white/[0.06] mt-8 border-y border-white/[0.08]" />
+
+            <div className="flex-1 px-8 py-5 flex flex-col justify-between">
+              {/* Signature + CVV */}
               <div className="flex items-center gap-4">
-                <div className="flex-1 h-12 bg-gradient-to-r from-gray-200 via-white to-gray-200 rounded flex items-center px-4">
-                  <span className="text-gray-400 italic text-sm">
+                <div className="flex-1 h-10 bg-white/[0.06] rounded border border-white/[0.08] flex items-center px-4">
+                  <span className="text-white/20 italic text-sm">
                     {userCard?.cardholderName || "Authorized Signature"}
                   </span>
                 </div>
-                <div className="bg-white rounded px-4 py-2">
-                  <div className="text-[8px] text-gray-500 uppercase">CVV</div>
-                  <div className="font-mono text-lg text-gray-800 font-bold">
+                <div className="bg-white/[0.08] rounded border border-white/[0.08] px-4 py-1.5">
+                  <div className="text-[8px] text-white/30 uppercase">CVV</div>
+                  <div className="font-mono text-lg text-white/60 font-bold">
                     {showDetails ? userCard?.cvv || "742" : "•••"}
                   </div>
                 </div>
               </div>
 
-              <div className="text-[9px] text-white/30 leading-relaxed">
-                This card is property of Protocol Bank. Use of this card is subject to the cardholder agreement. For
-                customer service, visit protocolbank.io/support
+              {/* Fine print */}
+              <div className="text-[9px] text-white/15 leading-relaxed">
+                This card is property of Protocol Banks. Use subject to the cardholder agreement.
               </div>
 
+              {/* Bottom — logo + Mastercard */}
               <div className="flex justify-between items-center">
-                <div className="text-white/50 text-sm">
-                  <span className="font-bold">Protocol</span> Bank
-                </div>
-                <div className="flex items-center gap-2">
-                  <div className="w-8 h-5 rounded bg-gradient-to-r from-red-500 to-yellow-500" />
-                  <div className="w-8 h-5 rounded bg-gradient-to-r from-blue-600 to-blue-400" />
-                </div>
+                <Image
+                  src="/logo-text-white.png"
+                  alt="Protocol Banks"
+                  width={100}
+                  height={24}
+                  className="opacity-40"
+                  style={{ objectFit: "contain", objectPosition: "left" }}
+                />
+                <svg width="42" height="28" viewBox="0 0 56 36" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <circle cx="20" cy="18" r="14" stroke="rgba(255,255,255,0.2)" strokeWidth="1" fill="none" />
+                  <circle cx="36" cy="18" r="14" stroke="rgba(255,255,255,0.2)" strokeWidth="1" fill="none" />
+                </svg>
               </div>
             </div>
           </div>
@@ -423,12 +373,12 @@ export default function CardPage() {
               <h1 className="text-5xl md:text-6xl font-bold tracking-tight leading-tight">
                 Your Crypto,
                 <span className="block text-transparent bg-clip-text bg-gradient-to-r from-primary via-violet-400 to-purple-400">
-                  Liquid Metal Card
+                  Glass Card
                 </span>
               </h1>
 
               <p className="text-xl text-muted-foreground max-w-lg leading-relaxed">
-                Experience the future of payments. Our liquid metal card converts your stablecoins to any currency
+                Experience the future of payments. A transparent card that converts your stablecoins to any currency
                 instantly at point of sale.
               </p>
 
