@@ -384,7 +384,7 @@ export function LandingPage({ onConnectWallet, onTryDemo }: LandingPageProps) {
             </p>
           </div>
           
-          <div className="relative w-full max-w-6xl mx-auto">
+          <div className="relative w-full max-w-7xl mx-auto px-4 sm:px-8 lg:px-12">
             <style jsx global>{`
               @keyframes marquee {
                 0% { transform: translateX(0); }
@@ -405,7 +405,7 @@ export function LandingPage({ onConnectWallet, onTryDemo }: LandingPageProps) {
                 WebkitMaskImage: 'linear-gradient(to right, transparent, black 10%, black 90%, transparent)' 
               }}
             >
-               <div className="flex animate-marquee gap-4 sm:gap-6 items-center py-4">
+               <div className="flex animate-marquee gap-6 sm:gap-8 items-center py-6">
                   {[
                     { name: "Ethereum", logo: "/networks/eth.png" },
                     { name: "Polygon", logo: "/networks/polygon.png" },
@@ -435,26 +435,26 @@ export function LandingPage({ onConnectWallet, onTryDemo }: LandingPageProps) {
                   ].map((chain, i) => (
                     <div
                       key={`${chain.name}-${i}`}
-                      className="flex items-center gap-3 px-6 py-3 rounded-full border border-white/20 bg-white/40 dark:bg-black/20 backdrop-blur-xl hover:bg-white/60 hover:dark:bg-black/40 hover:border-primary/30 transition-all shrink-0 cursor-default"
+                      className="flex items-center gap-4 px-8 py-4 rounded-full border border-white/20 bg-white/40 dark:bg-black/20 backdrop-blur-xl hover:bg-white/60 hover:dark:bg-black/40 hover:border-primary/30 transition-all shrink-0 cursor-default"
                     >
                       {chain.logo ? (
-                        <div className="relative h-6 w-6">
+                        <div className="relative h-8 w-8">
                            <Image 
                               src={chain.logo} 
                               alt={chain.name} 
-                              width={24} 
-                              height={24}
+                              width={32} 
+                              height={32}
                               className="object-contain" 
                            />
                         </div>
                       ) : chain.icon === "Bitcoin" ? (
-                         <Bitcoin className="h-6 w-6 text-[#F7931A]" />
+                         <Bitcoin className="h-8 w-8 text-[#F7931A]" />
                       ) : (
-                        <div className="h-6 w-6 rounded-full flex items-center justify-center text-[10px] font-bold text-white shadow-sm" style={{ backgroundColor: chain.color || '#666' }}>
+                        <div className="h-8 w-8 rounded-full flex items-center justify-center text-xs font-bold text-white shadow-sm" style={{ backgroundColor: chain.color || '#666' }}>
                           {chain.name[0]}
                         </div>
                       )}
-                      <span className="font-medium text-sm">{chain.name}</span>
+                      <span className="font-medium text-base">{chain.name}</span>
                     </div>
                   ))}
                </div>
