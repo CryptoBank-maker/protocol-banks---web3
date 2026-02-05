@@ -7,6 +7,7 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import crypto from "crypto"
+import { getAuthenticatedAddress } from "@/lib/api-auth"
 
 // Generate secure invoice ID
 function generateInvoiceId(): string {
@@ -32,6 +33,11 @@ function generateSignature(data: string): string {
 
 export async function POST(request: NextRequest) {
   try {
+    const callerAddress = await getAuthenticatedAddress(request);
+    if (!callerAddress) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
     const body = await request.json()
     const { recipientAddress, amount, token, chain, description, merchantName, expiresIn, metadata, amountFiat, fiatCurrency } = body
 
@@ -155,6 +161,11 @@ export async function GET(request: NextRequest) {
 // Update invoice status (e.g., after payment)
 export async function PATCH(request: NextRequest) {
   try {
+    const callerAddress = await getAuthenticatedAddress(request);
+    if (!callerAddress) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
     const body = await request.json()
     const { invoiceId, status, txHash, paidBy } = body
 

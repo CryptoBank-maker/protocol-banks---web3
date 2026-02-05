@@ -7,6 +7,7 @@ import {
   verifyVendorIntegrity,
   createAuditLog,
 } from "@/lib/security/security"
+import { getAuthenticatedAddress } from "@/lib/api-auth"
 
 /**
  * GET /api/vendors?owner=0x...
@@ -70,6 +71,11 @@ export async function GET(request: NextRequest) {
  */
 export async function POST(request: NextRequest) {
   try {
+    const callerAddress = await getAuthenticatedAddress(request);
+    if (!callerAddress) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
     const body = await request.json()
     const {
       name,

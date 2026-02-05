@@ -122,7 +122,7 @@ export default function MonetizePage() {
         {
           id: "key_2",
           name: "Development API",
-          key: "pk_test_51Hb8J2EZvKYlo2CXD9X8E5xY",
+          key: "pb_test_dev_xxxxxxxxxxxxxxxxxxxx",
           createdAt: new Date(Date.now() - 15 * 24 * 60 * 60 * 1000).toISOString(),
           lastUsed: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
           calls: 2341,
