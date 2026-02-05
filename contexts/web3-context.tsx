@@ -101,6 +101,7 @@ export function Web3Provider({ children }: { children: ReactNode }) {
     return false
   })
 
+  const [evmSigner, setEvmSigner] = useState<any>(null)
   const [sessionId] = useState(() => generateSessionId())
   const [securityStatus, setSecurityStatus] = useState({
     providerAuthentic: false,
@@ -252,6 +253,18 @@ export function Web3Provider({ children }: { children: ReactNode }) {
         setWallets((prev) => ({ ...prev, [type]: address }))
         setActiveChain(type)
 
+        // Create and store signer for EVM wallet
+        if (type === "EVM" && typeof window !== "undefined" && window.ethereum) {
+          try {
+            const { ethers } = await import("ethers")
+            const provider = new ethers.BrowserProvider(window.ethereum)
+            const signer = await provider.getSigner()
+            setEvmSigner(signer)
+          } catch (e) {
+            console.warn("[v0] Failed to create signer:", e)
+          }
+        }
+
         const bindResult = bindSessionToWallet(sessionId, address)
         if (bindResult.success) {
           setSecurityStatus((prev) => ({ ...prev, sessionBound: true }))
@@ -281,6 +294,7 @@ export function Web3Provider({ children }: { children: ReactNode }) {
   const disconnectWallet = (type?: ChainType) => {
     if (type) {
       setWallets((prev) => ({ ...prev, [type]: null }))
+      if (type === "EVM") setEvmSigner(null)
 
       try {
         const savedWallets = JSON.parse(localStorage.getItem("connected_wallets") || "{}")
@@ -296,6 +310,7 @@ export function Web3Provider({ children }: { children: ReactNode }) {
       }
     } else {
       setWallets({ EVM: null, SOLANA: null, BITCOIN: null })
+      setEvmSigner(null)
       setUsdtBalance("0")
       setUsdcBalance("0")
       setDaiBalance("0")
@@ -532,7 +547,7 @@ export function Web3Provider({ children }: { children: ReactNode }) {
         wallets,
         address: wallets.EVM,
         wallet: wallets.EVM,
-        signer: null,
+        signer: evmSigner,
         signMessage,
         sendToken,
         signERC3009Authorization,

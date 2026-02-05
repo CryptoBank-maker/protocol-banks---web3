@@ -33,9 +33,122 @@ import {
   Filter,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { useDemo } from "@/contexts/demo-context";
 import type { AcquiringOrder, Merchant } from "@/types/acquiring";
 
+// Demo orders shown when no wallet is connected
+const DEMO_ORDERS: AcquiringOrder[] = [
+  {
+    id: "demo-order-001",
+    order_no: "ORDER-78A3F1",
+    merchant_id: "demo-merchant-001",
+    amount: 25.00,
+    currency: "USD",
+    token: "USDC",
+    chain_id: 1,
+    payment_method: "crypto_transfer",
+    status: "paid",
+    payer_address: "0xAbC1234567890DEF1234567890abcdef12345678",
+    tx_hash: "0x9f8e7d6c5b4a3210fedcba9876543210abcdef0123456789abcdef0123456789",
+    expires_at: new Date(Date.now() + 86400000).toISOString(),
+    paid_at: new Date(Date.now() - 2 * 3600000).toISOString(),
+    created_at: new Date(Date.now() - 4 * 3600000).toISOString(),
+    updated_at: new Date(Date.now() - 2 * 3600000).toISOString(),
+  },
+  {
+    id: "demo-order-002",
+    order_no: "ORDER-92B4E2",
+    merchant_id: "demo-merchant-002",
+    amount: 150.00,
+    currency: "USD",
+    token: "USDC",
+    chain_id: 137,
+    status: "pending",
+    expires_at: new Date(Date.now() + 1800000).toISOString(),
+    created_at: new Date(Date.now() - 600000).toISOString(),
+    updated_at: new Date(Date.now() - 600000).toISOString(),
+  },
+  {
+    id: "demo-order-003",
+    order_no: "ORDER-15C7D3",
+    merchant_id: "demo-merchant-001",
+    amount: 499.99,
+    currency: "USD",
+    token: "USDT",
+    chain_id: 1,
+    payment_method: "crypto_transfer",
+    status: "paid",
+    payer_address: "0x1234abCD5678EF901234abcd5678ef9012345678",
+    tx_hash: "0xabcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789",
+    expires_at: new Date(Date.now() + 86400000).toISOString(),
+    paid_at: new Date(Date.now() - 86400000).toISOString(),
+    created_at: new Date(Date.now() - 2 * 86400000).toISOString(),
+    updated_at: new Date(Date.now() - 86400000).toISOString(),
+  },
+  {
+    id: "demo-order-004",
+    order_no: "ORDER-33F9A4",
+    merchant_id: "demo-merchant-003",
+    amount: 75.00,
+    currency: "USD",
+    token: "USDC",
+    chain_id: 42161,
+    status: "expired",
+    expires_at: new Date(Date.now() - 3600000).toISOString(),
+    created_at: new Date(Date.now() - 3 * 86400000).toISOString(),
+    updated_at: new Date(Date.now() - 3 * 86400000).toISOString(),
+  },
+  {
+    id: "demo-order-005",
+    order_no: "ORDER-56E2B5",
+    merchant_id: "demo-merchant-002",
+    amount: 1200.00,
+    currency: "USD",
+    token: "USDC",
+    chain_id: 137,
+    payment_method: "crypto_transfer",
+    status: "paid",
+    payer_address: "0xDEF4567890abcdef1234567890ABCDEF12345678",
+    tx_hash: "0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef",
+    expires_at: new Date(Date.now() + 86400000).toISOString(),
+    paid_at: new Date(Date.now() - 5 * 86400000).toISOString(),
+    created_at: new Date(Date.now() - 7 * 86400000).toISOString(),
+    updated_at: new Date(Date.now() - 5 * 86400000).toISOString(),
+  },
+];
+
+const DEMO_MERCHANTS: Merchant[] = [
+  {
+    id: "demo-merchant-001",
+    user_id: "demo-user",
+    name: "Protocol Coffee Shop",
+    wallet_address: "0x742d35Cc6634C0532925a3b844Bc9e7595f2bD18",
+    status: "active",
+    created_at: new Date(Date.now() - 30 * 86400000).toISOString(),
+    updated_at: new Date(Date.now() - 2 * 86400000).toISOString(),
+  },
+  {
+    id: "demo-merchant-002",
+    user_id: "demo-user",
+    name: "Web3 Design Studio",
+    wallet_address: "0x8Ba1f109551bD432803012645Ac136ddd64DBA72",
+    status: "active",
+    created_at: new Date(Date.now() - 14 * 86400000).toISOString(),
+    updated_at: new Date(Date.now() - 1 * 86400000).toISOString(),
+  },
+  {
+    id: "demo-merchant-003",
+    user_id: "demo-user",
+    name: "DeFi Tutoring",
+    wallet_address: "0xdD2FD4581271e230360230F9337D5c0430Bf44C0",
+    status: "active",
+    created_at: new Date(Date.now() - 3 * 86400000).toISOString(),
+    updated_at: new Date(Date.now() - 3 * 86400000).toISOString(),
+  },
+];
+
 export default function OrdersPage() {
+  const { isDemoMode } = useDemo();
   const { toast } = useToast();
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
@@ -58,9 +171,16 @@ export default function OrdersPage() {
   });
 
   useEffect(() => {
-    loadMerchants();
-    loadOrders();
-  }, []);
+    if (isDemoMode) {
+      setMerchants(DEMO_MERCHANTS);
+      setOrders(DEMO_ORDERS);
+      setFormData((prev) => ({ ...prev, merchant_id: DEMO_MERCHANTS[0].id }));
+      setLoading(false);
+    } else {
+      loadMerchants();
+      loadOrders();
+    }
+  }, [isDemoMode]);
 
   const loadMerchants = async () => {
     try {

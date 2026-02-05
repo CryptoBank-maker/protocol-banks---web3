@@ -9,9 +9,15 @@ import { type NextRequest, NextResponse } from "next/server"
 import { distributeAsset, checkAssetAvailability, type AssetDistributionConfig } from "@/lib/asset-distribution"
 import { createServerClient } from "@supabase/ssr"
 import { cookies } from "next/headers"
+import { getAuthenticatedAddress } from "@/lib/api-auth"
 
 export async function POST(request: NextRequest) {
   try {
+    const callerAddress = await getAuthenticatedAddress(request);
+    if (!callerAddress) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
     const body = await request.json()
     const {
       paymentTxHash,

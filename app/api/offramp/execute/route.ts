@@ -9,6 +9,7 @@ import { type NextRequest, NextResponse } from "next/server"
 import { createServerClient } from "@supabase/ssr"
 import { cookies } from "next/headers"
 import crypto from "crypto"
+import { getAuthenticatedAddress } from "@/lib/api-auth"
 
 interface OfframpExecuteRequest {
   quoteId: string
@@ -55,6 +56,11 @@ const PROVIDERS = {
 
 export async function POST(request: NextRequest) {
   try {
+    const callerAddress = await getAuthenticatedAddress(request);
+    if (!callerAddress) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
     const body: OfframpExecuteRequest = await request.json()
     const {
       quoteId,

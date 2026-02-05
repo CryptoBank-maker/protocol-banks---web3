@@ -1,6 +1,7 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { getSupabase } from "@/lib/supabase"
 import { validateBatch, calculateBatchTotals, type BatchPaymentItem } from "@/lib/services"
+import { getAuthenticatedAddress } from "@/lib/api-auth"
 
 /**
  * POST /api/batch-payment
@@ -8,6 +9,11 @@ import { validateBatch, calculateBatchTotals, type BatchPaymentItem } from "@/li
  */
 export async function POST(request: NextRequest) {
   try {
+    const callerAddress = await getAuthenticatedAddress(request);
+    if (!callerAddress) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
     const body = await request.json()
     const { recipients, token, chainId, fromAddress, memo } = body
 

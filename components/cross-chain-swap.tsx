@@ -41,7 +41,7 @@ import {
   type RangoAsset,
   type TokenInfo,
 } from "@/lib/rango"
-import { useWeb3 } from "@/contexts/web3-context"
+import { useUnifiedWallet } from "@/hooks/use-unified-wallet"
 import { useUserType } from "@/contexts/user-type-context"
 import { toast } from "sonner"
 import Image from "next/image"
@@ -61,7 +61,7 @@ export function CrossChainSwap({
   recipientAddress,
   onSwapComplete,
 }: CrossChainSwapProps) {
-  const { address, signer, isConnected } = useWeb3()
+  const { address, signer, isConnected } = useUnifiedWallet()
   const { isWeb2User, translateTerm } = useUserType()
 
   // Chain & Token Selection

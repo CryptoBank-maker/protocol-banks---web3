@@ -18,8 +18,19 @@ import {
   TrendingUp,
   ArrowRight,
 } from "lucide-react";
+import { useDemo } from "@/contexts/demo-context";
+
+// Demo stats shown when no wallet is connected
+const DEMO_STATS = {
+  totalMerchants: 3,
+  totalOrders: 47,
+  pendingOrders: 5,
+  paidOrders: 38,
+  totalAmount: 12480.50,
+};
 
 export default function AcquiringDashboard() {
+  const { isDemoMode } = useDemo();
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState({
     totalMerchants: 0,
@@ -30,8 +41,13 @@ export default function AcquiringDashboard() {
   });
 
   useEffect(() => {
-    loadStats();
-  }, []);
+    if (isDemoMode) {
+      setStats(DEMO_STATS);
+      setLoading(false);
+    } else {
+      loadStats();
+    }
+  }, [isDemoMode]);
 
   const loadStats = async () => {
     try {
@@ -84,6 +100,17 @@ export default function AcquiringDashboard() {
           Manage your acquiring business
         </p>
       </div>
+
+      {/* Demo Mode Banner */}
+      {isDemoMode && (
+        <Card className="mb-6 border-blue-500/20 bg-blue-500/5">
+          <CardContent className="pt-6 pb-4">
+            <p className="text-sm text-blue-500">
+              You are viewing demo data. Connect your wallet to see real acquiring data.
+            </p>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Data Overview */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">

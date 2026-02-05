@@ -10,7 +10,7 @@ import {
   calculateNextPaymentDate,
   formatSubscriptionForDisplay,
 } from "@/lib/subscription-helpers"
-import { processSinglePayment } from "@/lib/services/payment-service"
+// processSinglePayment is dynamically imported in handlePayNow to avoid bundling server-only modules (prisma, ioredis)
 import type { SubscriptionInput, AutoPayUseCase } from "@/types"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
@@ -159,6 +159,7 @@ export default function SubscriptionsPage() {
     }
 
     try {
+      const { processSinglePayment } = await import("@/lib/services/payment-service")
       const result = await processSinglePayment(
         {
           address: subscription.recipient_address,

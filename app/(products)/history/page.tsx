@@ -10,6 +10,7 @@ import { Search, Download, ArrowUpRight, ArrowDownLeft, ExternalLink, Calendar, 
 import { useUnifiedWallet } from "@/hooks/use-unified-wallet"
 import { getSupabase } from "@/lib/supabase"
 import { Alert, AlertDescription } from "@/components/ui/alert"
+import { useDemo } from "@/contexts/demo-context"
 import Link from "next/link"
 import type { Transaction } from "@/types"
 import type { PaymentGroup } from "@/types/payment"
@@ -24,8 +25,93 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 
+// Demo transaction data for preview when no wallet is connected
+const DEMO_TRANSACTIONS: Transaction[] = [
+  {
+    id: "demo-tx-1",
+    type: "sent",
+    amount: "500",
+    token: "USDC",
+    token_symbol: "USDC",
+    chain: "ethereum",
+    from_address: "0xYourWallet...d3F8",
+    to_address: "0xAlice9a2B...7c4E",
+    tx_hash: "0xdemo1a2b3c4d5e6f7890abcdef1234567890abcdef1234567890abcdef12345678",
+    status: "completed",
+    timestamp: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
+    created_at: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
+    notes: "Batch payment - Team payroll",
+    amount_usd: 500,
+  },
+  {
+    id: "demo-tx-2",
+    type: "received",
+    amount: "1200",
+    token: "USDC",
+    token_symbol: "USDC",
+    chain: "ethereum",
+    from_address: "0xClient4e7F...b12A",
+    to_address: "0xYourWallet...d3F8",
+    tx_hash: "0xdemo2b3c4d5e6f7890abcdef1234567890abcdef1234567890abcdef12345679",
+    status: "completed",
+    timestamp: new Date(Date.now() - 8 * 60 * 60 * 1000).toISOString(),
+    created_at: new Date(Date.now() - 8 * 60 * 60 * 1000).toISOString(),
+    notes: "Invoice #1042 payment",
+    amount_usd: 1200,
+  },
+  {
+    id: "demo-tx-3",
+    type: "sent",
+    amount: "15.99",
+    token: "USDC",
+    token_symbol: "USDC",
+    chain: "polygon",
+    from_address: "0xYourWallet...d3F8",
+    to_address: "0xNetflix8cD...e93B",
+    tx_hash: "0xdemo3c4d5e6f7890abcdef1234567890abcdef1234567890abcdef1234567a",
+    status: "completed",
+    timestamp: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
+    created_at: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
+    notes: "Subscription - Netflix",
+    amount_usd: 15.99,
+  },
+  {
+    id: "demo-tx-4",
+    type: "sent",
+    amount: "2500",
+    token: "USDC",
+    token_symbol: "USDC",
+    chain: "arbitrum",
+    from_address: "0xYourWallet...d3F8",
+    to_address: "0xAWS5fA1c2...4d7E",
+    tx_hash: "0xdemo4d5e6f7890abcdef1234567890abcdef1234567890abcdef1234567b",
+    status: "completed",
+    timestamp: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString(),
+    created_at: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString(),
+    notes: "Auto pay - AWS Infrastructure",
+    amount_usd: 2500,
+  },
+  {
+    id: "demo-tx-5",
+    type: "received",
+    amount: "50",
+    token: "USDC",
+    token_symbol: "USDC",
+    chain: "base",
+    from_address: "0xBob3eC7a1...f28D",
+    to_address: "0xYourWallet...d3F8",
+    tx_hash: "0xdemo5e6f7890abcdef1234567890abcdef1234567890abcdef1234567c",
+    status: "completed",
+    timestamp: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString(),
+    created_at: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString(),
+    notes: "Payment link - Coffee reimbursement",
+    amount_usd: 50,
+  },
+]
+
 export default function HistoryPage() {
   const { isConnected, address: wallet, chainId } = useUnifiedWallet()
+  const { isDemoMode } = useDemo()
   const [transactions, setTransactions] = useState<Transaction[]>([])
   const [loading, setLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState("")
@@ -70,19 +156,25 @@ export default function HistoryPage() {
     }
   }, [])
 
+  // Determine if we should show demo data (demo mode or no wallet connected)
+  const showDemoData = isDemoMode || !isConnected
+
   useEffect(() => {
-    if (isConnected && wallet) {
+    if (isConnected && wallet && !isDemoMode) {
       loadTransactions()
+    } else if (showDemoData) {
+      setTransactions(DEMO_TRANSACTIONS)
+      setLoading(false)
     } else {
       setLoading(false)
     }
-  }, [isConnected, wallet])
+  }, [isConnected, wallet, isDemoMode, showDemoData])
 
   useEffect(() => {
-    if (activeTab === "groups" && isConnected && wallet) {
+    if (activeTab === "groups" && isConnected && wallet && !isDemoMode) {
       loadGroups()
     }
-  }, [activeTab, isConnected, wallet, loadGroups])
+  }, [activeTab, isConnected, wallet, loadGroups, isDemoMode])
 
   const loadTransactions = async () => {
     try {
@@ -253,7 +345,22 @@ export default function HistoryPage() {
         </div>
       </div>
 
-      {!isConnected ? (
+      {showDemoData && (
+        <Alert className="bg-primary/5 border-primary/20 mb-4">
+          <AlertDescription className="flex items-center justify-between">
+            <span>
+              {!isConnected
+                ? "Showing preview data. Connect your wallet to view your real transaction history."
+                : "Showing preview data. Disable demo mode to view your real transactions."}
+            </span>
+            <Badge variant="outline" className="ml-2 shrink-0 border-primary/30 text-primary">
+              Preview
+            </Badge>
+          </AlertDescription>
+        </Alert>
+      )}
+
+      {(!isConnected && !showDemoData) ? (
         <Alert className="bg-primary/5 border-primary/20">
           <AlertDescription>Connect your wallet to view your transaction history</AlertDescription>
         </Alert>
@@ -517,6 +624,11 @@ export default function HistoryPage() {
                             ? `To: ${tx.to_address.slice(0, 6)}...${tx.to_address.slice(-4)}`
                             : `From: ${tx.from_address.slice(0, 6)}...${tx.from_address.slice(-4)}`}
                         </div>
+                        {tx.notes && (
+                          <div className="text-xs text-muted-foreground/70 mt-0.5">
+                            {tx.notes}
+                          </div>
+                        )}
                         <div className="text-xs text-muted-foreground">
                           {new Date(tx.timestamp || tx.created_at).toLocaleDateString()} {new Date(tx.timestamp || tx.created_at).toLocaleTimeString()}
                         </div>
@@ -580,7 +692,7 @@ export default function HistoryPage() {
           amount_usd: tx.amount_usd != null ? tx.amount_usd : (Number.parseFloat(String(tx.amount)) || 0),
           timestamp: tx.timestamp || tx.created_at,
         }))}
-        walletAddress={wallet || undefined}
+        walletAddress={wallet || (showDemoData ? "0xYourWallet...d3F8" : undefined)}
         loading={loading}
         title="Recent Activity"
         description="Your most recent transactions"

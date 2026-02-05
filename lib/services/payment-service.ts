@@ -11,7 +11,10 @@ import {
   type BatchPaymentItem,
 } from "@/lib/services"
 import { webhookTriggerService, type PaymentEventData, type BatchPaymentEventData } from "./webhook-trigger-service"
-import { vendorPaymentService } from "./vendor-payment-service"
+
+// Lazy import to avoid bundling pg/prisma on client side
+const getVendorPaymentService = () =>
+  import("./vendor-payment-service").then((m) => m.vendorPaymentService)
 
 /**
  * 验证收款人数据
@@ -77,12 +80,14 @@ export async function processSinglePayment(
     console.error("[v0] Failed to trigger payment.created webhook:", err)
   })
 
-  // Auto-link payment to vendor (fire and forget)
-  vendorPaymentService.autoLinkPayment(paymentId, recipient.address).then((vendorId) => {
-    if (vendorId) {
-      console.log("[v0] Payment auto-linked to vendor:", vendorId)
-    }
-  }).catch((err) => {
+  // Auto-link payment to vendor (fire and forget, lazy loaded to avoid prisma in client bundle)
+  getVendorPaymentService().then((svc) =>
+    svc.autoLinkPayment(paymentId, recipient.address).then((vendorId) => {
+      if (vendorId) {
+        console.log("[v0] Payment auto-linked to vendor:", vendorId)
+      }
+    })
+  ).catch((err) => {
     console.error("[v0] Failed to auto-link payment to vendor:", err)
   })
 

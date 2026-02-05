@@ -4,7 +4,9 @@
  */
 
 import { WebhookService, type WebhookEvent, generateWebhookSignature } from './webhook-service';
-import { prisma } from '@/lib/prisma';
+
+// Lazy prisma import to avoid bundling pg in client components
+const getPrisma = () => import('@/lib/prisma').then((m) => m.prisma);
 
 // ============================================
 // Types
@@ -196,7 +198,8 @@ export async function processWebhookDeliveries(): Promise<{ processed: number; s
     for (const delivery of deliveries) {
       try {
         // Get webhook details
-        const webhook = await prisma.webhook.findUnique({
+        const db = await getPrisma();
+        const webhook = await db.webhook.findUnique({
           where: { id: delivery.webhook_id }
         });
 

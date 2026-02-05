@@ -1,7 +1,8 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { useWeb3 } from "@/contexts/web3-context"
+import { useUnifiedWallet } from "@/hooks/use-unified-wallet"
+import { useDemo } from "@/contexts/demo-context"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -44,11 +45,82 @@ interface Agent {
   auto_execute_max_amount?: string
   created_at: string
   last_active_at?: string
+  budget?: {
+    total: string
+    spent: string
+    remaining: string
+  }
+  session_key_address?: string
+  allowed_tokens?: string[]
+  max_per_tx?: string
 }
 
+// Demo data for preview when no wallet is connected
+const demoAgents: Agent[] = [
+  {
+    id: "agent_demo_1",
+    name: "Payroll Agent",
+    description: "Automated monthly salary distribution to team members across multiple chains",
+    status: "active",
+    api_key_prefix: "pb_sk_payroll",
+    webhook_url: "https://api.company.io/webhooks/payroll",
+    auto_execute_enabled: true,
+    auto_execute_max_amount: "5000",
+    created_at: new Date(Date.now() - 45 * 24 * 60 * 60 * 1000).toISOString(),
+    last_active_at: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
+    budget: {
+      total: "50000",
+      spent: "32450",
+      remaining: "17550",
+    },
+    session_key_address: "0x7a3B...9f2E",
+    allowed_tokens: ["USDC", "USDT", "DAI"],
+    max_per_tx: "5000",
+  },
+  {
+    id: "agent_demo_2",
+    name: "DCA Bot",
+    description: "Dollar cost averaging into ETH -- buys $200 worth every Monday and Thursday",
+    status: "active",
+    api_key_prefix: "pb_sk_dcabot",
+    auto_execute_enabled: true,
+    auto_execute_max_amount: "200",
+    created_at: new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString(),
+    last_active_at: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString(),
+    budget: {
+      total: "10000",
+      spent: "4800",
+      remaining: "5200",
+    },
+    session_key_address: "0x2eC4...d71A",
+    allowed_tokens: ["USDC"],
+    max_per_tx: "200",
+  },
+  {
+    id: "agent_demo_3",
+    name: "Subscription Manager",
+    description: "Auto-pay for SaaS services, infrastructure costs, and recurring vendor invoices",
+    status: "paused",
+    api_key_prefix: "pb_sk_submgr",
+    webhook_url: "https://billing.internal/hooks/protocol-bank",
+    auto_execute_enabled: true,
+    auto_execute_max_amount: "500",
+    created_at: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString(),
+    last_active_at: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString(),
+    budget: {
+      total: "6000",
+      spent: "1850",
+      remaining: "4150",
+    },
+    session_key_address: "0xf8A1...3c5D",
+    allowed_tokens: ["USDC", "USDT"],
+    max_per_tx: "500",
+  },
+]
+
 export default function AgentsPage() {
-  const { wallets } = useWeb3()
-  const address = wallets.EVM
+  const { address } = useUnifiedWallet()
+  const { isDemoMode } = useDemo()
   const { toast } = useToast()
   const [agents, setAgents] = useState<Agent[]>([])
   const [loading, setLoading] = useState(true)
@@ -66,19 +138,20 @@ export default function AgentsPage() {
   const [autoExecuteMaxAmount, setAutoExecuteMaxAmount] = useState("")
 
   useEffect(() => {
-    if (address) {
-      loadAgents()
-    }
-  }, [address])
+    loadAgents()
+  }, [address, isDemoMode])
 
   const loadAgents = async () => {
-    if (!address) return
     setLoading(true)
     try {
-      const response = await fetch(`/api/agents?owner=${address}`)
-      if (response.ok) {
-        const data = await response.json()
-        setAgents(data.agents || [])
+      if (isDemoMode || !address) {
+        setAgents(demoAgents)
+      } else {
+        const response = await fetch(`/api/agents?owner=${address}`)
+        if (response.ok) {
+          const data = await response.json()
+          setAgents(data.agents || [])
+        }
       }
     } catch (error) {
       console.error("Failed to load agents:", error)
@@ -87,8 +160,43 @@ export default function AgentsPage() {
     }
   }
 
+  const isPreviewMode = isDemoMode || !address
+
   const handleCreateAgent = async () => {
-    if (!address || !agentName) return
+    if (!agentName) return
+
+    if (isPreviewMode) {
+      const demoAgent: Agent = {
+        id: `agent_demo_${Date.now()}`,
+        name: agentName,
+        description: agentDescription,
+        status: "active",
+        api_key_prefix: `pb_sk_${agentName.toLowerCase().replace(/\s+/g, "").slice(0, 6)}`,
+        webhook_url: webhookUrl || undefined,
+        auto_execute_enabled: autoExecuteEnabled,
+        auto_execute_max_amount: autoExecuteMaxAmount || undefined,
+        created_at: new Date().toISOString(),
+        last_active_at: undefined,
+        budget: { total: "0", spent: "0", remaining: "0" },
+        session_key_address: `0x${Math.random().toString(16).slice(2, 6)}...${Math.random().toString(16).slice(2, 6)}`,
+        allowed_tokens: ["USDC"],
+        max_per_tx: autoExecuteMaxAmount || "100",
+      }
+      setNewApiKey("pb_sk_demo_" + Math.random().toString(36).slice(2, 18))
+      setAgents((prev) => [demoAgent, ...prev])
+      toast({
+        title: "Agent Created (Preview)",
+        description: "This is demo data. Connect your wallet to create real agents.",
+      })
+      setAgentName("")
+      setAgentDescription("")
+      setWebhookUrl("")
+      setAutoExecuteEnabled(false)
+      setAutoExecuteMaxAmount("")
+      return
+    }
+
+    if (!address) return
 
     try {
       const response = await fetch('/api/agents', {
@@ -131,7 +239,17 @@ export default function AgentsPage() {
   }
 
   const handleDeleteAgent = async () => {
-    if (!address || !selectedAgent) return
+    if (!selectedAgent) return
+
+    if (isPreviewMode) {
+      setAgents((prev) => prev.filter((a) => a.id !== selectedAgent.id))
+      toast({ title: "Agent Deactivated (Preview)" })
+      setDeleteDialogOpen(false)
+      setSelectedAgent(null)
+      return
+    }
+
+    if (!address) return
 
     try {
       const response = await fetch(`/api/agents/${selectedAgent.id}`, {
@@ -159,19 +277,28 @@ export default function AgentsPage() {
   }
 
   const handleToggleStatus = async (agent: Agent) => {
+    const newStatus = agent.status === 'active' ? 'paused' : 'active'
+
+    if (isPreviewMode) {
+      setAgents((prev) => prev.map((a) =>
+        a.id === agent.id ? { ...a, status: newStatus } : a
+      ))
+      toast({ title: `Agent ${newStatus === 'active' ? 'Resumed' : 'Paused'} (Preview)` })
+      return
+    }
+
     try {
-      const newStatus = agent.status === 'active' ? 'paused' : 'active'
       const response = await fetch(`/api/agents/${agent.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
+        body: JSON.stringify({
           owner_address: address,
-          status: newStatus 
+          status: newStatus
         }),
       })
 
       if (response.ok) {
-        setAgents((prev) => prev.map((a) => 
+        setAgents((prev) => prev.map((a) =>
           a.id === agent.id ? { ...a, status: newStatus } : a
         ))
         toast({ title: `Agent ${newStatus === 'active' ? 'Resumed' : 'Paused'}` })
@@ -186,6 +313,12 @@ export default function AgentsPage() {
   }
 
   const handlePauseAll = async () => {
+    if (isPreviewMode) {
+      setAgents((prev) => prev.map((a) => ({ ...a, status: 'paused' as const })))
+      toast({ title: "All Agents Paused (Preview)", description: "Emergency pause activated" })
+      return
+    }
+
     try {
       const response = await fetch('/api/agents/pause-all', {
         method: 'POST',

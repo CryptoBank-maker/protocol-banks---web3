@@ -3,7 +3,7 @@
 import type React from "react"
 
 import { useState, useRef } from "react"
-import { useWeb3 } from "@/contexts/web3-context"
+import { useUnifiedWallet } from "@/hooks/use-unified-wallet"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -302,7 +302,7 @@ function LiquidMetalCard({
 }
 
 export default function CardPage() {
-  const { isConnected, wallet } = useWeb3()
+  const { isConnected, address: wallet } = useUnifiedWallet()
   const [activeTab, setActiveTab] = useState<"overview" | "apply" | "manage">("overview")
   const [cardType, setCardType] = useState<CardType>("virtual")
   const [isApplying, setIsApplying] = useState(false)

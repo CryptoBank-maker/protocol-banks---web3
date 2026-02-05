@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Loader2, CheckCircle2, AlertCircle, Clock, Copy, ArrowLeft, RefreshCw } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { useWeb3 } from "@/contexts/web3-context";
+import { useUnifiedWallet } from "@/hooks/use-unified-wallet";
 import { sendToken, getTokenAddress, ERC20_ABI, CHAIN_IDS, RPC_URLS } from "@/lib/web3";
 import { ethers } from "ethers";
 import { QRCodeSVG } from "qrcode.react";
@@ -62,7 +62,7 @@ const PAYMENT_METHODS: PaymentMethod[] = [
 function CheckoutContent() {
   const searchParams = useSearchParams();
   const { toast } = useToast();
-  const { chainId } = useWeb3();
+  const { chainId } = useUnifiedWallet();
 
   const NETWORK_CHAIN_IDS: Record<string, number> = {
     eth: CHAIN_IDS.MAINNET,

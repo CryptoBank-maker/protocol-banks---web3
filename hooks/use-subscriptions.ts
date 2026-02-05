@@ -172,12 +172,14 @@ class ApiError extends Error {
   }
 }
 
-async function apiRequest<T>(url: string, options?: RequestInit): Promise<T> {
+async function apiRequest<T>(url: string, options?: RequestInit & { walletAddress?: string }): Promise<T> {
+  const { walletAddress: _wa, ...fetchOptions } = options || {}
   const response = await fetch(url, {
-    ...options,
+    ...fetchOptions,
     headers: {
       "Content-Type": "application/json",
-      ...options?.headers,
+      ...(options?.walletAddress ? { "x-wallet-address": options.walletAddress } : {}),
+      ...fetchOptions?.headers,
     },
   })
 
@@ -238,7 +240,8 @@ export function useSubscriptions(options: UseSubscriptionsOptions = {}) {
 
       // Fetch from REST API
       const response = await apiRequest<{ success: boolean; subscriptions: Subscription[] }>(
-        "/api/subscriptions"
+        "/api/subscriptions",
+        { walletAddress }
       )
 
       console.log("[v0] useSubscriptions: Loaded from API, count:", response.subscriptions?.length || 0)
@@ -273,6 +276,7 @@ export function useSubscriptions(options: UseSubscriptionsOptions = {}) {
         {
           method: "POST",
           body: JSON.stringify(subscription),
+          walletAddress,
         }
       )
 
@@ -297,6 +301,7 @@ export function useSubscriptions(options: UseSubscriptionsOptions = {}) {
         {
           method: "PUT",
           body: JSON.stringify(updates),
+          walletAddress,
         }
       )
 
@@ -304,7 +309,7 @@ export function useSubscriptions(options: UseSubscriptionsOptions = {}) {
         prev.map((s) => (s.id === id ? { ...s, ...updates, updated_at: new Date().toISOString() } : s)),
       )
     },
-    [isDemoMode],
+    [isDemoMode, walletAddress],
   )
 
   // Update subscription status via REST API
@@ -324,6 +329,7 @@ export function useSubscriptions(options: UseSubscriptionsOptions = {}) {
         {
           method: "PUT",
           body: JSON.stringify({ status }),
+          walletAddress,
         }
       )
 
@@ -346,7 +352,7 @@ export function useSubscriptions(options: UseSubscriptionsOptions = {}) {
       // Delete via REST API
       await apiRequest<{ success: boolean }>(
         `/api/subscriptions/${id}`,
-        { method: "DELETE" }
+        { method: "DELETE", walletAddress }
       )
 
       setSubscriptions((prev) => prev.filter((s) => s.id !== id))

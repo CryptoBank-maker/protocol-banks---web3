@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { useWeb3 } from "@/contexts/web3-context"
+import { useUnifiedWallet } from "@/hooks/use-unified-wallet"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -60,7 +60,7 @@ const PAYMENT_METHODS = [
 type Step = "configure" | "review" | "processing" | "complete"
 
 export default function OfframpPage() {
-  const { isConnected, wallet } = useWeb3()
+  const { isConnected, address: wallet } = useUnifiedWallet()
   const [step, setStep] = useState<Step>("configure")
   const [loading, setLoading] = useState(false)
   const [amount, setAmount] = useState("")

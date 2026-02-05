@@ -5,6 +5,7 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
+import { getAuthenticatedAddress } from "@/lib/api-auth";
 
 export async function GET(
   request: NextRequest,
@@ -84,6 +85,11 @@ export async function PATCH(
   { params }: { params: Promise<{ orderNo: string }> },
 ) {
   try {
+    const callerAddress = await getAuthenticatedAddress(request);
+    if (!callerAddress) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
     const { orderNo } = await params;
     const body = await request.json();
     const { status, payment_method, payer_address, tx_hash } = body;

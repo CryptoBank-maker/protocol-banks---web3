@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect, use } from "react"
-import { useWeb3 } from "@/contexts/web3-context"
+import { useUnifiedWallet } from "@/hooks/use-unified-wallet"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -47,8 +47,7 @@ interface Activity {
 
 export default function AgentDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params)
-  const { wallets } = useWeb3()
-  const address = wallets.EVM
+  const { address } = useUnifiedWallet()
   const { toast } = useToast()
   const [agent, setAgent] = useState<Agent | null>(null)
   const [budgets, setBudgets] = useState<Budget[]>([])

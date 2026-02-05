@@ -298,7 +298,7 @@ export default function BalancesPage() {
       type: p.type as "sent" | "received",
       amount: parseFloat(String(p.amount)) || 0,
       currency: p.token,
-      status: p.status as "completed" | "pending" | "failed",
+      status: (p.status?.toLowerCase() || "pending") as "completed" | "pending" | "failed",
       timestamp: p.timestamp || p.created_at,
       entity: p.vendor_name || (p.type === 'sent' ? p.to_address : p.from_address) || "Unknown"
     }))

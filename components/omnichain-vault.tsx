@@ -26,7 +26,7 @@ import {
   Loader2,
   ArrowDownUp,
 } from "lucide-react"
-import { useWeb3 } from "@/contexts/web3-context"
+import { useUnifiedWallet } from "@/hooks/use-unified-wallet"
 import { useUserType } from "@/contexts/user-type-context"
 import { ZetaChainService, type OmnichainBalance } from "@/lib/zetachain"
 import { toast } from "sonner"
@@ -71,7 +71,7 @@ const ChainIcon = ({ chain }: { chain: string }): React.ReactElement => {
 }
 
 export function OmnichainVault() {
-  const { address, isConnected } = useWeb3()
+  const { address, isConnected } = useUnifiedWallet()
   const { translateTerm } = useUserType()
 
   const [balances, setBalances] = useState<OmnichainBalance[]>([])

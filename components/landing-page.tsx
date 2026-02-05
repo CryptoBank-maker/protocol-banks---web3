@@ -1,6 +1,7 @@
 "use client"
 
 import Link from "next/link"
+import Image from "next/image"
 import { Button } from "@/components/ui/button"
 import {
   ArrowRight,
@@ -15,6 +16,7 @@ import {
   CreditCard,
   ChevronRight,
   Play,
+  Bitcoin,
 } from "lucide-react"
 
 interface LandingPageProps {
@@ -371,7 +373,7 @@ export function LandingPage({ onConnectWallet, onTryDemo }: LandingPageProps) {
       </section>
 
       {/* Supported Chains */}
-      <section className="border-y border-border bg-muted/20">
+      <section className="border-y border-border bg-muted/20 overflow-hidden">
         <div className="container mx-auto px-4 py-16 sm:py-20">
           <div className="text-center mb-10">
             <h2 className="text-2xl sm:text-3xl font-bold tracking-tight">
@@ -381,19 +383,82 @@ export function LandingPage({ onConnectWallet, onTryDemo }: LandingPageProps) {
               Connect your preferred wallet and operate across all major networks from a single dashboard.
             </p>
           </div>
-          <div className="flex flex-wrap justify-center gap-4 sm:gap-6 text-sm text-muted-foreground">
-            {[
-              "Ethereum", "Polygon", "Arbitrum", "Optimism",
-              "Base", "BSC", "Avalanche", "HashKey Chain",
-              "Solana", "Bitcoin", "ZetaChain",
-            ].map((chain) => (
-              <div
-                key={chain}
-                className="px-5 py-3 rounded-full border border-border bg-card hover:border-primary/30 transition-colors"
-              >
-                {chain}
-              </div>
-            ))}
+          
+          <div className="relative w-full max-w-6xl mx-auto">
+            <style jsx global>{`
+              @keyframes marquee {
+                0% { transform: translateX(0); }
+                100% { transform: translateX(-50%); }
+              }
+              .animate-marquee {
+                animation: marquee 40s linear infinite;
+              }
+              .animate-marquee:hover {
+                animation-play-state: paused;
+              }
+            `}</style>
+            
+            <div 
+              className="flex overflow-hidden relative"
+              style={{ 
+                maskImage: 'linear-gradient(to right, transparent, black 10%, black 90%, transparent)', 
+                WebkitMaskImage: 'linear-gradient(to right, transparent, black 10%, black 90%, transparent)' 
+              }}
+            >
+               <div className="flex animate-marquee gap-4 sm:gap-6 items-center py-4">
+                  {[
+                    { name: "Ethereum", logo: "/networks/eth.png" },
+                    { name: "Polygon", logo: "/networks/polygon.png" },
+                    { name: "Arbitrum", logo: "/networks/arb.png" },
+                    { name: "Optimism", logo: "/networks/optimism.png" },
+                    { name: "Base", logo: "/networks/base.png" },
+                    { name: "BSC", logo: "/networks/bnb.png" },
+                    { name: "Avalanche", logo: "/networks/avax.png" },
+                    { name: "HashKey Chain", logo: "/networks/hsk.png" },
+                    { name: "Solana", logo: "/networks/solana.png" },
+                    { name: "Tron", logo: "/networks/tron.png" },
+                    { name: "Bitcoin", icon: "Bitcoin", color: "#F7931A" },
+                    { name: "ZetaChain", color: "#005741" },
+                    // Repeat list to ensure smooth seamless loop
+                    { name: "Ethereum", logo: "/networks/eth.png" },
+                    { name: "Polygon", logo: "/networks/polygon.png" },
+                    { name: "Arbitrum", logo: "/networks/arb.png" },
+                    { name: "Optimism", logo: "/networks/optimism.png" },
+                    { name: "Base", logo: "/networks/base.png" },
+                    { name: "BSC", logo: "/networks/bnb.png" },
+                    { name: "Avalanche", logo: "/networks/avax.png" },
+                    { name: "HashKey Chain", logo: "/networks/hsk.png" },
+                    { name: "Solana", logo: "/networks/solana.png" },
+                    { name: "Tron", logo: "/networks/tron.png" },
+                    { name: "Bitcoin", icon: "Bitcoin", color: "#F7931A" },
+                    { name: "ZetaChain", color: "#005741" },
+                  ].map((chain, i) => (
+                    <div
+                      key={`${chain.name}-${i}`}
+                      className="flex items-center gap-3 px-6 py-3 rounded-full border border-border bg-card/50 hover:bg-card hover:border-primary/30 transition-all shrink-0 cursor-default"
+                    >
+                      {chain.logo ? (
+                        <div className="relative h-6 w-6">
+                           <Image 
+                              src={chain.logo} 
+                              alt={chain.name} 
+                              width={24} 
+                              height={24}
+                              className="object-contain" 
+                           />
+                        </div>
+                      ) : chain.icon === "Bitcoin" ? (
+                         <Bitcoin className="h-6 w-6 text-[#F7931A]" />
+                      ) : (
+                        <div className="h-6 w-6 rounded-full flex items-center justify-center text-[10px] font-bold text-white shadow-sm" style={{ backgroundColor: chain.color || '#666' }}>
+                          {chain.name[0]}
+                        </div>
+                      )}
+                      <span className="font-medium text-sm">{chain.name}</span>
+                    </div>
+                  ))}
+               </div>
+            </div>
           </div>
         </div>
       </section>

@@ -9,6 +9,7 @@ import { type NextRequest, NextResponse } from "next/server"
 import { createServerClient } from "@supabase/ssr"
 import { cookies } from "next/headers"
 import crypto from "crypto"
+import { getAuthenticatedAddress } from "@/lib/api-auth"
 
 // ============================================
 // Helpers
@@ -59,6 +60,11 @@ function buildPaymentUrl(linkId: string, recipientAddress: string, amount: strin
 
 export async function POST(request: NextRequest) {
   try {
+    const callerAddress = await getAuthenticatedAddress(request);
+    if (!callerAddress) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
     const body = await request.json()
     const {
       merchantId,
@@ -220,6 +226,11 @@ export async function GET(request: NextRequest) {
 
 export async function PATCH(request: NextRequest) {
   try {
+    const callerAddress = await getAuthenticatedAddress(request);
+    if (!callerAddress) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
     const body = await request.json()
     const { linkId, status, ...updates } = body
 
@@ -260,6 +271,11 @@ export async function PATCH(request: NextRequest) {
 
 export async function DELETE(request: NextRequest) {
   try {
+    const callerAddress = await getAuthenticatedAddress(request);
+    if (!callerAddress) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
     const { searchParams } = new URL(request.url)
     const linkId = searchParams.get("linkId")
 

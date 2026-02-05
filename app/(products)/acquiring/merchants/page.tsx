@@ -15,9 +15,48 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Loader2, Plus, Copy, CheckCircle2, Store } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { useDemo } from "@/contexts/demo-context";
 import type { Merchant } from "@/types/acquiring";
 
+// Demo merchants shown when no wallet is connected
+const DEMO_MERCHANTS: Merchant[] = [
+  {
+    id: "demo-merchant-001",
+    user_id: "demo-user",
+    name: "Protocol Coffee Shop",
+    wallet_address: "0x742d35Cc6634C0532925a3b844Bc9e7595f2bD18",
+    callback_url: "https://protocoffee.example.com/webhook",
+    logo_url: "",
+    status: "active",
+    created_at: new Date(Date.now() - 30 * 86400000).toISOString(),
+    updated_at: new Date(Date.now() - 2 * 86400000).toISOString(),
+  },
+  {
+    id: "demo-merchant-002",
+    user_id: "demo-user",
+    name: "Web3 Design Studio",
+    wallet_address: "0x8Ba1f109551bD432803012645Ac136ddd64DBA72",
+    callback_url: "https://web3design.example.com/api/payments",
+    logo_url: "",
+    status: "active",
+    created_at: new Date(Date.now() - 14 * 86400000).toISOString(),
+    updated_at: new Date(Date.now() - 1 * 86400000).toISOString(),
+  },
+  {
+    id: "demo-merchant-003",
+    user_id: "demo-user",
+    name: "DeFi Tutoring",
+    wallet_address: "0xdD2FD4581271e230360230F9337D5c0430Bf44C0",
+    callback_url: "",
+    logo_url: "",
+    status: "active",
+    created_at: new Date(Date.now() - 3 * 86400000).toISOString(),
+    updated_at: new Date(Date.now() - 3 * 86400000).toISOString(),
+  },
+];
+
 export default function MerchantsPage() {
+  const { isDemoMode } = useDemo();
   const { toast } = useToast();
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
@@ -37,8 +76,13 @@ export default function MerchantsPage() {
 
   // Load merchant list
   useEffect(() => {
-    loadMerchants();
-  }, []);
+    if (isDemoMode) {
+      setMerchants(DEMO_MERCHANTS);
+      setLoading(false);
+    } else {
+      loadMerchants();
+    }
+  }, [isDemoMode]);
 
   const loadMerchants = async () => {
     try {
@@ -130,6 +174,17 @@ export default function MerchantsPage() {
           Create Merchant
         </Button>
       </div>
+
+      {/* Demo Mode Banner */}
+      {isDemoMode && (
+        <Card className="mb-6 border-blue-500/20 bg-blue-500/5">
+          <CardContent className="pt-6 pb-4">
+            <p className="text-sm text-blue-500">
+              You are viewing demo merchants. Connect your wallet to manage real merchants.
+            </p>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Create Merchant Form */}
       {showCreateForm && (

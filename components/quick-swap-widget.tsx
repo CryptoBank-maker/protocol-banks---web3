@@ -11,7 +11,7 @@ import { Separator } from "@/components/ui/separator"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { ArrowDownUp, Clock, Fuel, TrendingUp, AlertCircle, CheckCircle2, Loader2, Zap } from "lucide-react"
 import { zunoDex, type SwapQuote } from "@/lib/zunodex"
-import { useWeb3 } from "@/contexts/web3-context"
+import { useUnifiedWallet } from "@/hooks/use-unified-wallet"
 import { useUserType } from "@/contexts/user-type-context"
 import { toast } from "sonner"
 
@@ -28,7 +28,7 @@ export function QuickSwapWidget({
   defaultOutputToken = "USDC.ETH",
   onSwapComplete,
 }: QuickSwapWidgetProps) {
-  const { address, signer, isConnected } = useWeb3()
+  const { address, signer, isConnected } = useUnifiedWallet()
   const { translateTerm, isWeb2User } = useUserType()
 
   const [inputToken, setInputToken] = useState(defaultInputToken)

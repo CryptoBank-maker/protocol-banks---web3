@@ -2,11 +2,18 @@
  * Nonce Manager Service
  * Manages nonces for EIP-3009 TransferWithAuthorization
  */
-import Redis from 'ioredis'
 
-// Redis client
-const redisUrl = process.env.REDIS_URL
-const redis = redisUrl ? new Redis(redisUrl) : null
+// Lazy Redis import to avoid bundling ioredis in client components
+let redis: any = null
+const getRedis = async () => {
+  if (redis) return redis
+  if (typeof window !== "undefined") return null // Never use Redis on client
+  const redisUrl = process.env.REDIS_URL
+  if (!redisUrl) return null
+  const { default: Redis } = await import("ioredis")
+  redis = new Redis(redisUrl)
+  return redis
+}
 
 // In-memory nonce tracking fallback
 const usedNonces = new Map<string, Set<string>>()
@@ -33,9 +40,10 @@ export function generateNonce(): string {
 export async function isNonceUsed(address: string, nonce: string): Promise<boolean> {
   const normalizedNonce = nonce.toLowerCase()
   const normalizedAddress = address.toLowerCase()
-  
-  if (redis) {
-    const exists = await redis.sismember(`nonces:${normalizedAddress}`, normalizedNonce)
+
+  const redisClient = await getRedis()
+  if (redisClient) {
+    const exists = await redisClient.sismember(`nonces:${normalizedAddress}`, normalizedNonce)
     return exists === 1
   }
 
@@ -51,9 +59,9 @@ export async function markNonceUsed(address: string, nonce: string): Promise<voi
   const normalizedNonce = nonce.toLowerCase()
   const normalizedAddress = address.toLowerCase()
 
-  if (redis) {
-    await redis.sadd(`nonces:${normalizedAddress}`, normalizedNonce)
-    // Optional: Set expire if nonce history isn't needed forever
+  const redisClient = await getRedis()
+  if (redisClient) {
+    await redisClient.sadd(`nonces:${normalizedAddress}`, normalizedNonce)
     return
   }
 
@@ -68,8 +76,9 @@ export async function markNonceUsed(address: string, nonce: string): Promise<voi
  * Get current nonce count for an address
  */
 export async function getNonceCount(address: string): Promise<number> {
-  if (redis) {
-    return await redis.scard(`nonces:${address.toLowerCase()}`)
+  const redisClient = await getRedis()
+  if (redisClient) {
+    return await redisClient.scard(`nonces:${address.toLowerCase()}`)
   }
   const nonceSet = usedNonces.get(address.toLowerCase())
   return nonceSet ? nonceSet.size : 0
@@ -81,7 +90,6 @@ export async function getNonceCount(address: string): Promise<number> {
  */
 export function incrementNonce(address: string): string {
   const newNonce = generateNonce()
-  // The previous nonce is implicitly "used" when we generate a new one
   return newNonce
 }
 

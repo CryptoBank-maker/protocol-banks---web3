@@ -6,7 +6,6 @@
 
 import { type NextRequest, NextResponse } from 'next/server';
 import { SubscriptionService, type SubscriptionFrequency } from '@/lib/services/subscription-service';
-import { getSupabase } from '@/lib/supabase';
 
 const subscriptionService = new SubscriptionService();
 
@@ -14,26 +13,43 @@ const VALID_FREQUENCIES: SubscriptionFrequency[] = ['daily', 'weekly', 'monthly'
 const VALID_TOKENS = ['USDC', 'USDT', 'DAI', 'ETH', 'WETH', 'WBTC'];
 
 /**
+ * Extract owner address from request:
+ * 1. Try server-side Supabase auth (cookie-based)
+ * 2. Fall back to x-wallet-address header
+ */
+async function getOwnerAddress(request: NextRequest): Promise<string | null> {
+  // Try Supabase server auth first
+  try {
+    const { createClient } = await import('@/lib/supabase/server');
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (user) {
+      return user.user_metadata?.wallet_address || user.email || null;
+    }
+  } catch {
+    // Supabase not configured or cookies not available
+  }
+
+  // Fallback: x-wallet-address header
+  const walletAddress = request.headers.get('x-wallet-address');
+  if (walletAddress && /^0x[a-fA-F0-9]{40}$/.test(walletAddress)) {
+    return walletAddress;
+  }
+
+  return null;
+}
+
+/**
  * POST /api/subscriptions
  * Create a new subscription
  */
 export async function POST(request: NextRequest) {
   try {
-    const supabase = getSupabase();
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-    
-    if (authError || !user) {
-      return NextResponse.json(
-        { error: 'Unauthorized', message: 'Authentication required' },
-        { status: 401 }
-      );
-    }
-
-    const ownerAddress = user.user_metadata?.wallet_address || user.email;
+    const ownerAddress = await getOwnerAddress(request);
     if (!ownerAddress) {
       return NextResponse.json(
-        { error: 'Bad Request', message: 'No wallet address associated with account' },
-        { status: 400 }
+        { error: 'Unauthorized', message: 'Authentication required. Connect wallet or sign in.' },
+        { status: 401 }
       );
     }
 
@@ -162,21 +178,11 @@ export async function POST(request: NextRequest) {
  */
 export async function GET(request: NextRequest) {
   try {
-    const supabase = getSupabase();
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-    
-    if (authError || !user) {
-      return NextResponse.json(
-        { error: 'Unauthorized', message: 'Authentication required' },
-        { status: 401 }
-      );
-    }
-
-    const ownerAddress = user.user_metadata?.wallet_address || user.email;
+    const ownerAddress = await getOwnerAddress(request);
     if (!ownerAddress) {
       return NextResponse.json(
-        { error: 'Bad Request', message: 'No wallet address associated with account' },
-        { status: 400 }
+        { error: 'Unauthorized', message: 'Authentication required. Connect wallet or sign in.' },
+        { status: 401 }
       );
     }
 
