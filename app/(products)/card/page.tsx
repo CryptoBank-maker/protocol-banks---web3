@@ -355,11 +355,12 @@ export default function CardPage() {
     <main className="min-h-screen bg-background">
       <section className="relative overflow-hidden border-b border-border">
         <div className="absolute inset-0">
-          <div className="absolute inset-0 bg-gradient-to-br from-background via-background to-[#0a0a1a]" />
-          <div className="absolute inset-0 bg-[url('/grid.svg')] opacity-5" />
+          <div className="absolute inset-0 bg-gradient-to-br from-background via-primary/5 to-violet-950/40" />
+          <div className="absolute inset-0 bg-[url('/grid.svg')] opacity-10" />
           {/* Floating orbs - indigo/violet theme */}
-          <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-primary/5 rounded-full blur-3xl animate-pulse" />
-          <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-violet-500/5 rounded-full blur-3xl animate-pulse delay-1000" />
+          <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-primary/15 rounded-full blur-3xl animate-pulse" />
+          <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-violet-500/15 rounded-full blur-3xl animate-pulse delay-1000" />
+          <div className="absolute top-1/2 right-1/3 w-64 h-64 bg-indigo-500/10 rounded-full blur-2xl animate-pulse delay-500" />
         </div>
 
         <div className="container mx-auto px-4 py-16 md:py-24 relative z-10">
@@ -370,9 +371,9 @@ export default function CardPage() {
                 Next-Gen Digital Banking
               </Badge>
 
-              <h1 className="text-5xl md:text-6xl font-bold tracking-tight leading-tight">
-                Your Crypto,
-                <span className="block text-transparent bg-clip-text bg-gradient-to-r from-primary via-violet-400 to-purple-400">
+              <h1 className="text-5xl md:text-6xl tracking-tight leading-tight">
+                <span className="font-light">Your Crypto,</span>
+                <span className="block font-bold text-transparent bg-clip-text bg-gradient-to-r from-primary via-violet-400 to-purple-400">
                   Glass Card
                 </span>
               </h1>
