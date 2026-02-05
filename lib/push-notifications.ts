@@ -113,7 +113,6 @@ export class PushNotificationService {
     this.swRegistration.showNotification(title, {
       icon: "/logo.png",
       badge: "/logo.png",
-      vibrate: [200, 100, 200],
       ...options,
     })
   }

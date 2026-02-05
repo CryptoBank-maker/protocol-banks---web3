@@ -1,5 +1,5 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { createClient } from "@/lib/supabase/server"
+import { prisma } from "@/lib/prisma"
 import { relayerService, isRelayerConfigured } from "@/lib/services/relayer-service"
 import type { Hex, Address } from "viem"
 
@@ -54,16 +54,12 @@ export async function POST(request: NextRequest): Promise<NextResponse<X402Execu
       )
     }
 
-    const supabase = await createClient()
-
     // Get the authorization
-    const { data: auth, error: fetchError } = await supabase
-      .from("x402_authorizations")
-      .select("*")
-      .eq("transfer_id", transferId)
-      .single()
+    const auth = await prisma.x402Authorization.findFirst({
+        where: { transfer_id: transferId }
+    });
 
-    if (fetchError || !auth) {
+    if (!auth) {
       return NextResponse.json(
         { success: false, error: "Authorization not found" },
         { status: 404 }
@@ -74,19 +70,21 @@ export async function POST(request: NextRequest): Promise<NextResponse<X402Execu
     if (auth.status === "completed" || auth.status === "settled") {
       return NextResponse.json({
         success: true,
-        txHash: auth.tx_hash,
+        txHash: auth.tx_hash ?? undefined,
         status: auth.status,
       })
     }
 
     // Check if expired
     const now = new Date()
-    const validBefore = new Date(auth.valid_before)
+    // Prisma returns Date objects, so we can use them directly
+    const validBefore = auth.valid_before; 
+    
     if (now > validBefore) {
-      await supabase
-        .from("x402_authorizations")
-        .update({ status: "expired" })
-        .eq("transfer_id", transferId)
+      await prisma.x402Authorization.update({
+        where: { id: auth.id },
+        data: { status: "expired" } 
+      });
 
       return NextResponse.json(
         { success: false, error: "Authorization has expired", status: "expired" },
@@ -95,10 +93,10 @@ export async function POST(request: NextRequest): Promise<NextResponse<X402Execu
     }
 
     // Update status to executing
-    await supabase
-      .from("x402_authorizations")
-      .update({ status: "executing", signature })
-      .eq("transfer_id", transferId)
+    await prisma.x402Authorization.update({
+        where: { id: auth.id },
+        data: { status: "executing", signature }
+    });
 
     // Execute the payment
     let txHash: string
@@ -111,8 +109,8 @@ export async function POST(request: NextRequest): Promise<NextResponse<X402Execu
         from: auth.from_address as Address,
         to: auth.to_address as Address,
         value: auth.amount,
-        validAfter: Math.floor(new Date(auth.valid_after).getTime() / 1000),
-        validBefore: Math.floor(new Date(auth.valid_before).getTime() / 1000),
+        validAfter: Math.floor(auth.valid_after.getTime() / 1000),
+        validBefore: Math.floor(auth.valid_before.getTime() / 1000),
         nonce: auth.nonce as Hex,
         signature: signature as Hex,
       })
@@ -132,14 +130,14 @@ export async function POST(request: NextRequest): Promise<NextResponse<X402Execu
     }
 
     // Update authorization with transaction hash
-    await supabase
-      .from("x402_authorizations")
-      .update({
-        tx_hash: txHash,
-        status: "completed",
-        completed_at: new Date().toISOString(),
-      })
-      .eq("transfer_id", transferId)
+    await prisma.x402Authorization.update({
+        where: { id: auth.id },
+        data: {
+            tx_hash: txHash,
+            status: "completed",
+            // completed_at removed as it is not in Prisma schema, updated_at will auto-update
+        }
+    });
 
     return NextResponse.json({
       success: true,
@@ -179,25 +177,30 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     )
   }
 
-  const supabase = getSupabase()
-  const { data, error } = await supabase
-    .from("x402_authorizations")
-    .select("transfer_id, status, tx_hash, created_at, completed_at")
-    .eq("transfer_id", transferId)
-    .single()
+  // Refactored to use Prisma
+  try {
+    const data = await prisma.x402Authorization.findFirst({
+        where: { transfer_id: transferId }
+    });
 
-  if (error || !data) {
-    return NextResponse.json(
-      { error: "Authorization not found" },
-      { status: 404 }
+    if (!data) {
+        return NextResponse.json(
+        { error: "Authorization not found" },
+        { status: 404 }
+        )
+    }
+
+    return NextResponse.json({
+        transferId: data.transfer_id,
+        status: data.status,
+        txHash: data.tx_hash,
+        createdAt: data.created_at,
+        updatedAt: data.updated_at,
+    })
+  } catch (error) {
+     return NextResponse.json(
+      { error: "Failed to fetch status" },
+      { status: 500 }
     )
   }
-
-  return NextResponse.json({
-    transferId: data.transfer_id,
-    status: data.status,
-    txHash: data.tx_hash,
-    createdAt: data.created_at,
-    completedAt: data.completed_at,
-  })
 }

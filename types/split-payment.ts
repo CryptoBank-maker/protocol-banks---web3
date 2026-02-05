@@ -25,17 +25,18 @@ export interface SplitTemplate {
 
 export interface SplitExecution {
   id: string;
-  template_id?: string;
+  template_id?: string | null;
   owner_address: string;
-  team_id?: string;
+  team_id?: string | null;
   total_amount: string;
   token: string;
   chain_id: number;
   recipients: SplitRecipient[];
   status: SplitExecutionStatus;
-  tx_hash?: string;
-  error_message?: string;
+  tx_hash?: string | null;
+  error_message?: string | null;
   created_at: string;
+  updated_at?: string;
   executed_at?: string;
 }
 

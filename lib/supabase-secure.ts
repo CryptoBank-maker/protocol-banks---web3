@@ -16,7 +16,7 @@ import {
   createVendorIntegrityHash,
   createAuditLog,
   type AuditLogEntry,
-} from "./security"
+} from "./security/security"
 
 // Create singleton Supabase client
 let supabaseInstance: ReturnType<typeof createBrowserClient> | null = null

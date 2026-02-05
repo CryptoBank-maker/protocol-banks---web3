@@ -264,6 +264,7 @@ export async function GET(request: NextRequest) {
           select: {
             id: true,
             name: true,
+            company_name: true,
             created_at: true,
             updated_at: true,
           },

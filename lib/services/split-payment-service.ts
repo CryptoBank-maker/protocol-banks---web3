@@ -213,6 +213,7 @@ export class SplitPaymentService {
     return {
         ...execution,
         recipients: execution.recipients as any,
+        status: execution.status as SplitExecutionStatus,
         created_at: execution.created_at.toISOString(),
         updated_at: execution.updated_at.toISOString()
     };
@@ -357,6 +358,7 @@ export class SplitPaymentService {
       return executions.map(e => ({
           ...e,
           recipients: e.recipients as any,
+          status: e.status as SplitExecutionStatus,
           created_at: e.created_at.toISOString(),
           updated_at: e.updated_at.toISOString()
       }));
@@ -375,6 +377,7 @@ export class SplitPaymentService {
     return {
         ...execution,
         recipients: execution.recipients as any,
+        status: execution.status as SplitExecutionStatus,
         created_at: execution.created_at.toISOString(),
         updated_at: execution.updated_at.toISOString()
     };

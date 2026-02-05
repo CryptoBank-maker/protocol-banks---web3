@@ -51,7 +51,7 @@ export async function sha256(data: string | Uint8Array): Promise<string> {
   const encoder = new TextEncoder()
   const dataBytes = typeof data === "string" ? encoder.encode(data) : data
 
-  const hashBuffer = await crypto.subtle.digest("SHA-256", dataBytes)
+  const hashBuffer = await crypto.subtle.digest("SHA-256", dataBytes as BufferSource)
   const hashArray = new Uint8Array(hashBuffer)
 
   return Array.from(hashArray)
@@ -81,7 +81,7 @@ export async function deriveKeyFromPIN(pin: string, salt: Uint8Array, iterations
   return crypto.subtle.deriveKey(
     {
       name: "PBKDF2",
-      salt,
+      salt: salt as BufferSource,
       iterations,
       hash: "SHA-256",
     },
@@ -109,7 +109,7 @@ export async function encryptAES(
   const iv = generateRandomBytes(12)
 
   // Encrypt
-  const ciphertext = await crypto.subtle.encrypt({ name: "AES-GCM", iv }, key, data)
+  const ciphertext = await crypto.subtle.encrypt({ name: "AES-GCM", iv: iv as BufferSource }, key, data as BufferSource)
 
   return {
     ciphertext: new Uint8Array(ciphertext),
@@ -128,7 +128,7 @@ export async function encryptAES(
 export async function decryptAES(ciphertext: Uint8Array, key: CryptoKey, iv: Uint8Array): Promise<Uint8Array> {
   const crypto = getCrypto()
 
-  const plaintext = await crypto.subtle.decrypt({ name: "AES-GCM", iv }, key, ciphertext)
+  const plaintext = await crypto.subtle.decrypt({ name: "AES-GCM", iv: iv as BufferSource }, key, ciphertext as BufferSource)
 
   return new Uint8Array(plaintext)
 }

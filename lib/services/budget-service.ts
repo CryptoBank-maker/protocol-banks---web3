@@ -22,12 +22,12 @@ export interface AgentBudget {
   owner_address: string;
   amount: string;
   token: string;
-  chain_id?: number;
+  chain_id?: number | null;
   period: BudgetPeriod;
   used_amount: string;
   remaining_amount: string;
   period_start: Date;
-  period_end?: Date;
+  period_end?: Date | null;
   created_at: Date;
   updated_at: Date;
 }
@@ -615,8 +615,7 @@ export class BudgetService {
           const budget: AgentBudget = {
             ...b,
             amount: b.amount,
-            currency: b.currency,
-            period: b.period as any,
+            period: b.period as BudgetPeriod,
             period_start: b.period_start,
             period_end: b.period_end || undefined,
             created_at: b.created_at,

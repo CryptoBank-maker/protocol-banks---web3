@@ -27,7 +27,7 @@ interface Payment {
 
 interface PaymentActivityProps {
   payments: Payment[]
-  walletAddress?: string
+  walletAddress?: string | null
   loading?: boolean
   showAll?: boolean
   title?: string

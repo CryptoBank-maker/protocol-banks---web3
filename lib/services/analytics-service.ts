@@ -225,15 +225,26 @@ export class AnalyticsService {
     try {
       const data = await prisma.payment.findMany({
         where,
-        select: { chain_id: true, amount: true }
+        select: { chain: true, amount: true }
       });
+
+      // Chain name to ID mapping
+      const chainNameToId: Record<string, number> = {
+        'Ethereum': 1,
+        'Polygon': 137,
+        'Arbitrum': 42161,
+        'Base': 8453,
+        'Optimism': 10,
+        'BSC': 56,
+        'Tron': 728126428, // Tron chain ID
+      };
 
       // Aggregate by chain
       const chainMap = new Map<number, { volume: number; count: number }>();
       let totalVolume = 0;
 
       for (const payment of data) {
-        const chainId = payment.chain_id || 1;
+        const chainId = chainNameToId[payment.chain] || 1;
         const amount = parseFloat(payment.amount) || 0;
 
         if (!chainMap.has(chainId)) {

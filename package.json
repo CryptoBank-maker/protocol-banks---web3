@@ -120,6 +120,7 @@
     "@types/ioredis": "^4.28.10",
     "@types/jest": "^29.5.12",
     "@types/node": "^22",
+    "@types/pg": "^8.16.0",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "adm-zip": "^0.5.16",

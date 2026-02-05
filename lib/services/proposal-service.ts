@@ -26,16 +26,16 @@ export interface PaymentProposal {
   token: string;
   chain_id: number;
   reason: string;
-  metadata?: Record<string, any>;
+  metadata?: Record<string, any> | null;
   status: ProposalStatus;
-  rejection_reason?: string;
-  budget_id?: string;
-  x402_authorization_id?: string;
-  tx_hash?: string;
+  rejection_reason?: string | null;
+  budget_id?: string | null;
+  x402_authorization_id?: string | null;
+  tx_hash?: string | null;
   created_at: Date;
   updated_at: Date;
-  approved_at?: Date;
-  executed_at?: Date;
+  approved_at?: Date | null;
+  executed_at?: Date | null;
 }
 
 export interface CreateProposalInput {

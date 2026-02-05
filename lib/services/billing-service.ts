@@ -293,16 +293,15 @@ export class BillingService {
    * Check if user can create more scheduled payments
    */
   async canCreateScheduledPayment(userAddress: string): Promise<boolean> {
-    // Count existing scheduled payments
-    const { count, error } = await this.supabase
-      .from('scheduled_payments')
-      .select('*', { count: 'exact', head: true })
-      .eq('owner_address', userAddress)
-      .in('status', ['active', 'paused']);
+    // Count existing scheduled payments using Prisma
+    const count = await prisma.scheduledPayment.count({
+      where: {
+        owner_address: userAddress,
+        status: { in: ['active', 'paused'] }
+      }
+    });
 
-    if (error) throw new Error(`Failed to count scheduled payments: ${error.message}`);
-
-    const result = await this.checkLimit(userAddress, 'max_scheduled', count || 0);
+    const result = await this.checkLimit(userAddress, 'max_scheduled', count);
     return result.allowed;
   }
 
@@ -310,14 +309,13 @@ export class BillingService {
    * Check if team can add more members
    */
   async canAddTeamMember(userAddress: string, teamId: string): Promise<boolean> {
-    // Count current team members
-    const { count, error } = await this.supabase
-      .from('team_members')
-      .select('*', { count: 'exact', head: true })
-      .eq('team_id', teamId)
-      .eq('status', 'active');
-
-    if (error) throw new Error(`Failed to count team members: ${error.message}`);
+    // Count current team members using Prisma
+    const count = await prisma.teamMember.count({
+      where: {
+        team_id: teamId,
+        status: 'active'
+      }
+    });
 
     const result = await this.checkLimit(userAddress, 'max_team_members', count || 0);
     return result.allowed;
@@ -480,7 +478,7 @@ export class BillingService {
       prisma.payment.findMany({
         where: {
           from_address: userAddress,
-          timestamp: {
+          created_at: {
             gte: startOfMonth,
             lte: endOfMonth
           },

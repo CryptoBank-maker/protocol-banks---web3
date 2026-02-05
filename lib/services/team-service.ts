@@ -135,6 +135,7 @@ export class TeamService {
 
     const mappedMembers: TeamMember[] = members.map(m => ({
         ...m,
+        role: m.role as TeamRole,
         invited_at: m.invited_at.toISOString(),
         accepted_at: m.accepted_at ? m.accepted_at.toISOString() : undefined,
         status: m.status as MemberStatus
@@ -292,6 +293,7 @@ export class TeamService {
 
     return {
         ...member,
+        role: member.role as TeamRole,
         invited_at: member.invited_at.toISOString(),
         accepted_at: member.accepted_at?.toISOString(),
         status: member.status as MemberStatus
@@ -330,6 +332,7 @@ export class TeamService {
 
     return {
         ...member,
+        role: member.role as TeamRole,
         invited_at: member.invited_at.toISOString(),
         accepted_at: member.accepted_at?.toISOString(),
         status: member.status as MemberStatus
@@ -415,6 +418,7 @@ export class TeamService {
 
     return {
         ...member,
+        role: member.role as TeamRole,
         invited_at: member.invited_at.toISOString(),
         accepted_at: member.accepted_at?.toISOString(),
         status: member.status as MemberStatus
@@ -437,6 +441,7 @@ export class TeamService {
 
     return invitations.map(inv => ({
         ...inv,
+        role: inv.role as TeamRole,
         invited_at: inv.invited_at.toISOString(),
         accepted_at: inv.accepted_at?.toISOString(),
         status: inv.status as MemberStatus,
@@ -531,7 +536,7 @@ export class TeamService {
       team_id: teamId,
       user_address: userAddress,
       action,
-      details,
+      details: details as any,
         }
     });
   }
@@ -551,8 +556,9 @@ export class TeamService {
     
     return logs.map(l => ({
         ...l,
+        action: l.action as TeamAuditAction,
         created_at: l.created_at.toISOString(),
-        details: l.details || {}
+        details: l.details as Record<string, unknown> | undefined
     }));
   }
 }

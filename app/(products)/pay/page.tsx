@@ -375,7 +375,7 @@ function PaymentContent() {
 
       // Balance check
       try {
-        const balance = await getTokenBalance(wallets.EVM, tokenAddress)
+        const balance = await getTokenBalance(wallets.EVM!, tokenAddress)
         if (parseFloat(balance) < parseFloat(amount!)) {
           toast({
             title: "Insufficient Balance",
@@ -404,14 +404,14 @@ function PaymentContent() {
 
       if (isGasless) {
         toast({ title: "Signing Authorization", description: "Please sign the x402 payment authorization." })
-        const auth = await signERC3009Authorization(tokenAddress, wallets.EVM, to!, amount!, chainId)
+        const auth = await signERC3009Authorization(tokenAddress, wallets.EVM!, to!, amount!, chainId)
 
         if (!verifyLock(lock)) { setProcessing(false); return }
 
         toast({ title: "Processing Payment", description: "Submitting your secure payment..." })
 
         try {
-          hash = await executeERC3009Transfer(tokenAddress, wallets.EVM, to!, amount!, auth)
+          hash = await executeERC3009Transfer(tokenAddress, wallets.EVM!, to!, amount!, auth)
         } catch (erc3009Error: any) {
           throw new Error(`ERC-3009 transfer failed: ${erc3009Error.message}`)
         }
@@ -472,7 +472,7 @@ function PaymentContent() {
             await recordFee({
               paymentId: paymentData.id,
               amount: Number(amount),
-              fromAddress: wallets.EVM,
+              fromAddress: wallets.EVM!,
               tokenSymbol: token!,
               chainId: chainId,
               tier: "standard",

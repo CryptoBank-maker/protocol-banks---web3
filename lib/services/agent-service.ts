@@ -30,20 +30,20 @@ export interface Agent {
   id: string;
   owner_address: string;
   name: string;
-  description?: string;
+  description?: string | null;
   type: AgentType;
-  avatar_url?: string;
+  avatar_url?: string | null;
   api_key_hash: string;
   api_key_prefix: string;
-  webhook_url?: string;
-  webhook_secret_hash?: string;
+  webhook_url?: string | null;
+  webhook_secret_hash?: string | null;
   status: AgentStatus;
   auto_execute_enabled: boolean;
-  auto_execute_rules?: AutoExecuteRules;
+  auto_execute_rules?: AutoExecuteRules | null;
   rate_limit_per_minute: number;
   created_at: Date;
   updated_at: Date;
-  last_active_at?: Date;
+  last_active_at?: Date | null;
 }
 
 export interface CreateAgentInput {

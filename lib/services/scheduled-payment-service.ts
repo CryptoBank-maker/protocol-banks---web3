@@ -123,17 +123,17 @@ export class ScheduledPaymentService {
 
     const logs = await prisma.scheduledPaymentLog.findMany({
       where: { scheduled_payment_id: paymentId },
-      orderBy: { execution_time: 'desc' },
+      orderBy: { executed_at: 'desc' },
       take: logLimit
     });
 
     const mappedLogs: ScheduledPaymentLog[] = logs.map(l => ({
         ...l,
-        execution_time: l.execution_time.toISOString(),
-        created_at: l.created_at.toISOString(),
+        executed_at: l.executed_at.toISOString(),
         status: l.status as ExecutionStatus,
         tx_hash: l.tx_hash || undefined,
-        error_message: l.error_message || undefined
+        error_message: l.error_message || undefined,
+        details: l.details as any
     }));
 
     return {
@@ -499,6 +499,7 @@ export class ScheduledPaymentService {
 
     return logs.map(log => ({
       ...log,
+      executed_at: log.executed_at.toISOString(),
       execution_time: log.executed_at.toISOString(),
       created_at: log.executed_at.toISOString(),
       details: log.details as any

@@ -62,7 +62,7 @@ export function LandingPage({ onConnectWallet, onTryDemo }: LandingPageProps) {
       </section>
 
       {/* Trust Metrics Bar */}
-      <section className="border-y border-border bg-muted/30">
+      <section className="border-y border-white/20 bg-white/40 dark:bg-black/20 backdrop-blur-xl">
         <div className="container mx-auto px-4 py-10 sm:py-14">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-8 md:gap-12">
             <div>
@@ -101,7 +101,7 @@ export function LandingPage({ onConnectWallet, onTryDemo }: LandingPageProps) {
         <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
           {/* Batch Payments */}
           <Link href="/batch-payment" className="group">
-            <div className="p-6 rounded-xl border border-border bg-card hover:border-primary/30 hover:shadow-lg hover:shadow-primary/5 transition-all h-full">
+            <div className="p-6 rounded-2xl border border-white/20 bg-white/60 dark:bg-black/20 backdrop-blur-xl hover:border-primary/30 hover:shadow-xl hover:shadow-primary/10 transition-all h-full">
               <div className="p-3 rounded-lg bg-blue-500/10 w-fit mb-4">
                 <Users className="h-6 w-6 text-blue-500" />
               </div>
@@ -120,7 +120,7 @@ export function LandingPage({ onConnectWallet, onTryDemo }: LandingPageProps) {
 
           {/* Gasless x402 */}
           <Link href="/checkout" className="group">
-            <div className="p-6 rounded-xl border border-border bg-card hover:border-primary/30 hover:shadow-lg hover:shadow-primary/5 transition-all h-full">
+            <div className="p-6 rounded-2xl border border-white/20 bg-white/60 dark:bg-black/20 backdrop-blur-xl hover:border-primary/30 hover:shadow-xl hover:shadow-primary/10 transition-all h-full">
               <div className="p-3 rounded-lg bg-yellow-500/10 w-fit mb-4">
                 <Zap className="h-6 w-6 text-yellow-500" />
               </div>
@@ -139,7 +139,7 @@ export function LandingPage({ onConnectWallet, onTryDemo }: LandingPageProps) {
 
           {/* Cross-Chain */}
           <Link href="/omnichain" className="group">
-            <div className="p-6 rounded-xl border border-border bg-card hover:border-primary/30 hover:shadow-lg hover:shadow-primary/5 transition-all h-full">
+            <div className="p-6 rounded-2xl border border-white/20 bg-white/60 dark:bg-black/20 backdrop-blur-xl hover:border-primary/30 hover:shadow-xl hover:shadow-primary/10 transition-all h-full">
               <div className="p-3 rounded-lg bg-green-500/10 w-fit mb-4">
                 <Globe className="h-6 w-6 text-green-500" />
               </div>
@@ -158,7 +158,7 @@ export function LandingPage({ onConnectWallet, onTryDemo }: LandingPageProps) {
 
           {/* Subscriptions */}
           <Link href="/subscriptions" className="group">
-            <div className="p-6 rounded-xl border border-border bg-card hover:border-primary/30 hover:shadow-lg hover:shadow-primary/5 transition-all h-full">
+            <div className="p-6 rounded-2xl border border-white/20 bg-white/60 dark:bg-black/20 backdrop-blur-xl hover:border-primary/30 hover:shadow-xl hover:shadow-primary/10 transition-all h-full">
               <div className="p-3 rounded-lg bg-purple-500/10 w-fit mb-4">
                 <RefreshCw className="h-6 w-6 text-purple-500" />
               </div>
@@ -177,7 +177,7 @@ export function LandingPage({ onConnectWallet, onTryDemo }: LandingPageProps) {
 
           {/* AI Agents */}
           <Link href="/agents" className="group">
-            <div className="p-6 rounded-xl border border-border bg-card hover:border-primary/30 hover:shadow-lg hover:shadow-primary/5 transition-all h-full">
+            <div className="p-6 rounded-2xl border border-white/20 bg-white/60 dark:bg-black/20 backdrop-blur-xl hover:border-primary/30 hover:shadow-xl hover:shadow-primary/10 transition-all h-full">
               <div className="p-3 rounded-lg bg-orange-500/10 w-fit mb-4">
                 <Bot className="h-6 w-6 text-orange-500" />
               </div>
@@ -196,7 +196,7 @@ export function LandingPage({ onConnectWallet, onTryDemo }: LandingPageProps) {
 
           {/* Multi-Sig */}
           <Link href="/multisig" className="group">
-            <div className="p-6 rounded-xl border border-border bg-card hover:border-primary/30 hover:shadow-lg hover:shadow-primary/5 transition-all h-full">
+            <div className="p-6 rounded-2xl border border-white/20 bg-white/60 dark:bg-black/20 backdrop-blur-xl hover:border-primary/30 hover:shadow-xl hover:shadow-primary/10 transition-all h-full">
               <div className="p-3 rounded-lg bg-cyan-500/10 w-fit mb-4">
                 <Layers className="h-6 w-6 text-cyan-500" />
               </div>
@@ -272,7 +272,7 @@ export function LandingPage({ onConnectWallet, onTryDemo }: LandingPageProps) {
 
             {/* Right: visual card */}
             <div className="space-y-4">
-              <div className="rounded-xl border border-border bg-card p-6">
+              <div className="rounded-2xl border border-white/20 bg-white/40 dark:bg-black/20 backdrop-blur-xl p-6 shadow-lg">
                 <div className="flex items-center gap-2 mb-6">
                   <Shield className="h-5 w-5 text-emerald-500" />
                   <span className="font-semibold">Transaction Security Check</span>
@@ -301,15 +301,15 @@ export function LandingPage({ onConnectWallet, onTryDemo }: LandingPageProps) {
                 </div>
               </div>
               <div className="grid grid-cols-3 gap-3">
-                <div className="rounded-lg border border-border bg-card p-4 text-center">
+                <div className="rounded-lg border border-white/20 bg-white/40 dark:bg-black/20 backdrop-blur-xl p-4 text-center">
                   <p className="text-2xl font-bold">6</p>
                   <p className="text-xs text-muted-foreground mt-1">Security checks</p>
                 </div>
-                <div className="rounded-lg border border-border bg-card p-4 text-center">
+                <div className="rounded-lg border border-white/20 bg-white/40 dark:bg-black/20 backdrop-blur-xl p-4 text-center">
                   <p className="text-2xl font-bold">0</p>
                   <p className="text-xs text-muted-foreground mt-1">Keys exposed</p>
                 </div>
-                <div className="rounded-lg border border-border bg-card p-4 text-center">
+                <div className="rounded-lg border border-white/20 bg-white/40 dark:bg-black/20 backdrop-blur-xl p-4 text-center">
                   <p className="text-2xl font-bold">RLS</p>
                   <p className="text-xs text-muted-foreground mt-1">Data isolation</p>
                 </div>
@@ -332,9 +332,9 @@ export function LandingPage({ onConnectWallet, onTryDemo }: LandingPageProps) {
           </p>
         </div>
 
-        <div className="overflow-x-auto rounded-xl border border-border">
+        <div className="overflow-x-auto rounded-xl border border-white/20 bg-white/40 dark:bg-black/20 backdrop-blur-xl shadow-lg">
           <table className="w-full text-left text-sm">
-            <thead className="bg-muted text-foreground uppercase tracking-wider text-xs">
+            <thead className="bg-black/5 dark:bg-white/5 text-foreground uppercase tracking-wider text-xs">
               <tr>
                 <th className="p-4 font-medium">Method</th>
                 <th className="p-4 font-medium">Cost</th>
@@ -435,7 +435,7 @@ export function LandingPage({ onConnectWallet, onTryDemo }: LandingPageProps) {
                   ].map((chain, i) => (
                     <div
                       key={`${chain.name}-${i}`}
-                      className="flex items-center gap-3 px-6 py-3 rounded-full border border-border bg-card/50 hover:bg-card hover:border-primary/30 transition-all shrink-0 cursor-default"
+                      className="flex items-center gap-3 px-6 py-3 rounded-full border border-white/20 bg-white/40 dark:bg-black/20 backdrop-blur-xl hover:bg-white/60 hover:dark:bg-black/40 hover:border-primary/30 transition-all shrink-0 cursor-default"
                     >
                       {chain.logo ? (
                         <div className="relative h-6 w-6">

@@ -24,18 +24,18 @@ export interface ScheduleConfig {
 export interface ScheduledPayment {
   id: string;
   owner_address: string;
-  team_id?: string;
+  team_id?: string | null;
   name: string;
-  description?: string;
+  description?: string | null;
   recipients: ScheduledRecipient[];
   schedule_type: ScheduleType;
   schedule_config: ScheduleConfig;
   timezone: string;
   next_execution: string;
-  last_execution?: string;
+  last_execution?: string | Date | null;
   status: ScheduledPaymentStatus;
   total_executions: number;
-  max_executions?: number;
+  max_executions?: number | null;
   chain_id: number;
   token: string;
   created_at: string;
@@ -45,16 +45,15 @@ export interface ScheduledPayment {
 export interface ScheduledPaymentLog {
   id: string;
   scheduled_payment_id: string;
-  execution_time: string;
+  executed_at: string;  // Changed from execution_time to match Prisma schema
   status: ExecutionStatus;
-  tx_hash?: string;
+  tx_hash?: string | null;
   total_amount?: string;
   recipients_count: number;
   successful_count: number;
   failed_count: number;
-  error_message?: string;
-  details?: ExecutionDetail[];
-  created_at: string;
+  error_message?: string | null;
+  details?: ExecutionDetail[] | null;
 }
 
 export interface ExecutionDetail {

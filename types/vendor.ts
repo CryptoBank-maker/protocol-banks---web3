@@ -15,6 +15,7 @@ export type VendorCategory =
   | "Marketing"
   | "Infrastructure"
   | "Legal"
+  | "Exchange"
 
 // Web3 reputation tags for stablecoin Stripe-style contacts
 export type ReputationTag = "whale" | "active" | "newbie" | "inactive"

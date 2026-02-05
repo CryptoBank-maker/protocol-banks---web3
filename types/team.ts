@@ -9,7 +9,7 @@ export type MemberStatus = 'pending' | 'active' | 'removed';
 export interface Team {
   id: string;
   name: string;
-  description?: string;
+  description?: string | null;
   owner_address: string;
   created_at: string;
   updated_at: string;
