@@ -383,22 +383,46 @@ export default function CardPage() {
               </p>
 
               <div className="flex flex-wrap gap-4">
-                <Button
-                  size="lg"
+                {/* Primary glass CTA */}
+                <button
                   onClick={() => setActiveTab("apply")}
-                  className="bg-primary hover:bg-primary/90 text-primary-foreground text-lg px-8 py-6 rounded-xl shadow-lg shadow-primary/20"
+                  className="group relative rounded-xl px-8 py-4 text-lg font-medium transition-all duration-300 active:scale-[0.97] hover:scale-[1.02]"
+                  style={{
+                    background: "rgba(99,102,241,0.2)",
+                    backdropFilter: "blur(20px) saturate(1.4)",
+                    WebkitBackdropFilter: "blur(20px) saturate(1.4)",
+                    border: "0.5px solid rgba(99,102,241,0.3)",
+                    boxShadow: "0 8px 32px rgba(99,102,241,0.15)",
+                  }}
                 >
-                  <CreditCard className="mr-2 h-5 w-5" />
-                  Get Your Card
-                  <ArrowRight className="ml-2 h-5 w-5" />
-                </Button>
-                <Button
-                  size="lg"
-                  variant="outline"
-                  className="border-border bg-card/50 backdrop-blur-sm text-lg px-8 py-6 rounded-xl hover:bg-card"
+                  <div className="absolute inset-0 rounded-xl bg-white/[0.08] opacity-0 group-active:opacity-100 transition-opacity duration-150 pointer-events-none" />
+                  <div className="absolute inset-x-0 top-0 h-[1px] rounded-t-xl"
+                    style={{ background: "linear-gradient(90deg, transparent, rgba(165,170,255,0.35), transparent)" }}
+                  />
+                  <span className="relative z-10 flex items-center text-white/90">
+                    <CreditCard className="mr-2 h-5 w-5" />
+                    Get Your Card
+                    <ArrowRight className="ml-2 h-5 w-5" />
+                  </span>
+                </button>
+
+                {/* Secondary glass button */}
+                <button
+                  onClick={() => {}}
+                  className="group relative rounded-xl px-8 py-4 text-lg font-medium transition-all duration-300 active:scale-[0.97] hover:scale-[1.02]"
+                  style={{
+                    background: "rgba(255,255,255,0.05)",
+                    backdropFilter: "blur(20px) saturate(1.3)",
+                    WebkitBackdropFilter: "blur(20px) saturate(1.3)",
+                    border: "0.5px solid rgba(255,255,255,0.1)",
+                  }}
                 >
-                  Learn More
-                </Button>
+                  <div className="absolute inset-0 rounded-xl bg-white/[0.06] opacity-0 group-active:opacity-100 transition-opacity duration-150 pointer-events-none" />
+                  <div className="absolute inset-x-0 top-0 h-[1px] rounded-t-xl"
+                    style={{ background: "linear-gradient(90deg, transparent, rgba(255,255,255,0.12), transparent)" }}
+                  />
+                  <span className="relative z-10 text-white/70">Learn More</span>
+                </button>
               </div>
 
               {/* Stats - updated colors */}
@@ -441,101 +465,138 @@ export default function CardPage() {
             </TabsTrigger>
           </TabsList>
 
-          {/* Overview Tab - updated colors */}
+          {/* Overview Tab — Telegram-style glassmorphism */}
           <TabsContent value="overview" className="space-y-8">
             <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-4">
               {features.map((feature, index) => (
-                <Card
+                <div
                   key={index}
-                  className="bg-card/50 border-border hover:border-primary/30 transition-all hover:shadow-lg hover:shadow-primary/5"
+                  className="group relative rounded-2xl p-[1px] transition-all duration-300 hover:scale-[1.02]"
                 >
-                  <CardHeader>
-                    <feature.icon className="w-10 h-10 text-primary mb-2" />
-                    <CardTitle className="text-lg">{feature.title}</CardTitle>
-                  </CardHeader>
-                  <CardContent>
+                  {/* Glass border glow on hover */}
+                  <div className="absolute inset-0 rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-300"
+                    style={{ background: "linear-gradient(135deg, rgba(99,102,241,0.2), rgba(139,92,246,0.1), transparent)" }}
+                  />
+                  <div
+                    className="relative h-full rounded-2xl p-6 overflow-hidden"
+                    style={{
+                      background: "rgba(255,255,255,0.04)",
+                      backdropFilter: "blur(20px) saturate(1.4)",
+                      WebkitBackdropFilter: "blur(20px) saturate(1.4)",
+                      border: "0.5px solid rgba(255,255,255,0.08)",
+                    }}
+                  >
+                    {/* Inner top-edge highlight — glass refraction */}
+                    <div className="absolute inset-x-0 top-0 h-[1px]"
+                      style={{ background: "linear-gradient(90deg, transparent, rgba(255,255,255,0.12), transparent)" }}
+                    />
+                    <feature.icon className="w-10 h-10 text-primary mb-3" />
+                    <h3 className="text-lg font-semibold mb-1">{feature.title}</h3>
                     <p className="text-muted-foreground text-sm">{feature.description}</p>
-                  </CardContent>
-                </Card>
+                  </div>
+                </div>
               ))}
             </div>
 
-            {/* Card Types */}
+            {/* Card Types — glass selection cards */}
             <div className="grid md:grid-cols-2 gap-6">
-              <Card
-                className={`cursor-pointer transition-all ${
-                  cardType === "virtual" ? "border-primary bg-primary/5" : "border-border hover:border-primary/30"
-                }`}
-                onClick={() => setCardType("virtual")}
-              >
-                <CardHeader>
-                  <div className="flex justify-between items-start">
-                    <div>
-                      <CardTitle className="flex items-center gap-2">
-                        <Smartphone className="w-5 h-5" />
-                        Virtual Card
-                      </CardTitle>
-                      <CardDescription>Instant digital card</CardDescription>
-                    </div>
-                    {cardType === "virtual" && (
-                      <div className="w-6 h-6 rounded-full bg-primary flex items-center justify-center">
-                        <Check className="w-4 h-4 text-primary-foreground" />
-                      </div>
-                    )}
-                  </div>
-                </CardHeader>
-                <CardContent>
-                  <ul className="space-y-2">
-                    {cardBenefits.virtual.map((benefit, i) => (
-                      <li key={i} className="flex items-center gap-2 text-sm text-muted-foreground">
-                        <Check className="w-4 h-4 text-emerald-500" />
-                        {benefit}
-                      </li>
-                    ))}
-                  </ul>
-                </CardContent>
-              </Card>
+              {(["virtual", "physical"] as const).map((type) => {
+                const isSelected = cardType === type
+                const Icon = type === "virtual" ? Smartphone : CreditCard
+                const title = type === "virtual" ? "Virtual Card" : "Physical Card"
+                const desc = type === "virtual" ? "Instant digital card" : "Premium metal card"
+                return (
+                  <button
+                    key={type}
+                    onClick={() => setCardType(type)}
+                    className="group relative rounded-2xl text-left transition-all duration-300 active:scale-[0.98]"
+                  >
+                    {/* Active press overlay — Telegram-style material mask */}
+                    <div className="absolute inset-0 rounded-2xl bg-white/[0.06] opacity-0 group-active:opacity-100 transition-opacity duration-150 z-20 pointer-events-none" />
 
-              <Card
-                className={`cursor-pointer transition-all ${
-                  cardType === "physical" ? "border-primary bg-primary/5" : "border-border hover:border-primary/30"
-                }`}
-                onClick={() => setCardType("physical")}
-              >
-                <CardHeader>
-                  <div className="flex justify-between items-start">
-                    <div>
-                      <CardTitle className="flex items-center gap-2">
-                        <CreditCard className="w-5 h-5" />
-                        Physical Card
-                      </CardTitle>
-                      <CardDescription>Premium metal card</CardDescription>
-                    </div>
-                    {cardType === "physical" && (
-                      <div className="w-6 h-6 rounded-full bg-primary flex items-center justify-center">
-                        <Check className="w-4 h-4 text-primary-foreground" />
-                      </div>
+                    {/* Selected glow ring */}
+                    {isSelected && (
+                      <div className="absolute -inset-[1px] rounded-2xl z-0"
+                        style={{ background: "linear-gradient(135deg, rgba(99,102,241,0.4), rgba(139,92,246,0.2), rgba(99,102,241,0.1))" }}
+                      />
                     )}
-                  </div>
-                </CardHeader>
-                <CardContent>
-                  <ul className="space-y-2">
-                    {cardBenefits.physical.map((benefit, i) => (
-                      <li key={i} className="flex items-center gap-2 text-sm text-muted-foreground">
-                        <Check className="w-4 h-4 text-emerald-500" />
-                        {benefit}
-                      </li>
-                    ))}
-                  </ul>
-                </CardContent>
-              </Card>
+
+                    <div
+                      className="relative h-full rounded-2xl p-6 overflow-hidden z-10"
+                      style={{
+                        background: isSelected
+                          ? "rgba(99,102,241,0.06)"
+                          : "rgba(255,255,255,0.03)",
+                        backdropFilter: "blur(24px) saturate(1.5)",
+                        WebkitBackdropFilter: "blur(24px) saturate(1.5)",
+                        border: isSelected
+                          ? "0.5px solid rgba(99,102,241,0.3)"
+                          : "0.5px solid rgba(255,255,255,0.06)",
+                      }}
+                    >
+                      {/* Top edge highlight */}
+                      <div className="absolute inset-x-0 top-0 h-[1px]"
+                        style={{ background: isSelected
+                          ? "linear-gradient(90deg, transparent, rgba(99,102,241,0.3), transparent)"
+                          : "linear-gradient(90deg, transparent, rgba(255,255,255,0.1), transparent)"
+                        }}
+                      />
+
+                      <div className="flex justify-between items-start mb-4">
+                        <div>
+                          <div className="flex items-center gap-2 font-semibold text-base">
+                            <Icon className="w-5 h-5" />
+                            {title}
+                          </div>
+                          <div className="text-sm text-muted-foreground mt-0.5">{desc}</div>
+                        </div>
+                        {isSelected && (
+                          <div className="w-6 h-6 rounded-full flex items-center justify-center"
+                            style={{ background: "rgba(99,102,241,0.8)" }}
+                          >
+                            <Check className="w-4 h-4 text-white" />
+                          </div>
+                        )}
+                      </div>
+
+                      <ul className="space-y-2">
+                        {cardBenefits[type].map((benefit, i) => (
+                          <li key={i} className="flex items-center gap-2 text-sm text-muted-foreground">
+                            <Check className="w-4 h-4 text-emerald-500 shrink-0" />
+                            {benefit}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  </button>
+                )
+              })}
             </div>
 
+            {/* CTA — glass button */}
             <div className="flex justify-center">
-              <Button size="lg" onClick={() => setActiveTab("apply")} className="bg-primary hover:bg-primary/90">
-                Continue to Application
-                <ChevronRight className="ml-2 h-5 w-5" />
-              </Button>
+              <button
+                onClick={() => setActiveTab("apply")}
+                className="group relative rounded-xl px-8 py-4 text-lg font-medium transition-all duration-300 active:scale-[0.97]"
+                style={{
+                  background: "rgba(99,102,241,0.15)",
+                  backdropFilter: "blur(20px) saturate(1.4)",
+                  WebkitBackdropFilter: "blur(20px) saturate(1.4)",
+                  border: "0.5px solid rgba(99,102,241,0.25)",
+                  color: "rgb(165,170,255)",
+                }}
+              >
+                {/* Press overlay */}
+                <div className="absolute inset-0 rounded-xl bg-white/[0.08] opacity-0 group-active:opacity-100 transition-opacity duration-150 pointer-events-none" />
+                {/* Top edge light */}
+                <div className="absolute inset-x-0 top-0 h-[1px] rounded-t-xl"
+                  style={{ background: "linear-gradient(90deg, transparent, rgba(165,170,255,0.3), transparent)" }}
+                />
+                <span className="relative z-10 flex items-center">
+                  Continue to Application
+                  <ChevronRight className="ml-2 h-5 w-5" />
+                </span>
+              </button>
             </div>
           </TabsContent>
 

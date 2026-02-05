@@ -12,7 +12,6 @@ import {
   ProductItem
 } from "@/lib/products-config"
 import { Button } from "@/components/ui/button"
-import { Badge } from "@/components/ui/badge"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Separator } from "@/components/ui/separator"
 
@@ -21,10 +20,10 @@ function SidebarSection({ title, items }: { title: string, items: ProductItem[] 
 
   return (
     <div className="mb-4">
-      <h3 className="mb-2 px-4 text-xs font-semibold uppercase text-muted-foreground tracking-wider">
+      <h3 className="mb-2 px-4 text-[11px] font-semibold uppercase text-muted-foreground/60 tracking-[0.1em]">
         {title}
       </h3>
-      <div className="space-y-1 px-2">
+      <div className="space-y-0.5 px-2">
         {items.map((item) => {
           const isActive = pathname === item.href || (pathname.startsWith(item.href) && item.href !== '/')
           return (
@@ -32,20 +31,24 @@ function SidebarSection({ title, items }: { title: string, items: ProductItem[] 
               key={item.href}
               variant={isActive ? "secondary" : "ghost"}
               className={cn(
-                "w-full justify-start font-normal h-9",
-                isActive && "font-medium",
+                "w-full justify-start h-9",
+                isActive
+                  ? "font-semibold text-foreground"
+                  : "font-medium text-foreground/70 hover:text-foreground",
                 item.disabled && "opacity-50 pointer-events-none"
               )}
               asChild
             >
               <Link href={item.disabled ? "#" : item.href}>
-                <item.icon className={cn("mr-2 h-4 w-4", item.color.split(" ")[1])} />
-                <span className="flex-1 text-left">{item.title}</span>
-                {item.badge && (
-                  <Badge variant="secondary" className={cn("ml-auto text-[10px] px-1.5 py-0 h-4", item.badgeColor)}>
-                    {item.badge}
-                  </Badge>
-                )}
+                <item.icon
+                  className={cn(
+                    "mr-2.5 h-4 w-4 stroke-[1.8]",
+                    isActive
+                      ? "text-foreground"
+                      : "text-foreground/50"
+                  )}
+                />
+                <span className="flex-1 text-left text-[13px]">{item.title}</span>
               </Link>
             </Button>
           )
