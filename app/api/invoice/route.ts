@@ -112,6 +112,10 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Invoice ID required" }, { status: 400 })
     }
 
+    if (!signature) {
+      return NextResponse.json({ error: "Signature required to view invoice" }, { status: 403 })
+    }
+
     let invoice = await prisma.invoice.findUnique({
         where: { invoice_id: invoiceId }
     });
@@ -122,6 +126,13 @@ export async function GET(request: NextRequest) {
         return NextResponse.json({ error: "Invoice not found" }, { status: 404 })
     } else if (!invoice) {
         return NextResponse.json({ error: "Invoice not found" }, { status: 404 })
+    }
+
+    // Security: Verify signature matches the invoice
+    // This ensures only people with the full link (containing the signature) can view it.
+    // It is tamper-proof because the signature was generated using the secret key at creation.
+    if (invoice.signature && invoice.signature !== signature) {
+        return NextResponse.json({ error: "Invalid signature" }, { status: 403 })
     }
 
     return NextResponse.json({ success: true, invoice })

@@ -21,8 +21,17 @@ export const CHAINS: Record<string, { name: string; explorer: string; id: number
 
 export function getExplorerLink(chain: string | number, hash: string, type: 'tx' | 'address' = 'tx'): string {
   const chainKey = String(chain).toLowerCase();
-  const chainData = CHAINS[chainKey] || CHAINS["ethereum"];
-  return `${chainData.explorer}/${type}/${hash}`;
+  const chainData = CHAINS[chainKey];
+  
+  if (chainData) {
+      return `${chainData.explorer}/${type}/${hash}`;
+  }
+
+  // Fallback for unknown chains: Try general search or just return '#' if we really don't know
+  // Better fallback: If it looks like an EVM address/hash, default to Etherscan but maybe warn?
+  // User asked "How it displays for new chains".
+  // If we return a google search link, it's actually quite helpful.
+  return `https://google.com/search?q=${chain}+explorer+${hash}`;
 }
 
 export function getChainName(chain: string | number): string {
