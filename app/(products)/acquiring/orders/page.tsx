@@ -313,6 +313,17 @@ export default function OrdersPage() {
         </Button>
       </div>
 
+      {/* Demo Mode Banner */}
+      {isDemoMode && (
+        <Card className="mb-6 border-blue-500/20 bg-blue-500/5">
+          <CardContent className="pt-6 pb-4">
+            <p className="text-sm text-blue-500">
+              You are viewing demo orders. Connect your wallet to manage real orders.
+            </p>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Filter Bar */}
       <Card className="mb-6">
         <CardContent className="pt-6">

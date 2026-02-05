@@ -344,20 +344,19 @@ export default function AgentsPage() {
     toast({ title: "Copied to clipboard" })
   }
 
-  if (!address) {
-    return (
-      <div className="container mx-auto py-8 px-4">
-        <Card>
-          <CardContent className="py-8 text-center text-muted-foreground">
-            Please connect your wallet to manage AI agents
-          </CardContent>
-        </Card>
-      </div>
-    )
-  }
-
   return (
     <div className="container mx-auto py-8 px-4 max-w-6xl">
+      {isPreviewMode && (
+        <div className="mb-6 p-4 bg-yellow-500/10 border border-yellow-500/20 rounded-lg flex items-center gap-3">
+          <AlertTriangle className="h-5 w-5 text-yellow-500 shrink-0" />
+          <div>
+            <p className="font-medium text-yellow-500">Preview Mode</p>
+            <p className="text-sm text-muted-foreground">
+              You are viewing demo data. Connect your wallet to manage real AI agents.
+            </p>
+          </div>
+        </div>
+      )}
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-2xl font-bold">AI Agent Management</h1>
