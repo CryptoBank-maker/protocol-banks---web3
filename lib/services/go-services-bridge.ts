@@ -1,8 +1,11 @@
 /**
- * Go Services Bridge
- * Routes requests to Go microservices with fallback to TypeScript implementation
+ * Go Services Bridge (gRPC)
+ * Routes requests to Go microservices via gRPC with fallback to TypeScript implementation
  */
 
+import * as grpc from '@grpc/grpc-js';
+import * as protoLoader from '@grpc/proto-loader';
+import path from 'path';
 import { getCircuitBreaker, CircuitBreakerOpenError } from './circuit-breaker';
 import { HealthMonitorService } from './health-monitor-service';
 
@@ -37,13 +40,20 @@ export interface FallbackEvent {
 // Constants
 // ============================================
 
-const GO_SERVICE_URLS = {
-  'payout-engine': process.env.PAYOUT_ENGINE_URL || 'http://localhost:8081',
-  'event-indexer': process.env.EVENT_INDEXER_URL || 'http://localhost:8082',
-  'webhook-handler': process.env.WEBHOOK_HANDLER_URL || 'http://localhost:8083',
+const GO_SERVICE_CONFIG = {
+  payout: {
+    host: process.env.PAYOUT_ENGINE_HOST || 'localhost:50051',
+    protoPath: 'services/proto/payout.proto'
+  }
 };
 
-const REQUEST_TIMEOUT_MS = 5000;
+const PROTO_OPTIONS: protoLoader.Options = {
+  keepCase: true,
+  longs: String,
+  enums: String,
+  defaults: true,
+  oneofs: true
+};
 
 // ============================================
 // Go Services Bridge
@@ -52,9 +62,34 @@ const REQUEST_TIMEOUT_MS = 5000;
 export class GoServicesBridge {
   private healthMonitor: HealthMonitorService;
   private fallbackEvents: FallbackEvent[] = [];
+  
+  private payoutClient: any; // gRPC Client
 
   constructor() {
     this.healthMonitor = new HealthMonitorService();
+    this.initGrpcClients();
+  }
+
+  private initGrpcClients() {
+    try {
+      // Use process.cwd() to resolve path relevant to project root
+      // Assuming 'services/proto/payout.proto' is the path from root
+      const payoutProtoPath = path.resolve(process.cwd(), GO_SERVICE_CONFIG.payout.protoPath);
+      
+      const packageDefinition = protoLoader.loadSync(payoutProtoPath, PROTO_OPTIONS);
+      const protoDescriptor = grpc.loadPackageDefinition(packageDefinition) as any;
+      
+      const PayoutService = protoDescriptor.payout.PayoutService;
+      this.payoutClient = new PayoutService(
+        GO_SERVICE_CONFIG.payout.host, 
+        grpc.credentials.createInsecure()
+      );
+      
+      console.log('[GoServicesBridge] gRPC Clients initialized');
+    } catch (error) {
+      console.warn('[GoServicesBridge] Failed to initialize gRPC clients (Proto files missing?):', error);
+      // We don't throw here to allow fallback to work even if init fails
+    }
   }
 
   /**
@@ -64,11 +99,13 @@ export class GoServicesBridge {
     const startTime = Date.now();
     const circuitBreaker = getCircuitBreaker('payout-engine', {
       failureThreshold: 3,
-      timeout: 30000, // 30 seconds before retry
+      timeout: 30000, 
     });
 
     // Try Go service first
     try {
+      if (!this.payoutClient) throw new Error('gRPC client not initialized');
+
       const result = await circuitBreaker.execute(async () => {
         return await this.callGoPayoutService(request);
       });
@@ -89,65 +126,64 @@ export class GoServicesBridge {
   }
 
   /**
-   * Call Go payout service
+   * Call Go payout service (gRPC)
    */
-  private async callGoPayoutService(request: PayoutRequest): Promise<PayoutResponse> {
-    const url = `${GO_SERVICE_URLS['payout-engine']}/api/payout`;
-    
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
-
-    try {
-      const response = await fetch(url, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(request),
-        signal: controller.signal,
-      });
-
-      clearTimeout(timeoutId);
-
-      if (!response.ok) {
-        const errorBody = await response.text().catch(() => '');
-        throw new Error(`Go service error: HTTP ${response.status} - ${errorBody}`);
-      }
-
-      const data = await response.json();
-      return {
-        success: true,
-        tx_hash: data.tx_hash,
-        executed_by: 'go',
+  private callGoPayoutService(request: PayoutRequest): Promise<PayoutResponse> {
+    return new Promise((resolve, reject) => {
+      // Convert PayoutRequest (Single) to BatchPayoutRequest (Proto)
+      // Note: We need to generate a unique batch ID
+      const batchRequest = {
+        batch_id: `batch_${Date.now()}`,
+        user_id: 'system', // Default user
+        from_address: request.from_address,
+        chain_id: request.chain_id,
+        items: [
+          {
+            id: `item_${Date.now()}`,
+            recipient_address: request.to_address,
+            amount: request.amount, // Ensure this is in correct units (wei)
+            token_address: '', // TODO: Resolve token address if needed
+            token_symbol: request.token,
+            token_decimals: 18, // Default, logic should handle this
+            vendor_name: '',
+            vendor_id: '',
+            memo: request.memo || ''
+          }
+        ]
       };
-    } catch (error: any) {
-      clearTimeout(timeoutId);
-      
-      if (error.name === 'AbortError') {
-        throw new Error('Request timeout');
-      }
-      throw error;
-    }
+
+      // Set deadline
+      const deadline = new Date();
+      deadline.setSeconds(deadline.getSeconds() + 5);
+
+      const metadata = new grpc.Metadata();
+      // Add any auth metadata here if needed
+
+      this.payoutClient.SubmitBatchPayout(batchRequest, { deadline, metadata }, (error: any, response: any) => {
+        if (error) {
+          reject(new Error(`gRPC Error: ${error.message}`));
+          return;
+        }
+
+        resolve({
+          success: true,
+          tx_hash: response.tx_hash || 'pending', // Proto response fields
+          executed_by: 'go',
+        });
+      });
+    });
   }
 
   /**
    * TypeScript fallback implementation for payout
    */
   private async executePayoutTypescript(request: PayoutRequest): Promise<PayoutResponse> {
-    // This is a placeholder - in production, this would use ethers.js or viem
-    // to execute the transaction directly
     console.log('[GoServicesBridge] Executing payout via TypeScript fallback:', request);
     
-    // Simulate transaction execution
-    // In production, this would:
-    // 1. Connect to the appropriate chain
-    // 2. Build and sign the transaction
-    // 3. Submit to the network
-    // 4. Wait for confirmation
-    
+    // In production, this would use ethers.js/viem
     return {
       success: true,
-      tx_hash: `0x${Date.now().toString(16)}${'0'.repeat(48)}`, // Placeholder
+      tx_hash: `0x${Date.now().toString(16)}${'0'.repeat(48)}`, 
       executed_by: 'typescript',
     };
   }
@@ -162,65 +198,13 @@ export class GoServicesBridge {
       duration_ms,
       timestamp: new Date().toISOString(),
     };
-
-    this.fallbackEvents.push(event);
-    
-    // Keep only last 100 events
-    if (this.fallbackEvents.length > 100) {
-      this.fallbackEvents = this.fallbackEvents.slice(-100);
-    }
-
+    this.fallbackEvents.push(event);    
+    if (this.fallbackEvents.length > 100) this.fallbackEvents = this.fallbackEvents.slice(-100);
     console.log(`[GoServicesBridge] Fallback event:`, event);
   }
 
-  /**
-   * Get recent fallback events
-   */
   getFallbackEvents(limit: number = 10): FallbackEvent[] {
     return this.fallbackEvents.slice(-limit);
-  }
-
-  /**
-   * Check if Go service is available
-   */
-  async isGoServiceAvailable(service: keyof typeof GO_SERVICE_URLS): Promise<boolean> {
-    const circuitBreaker = getCircuitBreaker(service);
-    
-    // If circuit is open, service is not available
-    if (circuitBreaker.isOpen()) {
-      return false;
-    }
-
-    // Check actual health
-    return await this.healthMonitor.isGoServiceAvailable(service as any);
-  }
-
-  /**
-   * Get service status for all Go services
-   */
-  async getServicesStatus(): Promise<Record<string, { available: boolean; circuit_state: string }>> {
-    const status: Record<string, { available: boolean; circuit_state: string }> = {};
-
-    for (const service of Object.keys(GO_SERVICE_URLS) as Array<keyof typeof GO_SERVICE_URLS>) {
-      const circuitBreaker = getCircuitBreaker(service);
-      const available = await this.isGoServiceAvailable(service);
-      
-      status[service] = {
-        available,
-        circuit_state: circuitBreaker.getState(),
-      };
-    }
-
-    return status;
-  }
-
-  /**
-   * Force reset circuit breaker for a service
-   */
-  resetCircuitBreaker(service: keyof typeof GO_SERVICE_URLS): void {
-    const circuitBreaker = getCircuitBreaker(service);
-    circuitBreaker.reset();
-    console.log(`[GoServicesBridge] Circuit breaker reset for ${service}`);
   }
 }
 

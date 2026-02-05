@@ -15,7 +15,7 @@ export {
   markNonceUsed,
   isWithinValidityWindow,
   createValidityWindow,
-} from "@/backend"
+} from "@/lib/services"
 
 export const CHAIN_IDS = {
   MAINNET: 1,
