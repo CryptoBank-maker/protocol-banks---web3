@@ -33,8 +33,8 @@ function SidebarSection({ title, items }: { title: string, items: ProductItem[] 
               className={cn(
                 "w-full justify-start h-9",
                 isActive
-                  ? "font-semibold text-foreground"
-                  : "font-medium text-foreground/70 hover:text-foreground",
+                  ? "font-bold text-foreground"
+                  : "font-semibold text-foreground/80 hover:text-foreground",
                 item.disabled && "opacity-50 pointer-events-none"
               )}
               asChild
@@ -42,13 +42,13 @@ function SidebarSection({ title, items }: { title: string, items: ProductItem[] 
               <Link href={item.disabled ? "#" : item.href}>
                 <item.icon
                   className={cn(
-                    "mr-2.5 h-4 w-4 stroke-[1.8]",
+                    "mr-2.5 h-4 w-4 stroke-[2]",
                     isActive
                       ? "text-foreground"
-                      : "text-foreground/50"
+                      : "text-foreground/60"
                   )}
                 />
-                <span className="flex-1 text-left text-[13px]">{item.title}</span>
+                <span className="flex-1 text-left text-sm">{item.title}</span>
               </Link>
             </Button>
           )
