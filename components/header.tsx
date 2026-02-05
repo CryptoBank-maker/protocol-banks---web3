@@ -37,7 +37,7 @@ const UnifiedWalletButton = dynamic(() => import("./unified-wallet-button").then
 export function Header() {
   const pathname = usePathname()
   const { isDemoMode, toggleDemoMode } = useDemo()
-  const { theme, resolvedTheme } = useTheme()
+  const { resolvedTheme } = useTheme()
   const [isOpen, setIsOpen] = useState(false)
   const [mounted, setMounted] = useState(false)
 
@@ -49,7 +49,7 @@ export function Header() {
   const logoTextSrc = mounted && resolvedTheme === 'light' ? '/logo-text-black.png' : '/logo-text-white.png'
 
   const navItems = [
-    { href: "/", label: "Home", icon: Wallet },
+    { href: "/dashboard", label: "Dashboard", icon: Wallet },
     { href: "/balances", label: "Balances", icon: CreditCard },
     { href: "/history", label: "Transactions", icon: ArrowLeftRight },
     { href: "/vendors", label: "Contacts", icon: ShoppingBag },
@@ -57,7 +57,6 @@ export function Header() {
   ]
 
   const isActivePath = (href: string) => {
-    if (href === "/") return pathname === "/"
     return pathname === href || pathname.startsWith(`${href}/`)
   }
 
@@ -162,7 +161,7 @@ export function Header() {
         {/* Desktop Navigation */}
         <nav className="hidden md:flex items-center gap-1">
           {navItems
-            .filter((item) => item.href !== "/" && item.href !== "/products")
+            .filter((item) => item.href !== "/products")
             .map((item) => {
               const Icon = item.icon
               const isActive = isActivePath(item.href)
