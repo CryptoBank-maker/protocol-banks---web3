@@ -97,10 +97,19 @@ export default function AnalyticsPage() {
   const [isTagDialogOpen, setIsTagDialogOpen] = useState(false)
 
   useEffect(() => {
+    if (isDemoMode) {
+      setPayments(demoPayments)
+      setFilteredPayments(demoPayments)
+      setBatches(demoBatches)
+      setStats(demoStats)
+      setLoading(false)
+      return
+    }
+
     if (isConnected && wallet) {
       loadData()
     }
-  }, [isConnected, wallet])
+  }, [isDemoMode, isConnected, wallet])
 
   useEffect(() => {
     filterPayments()
@@ -379,6 +388,33 @@ export default function AnalyticsPage() {
     totalVendors: 86,
     avgTransaction: 99.76,
   }
+
+  const demoBatches: BatchPayment[] = [
+    {
+      id: "demo-batch-1",
+      batch_name: "January Payroll",
+      total_recipients: 42,
+      total_amount_usd: 58200,
+      status: "completed",
+      created_at: new Date(Date.now() - 6 * 24 * 60 * 60 * 1000).toISOString(),
+    },
+    {
+      id: "demo-batch-2",
+      batch_name: "Vendor Settlements",
+      total_recipients: 18,
+      total_amount_usd: 21450,
+      status: "processing",
+      created_at: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
+    },
+    {
+      id: "demo-batch-3",
+      batch_name: "Partner Disbursements",
+      total_recipients: 9,
+      total_amount_usd: 9800,
+      status: "completed",
+      created_at: new Date(Date.now() - 12 * 24 * 60 * 60 * 1000).toISOString(),
+    },
+  ]
 
   // Use real data or demo data
   const displayPayments = isDemoMode
