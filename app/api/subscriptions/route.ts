@@ -14,26 +14,21 @@ const VALID_TOKENS = ['USDC', 'USDT', 'DAI', 'ETH', 'WETH', 'WBTC'];
 
 /**
  * Extract owner address from request:
- * 1. Try server-side Supabase auth (cookie-based)
- * 2. Fall back to x-wallet-address header
+ * 1. x-wallet-address header (primary)
+ * 2. wallet query parameter (fallback)
  */
 async function getOwnerAddress(request: NextRequest): Promise<string | null> {
-  // Try Supabase server auth first
-  try {
-    const { createClient } = await import('@/lib/supabase/server');
-    const supabase = await createClient();
-    const { data: { user } } = await supabase.auth.getUser();
-    if (user) {
-      return user.user_metadata?.wallet_address || user.email || null;
-    }
-  } catch {
-    // Supabase not configured or cookies not available
+  // Primary: x-wallet-address header
+  const walletHeader = request.headers.get('x-wallet-address');
+  if (walletHeader && /^0x[a-fA-F0-9]{40}$/i.test(walletHeader)) {
+    return walletHeader;
   }
 
-  // Fallback: x-wallet-address header
-  const walletAddress = request.headers.get('x-wallet-address');
-  if (walletAddress && /^0x[a-fA-F0-9]{40}$/.test(walletAddress)) {
-    return walletAddress;
+  // Fallback: wallet query parameter
+  const { searchParams } = new URL(request.url);
+  const walletParam = searchParams.get('wallet');
+  if (walletParam && /^0x[a-fA-F0-9]{40}$/i.test(walletParam)) {
+    return walletParam;
   }
 
   return null;

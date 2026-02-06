@@ -48,11 +48,13 @@ export function DemoProvider({ children }: { children: ReactNode }) {
   const setWalletConnected = (connected: boolean) => {
     setWalletConnectedState(connected)
     if (connected) {
-      // Wallet connected, switch to real mode
+      // Wallet connected, switch to real mode and persist to localStorage
       setIsDemoMode(false)
+      localStorage.setItem(TEST_MODE_STORAGE_KEY, "false")
     } else {
       // Wallet disconnected, auto-enable test mode
       setIsDemoMode(true)
+      localStorage.setItem(TEST_MODE_STORAGE_KEY, "true")
     }
   }
 

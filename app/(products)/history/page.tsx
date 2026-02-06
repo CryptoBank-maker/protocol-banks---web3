@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Search, Download, ArrowUpRight, ArrowDownLeft, ExternalLink, Calendar, Filter, ChevronDown, ChevronRight, Layers, FolderOpen, ArrowLeft } from "lucide-react"
 import { useUnifiedWallet } from "@/hooks/use-unified-wallet"
-import { getSupabase } from "@/lib/supabase"
+import { authHeaders } from "@/lib/authenticated-fetch"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { useDemo } from "@/contexts/demo-context"
 import Link from "next/link"
@@ -129,7 +129,9 @@ export default function HistoryPage() {
     if (!wallet) return
     setGroupsLoading(true)
     try {
-      const res = await fetch(`/api/payment-groups?owner=${wallet}`)
+      const res = await fetch(`/api/payment-groups?owner=${wallet}`, {
+        headers: authHeaders(wallet),
+      })
       if (res.ok) {
         const data = await res.json()
         setGroups(data.groups || [])
@@ -144,7 +146,9 @@ export default function HistoryPage() {
   const loadGroupDetails = useCallback(async (groupId: string) => {
     setGroupPaymentsLoading(true)
     try {
-      const res = await fetch(`/api/payment-groups/${groupId}`)
+      const res = await fetch(`/api/payment-groups/${groupId}`, {
+        headers: authHeaders(wallet),
+      })
       if (res.ok) {
         const data = await res.json()
         setSelectedGroup(data.group)
@@ -180,7 +184,9 @@ export default function HistoryPage() {
     try {
       if (!wallet) return
 
-      const response = await fetch(`/api/payments?wallet=${wallet}&type=all`)
+      const response = await fetch(`/api/payments?wallet=${wallet}&type=all`, {
+        headers: authHeaders(wallet),
+      })
       if (!response.ok) {
         throw new Error("Failed to fetch payments")
       }

@@ -5,10 +5,11 @@ import Link from "next/link"
 import { useUnifiedWallet } from "@/hooks/use-unified-wallet"
 import { useDemo } from "@/contexts/demo-context"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { GlassCard, GlassCardContent, GlassCardHeader, GlassCardTitle } from "@/components/ui/glass-card"
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Skeleton } from "@/components/ui/skeleton"
+import { EmptyState } from "@/components/dashboard"
 import {
   ArrowDownLeft,
   ArrowUpRight,
@@ -98,8 +99,8 @@ export default function DashboardPage() {
       <div className="container mx-auto py-6 px-4 space-y-6">
 
         {/* Balance Card */}
-        <Card className="bg-gradient-to-br from-primary/10 via-background to-background border-primary/20">
-          <CardContent className="pt-6">
+        <GlassCard variant="primary" className="bg-gradient-to-br from-primary/10 via-background to-background">
+          <GlassCardContent className="pt-6">
             <div className="flex items-start justify-between">
               <div>
                 <p className="text-sm text-muted-foreground mb-1">Total Balance</p>
@@ -123,30 +124,34 @@ export default function DashboardPage() {
                 </Button>
               </Link>
             </div>
-          </CardContent>
-        </Card>
+          </GlassCardContent>
+        </GlassCard>
 
         {/* Quick Actions */}
         <div className="grid grid-cols-4 gap-3">
           {quickActions.map((action) => (
             <Link key={action.href} href={action.href}>
-              <Card className={`${action.color} border-0 cursor-pointer transition-all hover:scale-105`}>
-                <CardContent className="flex flex-col items-center justify-center py-4 px-2">
+              <GlassCard
+                size="sm"
+                interactive
+                className={`${action.color} border-0 cursor-pointer`}
+              >
+                <GlassCardContent className="flex flex-col items-center justify-center py-4 px-2">
                   <action.icon className="h-6 w-6 mb-2" />
                   <span className="text-xs font-medium">{action.label}</span>
-                </CardContent>
-              </Card>
+                </GlassCardContent>
+              </GlassCard>
             </Link>
           ))}
         </div>
 
         {/* Products Quick Access */}
-        <Card>
-          <CardHeader className="pb-3">
+        <GlassCard>
+          <GlassCardHeader className="pb-3">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <Grid3X3 className="h-5 w-5 text-muted-foreground" />
-                <CardTitle className="text-lg">Products</CardTitle>
+                <GlassCardTitle className="text-lg">Products</GlassCardTitle>
               </div>
               <Link href="/products">
                 <Button variant="ghost" size="sm" className="gap-1 text-muted-foreground">
@@ -155,12 +160,12 @@ export default function DashboardPage() {
                 </Button>
               </Link>
             </div>
-          </CardHeader>
-          <CardContent>
+          </GlassCardHeader>
+          <GlassCardContent>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
               <Link href="/checkout">
-                <div className="flex items-center gap-3 p-3 rounded-lg border hover:bg-muted/50 transition-colors cursor-pointer">
-                  <div className="p-2 rounded-lg bg-green-500/10">
+                <div className="flex items-center gap-3 p-3 rounded-lg border border-white/10 dark:border-white/5 hover:bg-primary/5 dark:hover:bg-primary/10 backdrop-blur-sm transition-all cursor-pointer">
+                  <div className="p-2 rounded-lg bg-green-500/10 backdrop-blur-sm">
                     <CreditCard className="h-4 w-4 text-green-500" />
                   </div>
                   <div>
@@ -170,8 +175,8 @@ export default function DashboardPage() {
                 </div>
               </Link>
               <Link href="/subscriptions">
-                <div className="flex items-center gap-3 p-3 rounded-lg border hover:bg-muted/50 transition-colors cursor-pointer">
-                  <div className="p-2 rounded-lg bg-purple-500/10">
+                <div className="flex items-center gap-3 p-3 rounded-lg border border-white/10 dark:border-white/5 hover:bg-primary/5 dark:hover:bg-primary/10 backdrop-blur-sm transition-all cursor-pointer">
+                  <div className="p-2 rounded-lg bg-purple-500/10 backdrop-blur-sm">
                     <RefreshCw className="h-4 w-4 text-purple-500" />
                   </div>
                   <div>
@@ -181,8 +186,8 @@ export default function DashboardPage() {
                 </div>
               </Link>
               <Link href="/agents">
-                <div className="flex items-center gap-3 p-3 rounded-lg border hover:bg-muted/50 transition-colors cursor-pointer">
-                  <div className="p-2 rounded-lg bg-blue-500/10">
+                <div className="flex items-center gap-3 p-3 rounded-lg border border-white/10 dark:border-white/5 hover:bg-primary/5 dark:hover:bg-primary/10 backdrop-blur-sm transition-all cursor-pointer">
+                  <div className="p-2 rounded-lg bg-blue-500/10 backdrop-blur-sm">
                     <Zap className="h-4 w-4 text-blue-500" />
                   </div>
                   <div>
@@ -192,8 +197,8 @@ export default function DashboardPage() {
                 </div>
               </Link>
               <Link href="/omnichain">
-                <div className="flex items-center gap-3 p-3 rounded-lg border hover:bg-muted/50 transition-colors cursor-pointer">
-                  <div className="p-2 rounded-lg bg-orange-500/10">
+                <div className="flex items-center gap-3 p-3 rounded-lg border border-white/10 dark:border-white/5 hover:bg-primary/5 dark:hover:bg-primary/10 backdrop-blur-sm transition-all cursor-pointer">
+                  <div className="p-2 rounded-lg bg-orange-500/10 backdrop-blur-sm">
                     <TrendingUp className="h-4 w-4 text-orange-500" />
                   </div>
                   <div>
@@ -203,16 +208,16 @@ export default function DashboardPage() {
                 </div>
               </Link>
             </div>
-          </CardContent>
-        </Card>
+          </GlassCardContent>
+        </GlassCard>
 
         {/* Recent Activity — Payouts / Top-ups / All */}
-        <Card>
-          <CardHeader className="pb-2">
+        <GlassCard>
+          <GlassCardHeader className="pb-2">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <Clock className="h-5 w-5 text-muted-foreground" />
-                <CardTitle className="text-lg">Recent Activity</CardTitle>
+                <GlassCardTitle className="text-lg">Recent Activity</GlassCardTitle>
               </div>
               <Link href="/history">
                 <Button variant="ghost" size="sm" className="gap-1 text-muted-foreground">
@@ -221,8 +226,8 @@ export default function DashboardPage() {
                 </Button>
               </Link>
             </div>
-          </CardHeader>
-          <CardContent>
+          </GlassCardHeader>
+          <GlassCardContent>
             <Tabs value={activityTab} onValueChange={setActivityTab}>
               <TabsList className="mb-4 h-9">
                 <TabsTrigger value="all" className="text-xs px-3">All activity</TabsTrigger>
@@ -248,17 +253,18 @@ export default function DashboardPage() {
                     ))}
                   </div>
                 ) : filteredPayments.length === 0 ? (
-                  <div className="flex flex-col items-center justify-center py-10 text-muted-foreground">
-                    <Inbox className="h-10 w-10 mb-3 opacity-40" />
-                    <p className="text-sm font-medium">No transactions yet</p>
-                    <p className="text-xs mt-1">
-                      {activityTab === "payouts"
+                  <EmptyState
+                    icon={Inbox}
+                    title="No transactions yet"
+                    description={
+                      activityTab === "payouts"
                         ? "Outgoing payments will appear here"
                         : activityTab === "topups"
                           ? "Incoming payments will appear here"
-                          : "Your transaction history will appear here"}
-                    </p>
-                  </div>
+                          : "Your transaction history will appear here"
+                    }
+                    size="sm"
+                  />
                 ) : (
                   <>
                     {/* Column headers */}
@@ -329,8 +335,8 @@ export default function DashboardPage() {
                 )}
               </div>
             </Tabs>
-          </CardContent>
-        </Card>
+          </GlassCardContent>
+        </GlassCard>
 
       </div>
     </div>

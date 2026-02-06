@@ -2,6 +2,7 @@
 
 import { useCallback, useState } from "react"
 import { useUnifiedWallet } from "@/hooks/use-unified-wallet"
+import { authHeaders } from "@/lib/authenticated-fetch"
 
 export interface AuditLogEntry {
   id: string
@@ -69,9 +70,9 @@ export function useAuditLog(): UseAuditLogReturn {
       try {
         const response = await fetch("/api/audit-log", {
           method: "POST",
-          headers: {
+          headers: authHeaders(actor, {
             "Content-Type": "application/json",
-          },
+          }),
           body: JSON.stringify({
             action,
             actor,
@@ -113,7 +114,9 @@ export function useAuditLog(): UseAuditLogReturn {
         if (options.action) params.set("action", options.action)
         if (options.limit) params.set("limit", options.limit.toString())
 
-        const response = await fetch(`/api/audit-log?${params.toString()}`)
+        const response = await fetch(`/api/audit-log?${params.toString()}`, {
+          headers: authHeaders(actor),
+        })
 
         if (!response.ok) {
           const error = await response.json()

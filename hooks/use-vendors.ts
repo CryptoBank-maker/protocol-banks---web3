@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect, useCallback } from "react"
-import { createClient } from "@/lib/supabase-client"
+import { authHeaders } from "@/lib/authenticated-fetch"
 import type { Vendor, VendorTier, VendorCategory } from "@/types"
 
 const DEMO_VENDORS: Vendor[] = [
@@ -303,17 +303,21 @@ export function useVendors(options: UseVendorsOptions = {}) {
         return
       }
 
-      const supabase = createClient()
-      const { data, error: dbError } = await supabase
-        .from("vendors")
-        .select("*")
-        .eq("created_by", walletAddress)
-        .order("created_at", { ascending: false })
+      // Fetch from Prisma-backed API route
+      const res = await fetch(`/api/vendors?owner=${walletAddress}`, {
+        headers: authHeaders(walletAddress),
+      })
 
-      if (dbError) throw dbError
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({}))
+        throw new Error(errorData.error || `Failed to load vendors (${res.status})`)
+      }
 
-      console.log("[v0] useVendors: Loaded from DB, count:", data?.length || 0)
-      setVendors(data || EMPTY_VENDORS)
+      const data = await res.json()
+      const vendors = data.vendors || data || []
+
+      console.log("[v0] useVendors: Loaded from API, count:", vendors.length)
+      setVendors(vendors)
     } catch (err) {
       console.error("[v0] useVendors: Error loading vendors:", err)
       setError(err instanceof Error ? err.message : "Failed to load vendors")
@@ -336,15 +340,23 @@ export function useVendors(options: UseVendorsOptions = {}) {
         return newVendor
       }
 
-      const supabase = createClient()
-      const { data, error: dbError } = await supabase.from("vendors").insert([vendor]).select().single()
+      const res = await fetch("/api/vendors", {
+        method: "POST",
+        headers: authHeaders(walletAddress, { "Content-Type": "application/json" }),
+        body: JSON.stringify(vendor),
+      })
 
-      if (dbError) throw dbError
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({}))
+        throw new Error(errorData.error || "Failed to create vendor")
+      }
 
-      setVendors((prev) => [data, ...prev])
-      return data
+      const data = await res.json()
+      const newVendor = data.vendor || data
+      setVendors((prev) => [newVendor, ...prev])
+      return newVendor
     },
-    [isDemoMode],
+    [isDemoMode, walletAddress],
   )
 
   const updateVendor = useCallback(
@@ -356,19 +368,22 @@ export function useVendors(options: UseVendorsOptions = {}) {
         return
       }
 
-      const supabase = createClient()
-      const { error: dbError } = await supabase
-        .from("vendors")
-        .update({ ...updates, updated_at: new Date().toISOString() })
-        .eq("id", id)
+      const res = await fetch(`/api/vendors/${id}`, {
+        method: "PATCH",
+        headers: authHeaders(walletAddress, { "Content-Type": "application/json" }),
+        body: JSON.stringify(updates),
+      })
 
-      if (dbError) throw dbError
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({}))
+        throw new Error(errorData.error || "Failed to update vendor")
+      }
 
       setVendors((prev) =>
         prev.map((v) => (v.id === id ? { ...v, ...updates, updated_at: new Date().toISOString() } : v)),
       )
     },
-    [isDemoMode],
+    [isDemoMode, walletAddress],
   )
 
   const deleteVendor = useCallback(
@@ -378,14 +393,19 @@ export function useVendors(options: UseVendorsOptions = {}) {
         return
       }
 
-      const supabase = createClient()
-      const { error: dbError } = await supabase.from("vendors").delete().eq("id", id)
+      const res = await fetch(`/api/vendors/${id}`, {
+        method: "DELETE",
+        headers: authHeaders(walletAddress),
+      })
 
-      if (dbError) throw dbError
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({}))
+        throw new Error(errorData.error || "Failed to delete vendor")
+      }
 
       setVendors((prev) => prev.filter((v) => v.id !== id))
     },
-    [isDemoMode],
+    [isDemoMode, walletAddress],
   )
 
   useEffect(() => {

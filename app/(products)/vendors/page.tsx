@@ -4,6 +4,7 @@ import type React from "react"
 import { useState, useEffect, useMemo } from "react"
 import { useUnifiedWallet } from "@/hooks/use-unified-wallet"
 import { useDemo } from "@/contexts/demo-context"
+import { authHeaders } from "@/lib/authenticated-fetch"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
@@ -306,7 +307,9 @@ export default function VendorsPage() {
         return
       }
 
-      const res = await fetch(`/api/vendors?owner=${wallet}`)
+      const res = await fetch(`/api/vendors?owner=${wallet}`, {
+        headers: authHeaders(wallet),
+      })
       if (!res.ok) throw new Error("Failed to fetch vendors")
       const { vendors: vendorsData } = await res.json()
 
@@ -384,7 +387,10 @@ export default function VendorsPage() {
     if (!vendorToDelete || !wallet) return
 
     try {
-      const res = await fetch(`/api/vendors/${vendorToDelete.id}?owner=${wallet}`, { method: "DELETE" })
+      const res = await fetch(`/api/vendors/${vendorToDelete.id}?owner=${wallet}`, {
+        method: "DELETE",
+        headers: authHeaders(wallet),
+      })
       if (!res.ok) {
         const data = await res.json().catch(() => ({}))
         throw new Error(data.error || "Failed to delete")
@@ -473,7 +479,7 @@ export default function VendorsPage() {
 
         const res = await fetch(`/api/vendors/${editingVendor.id}`, {
           method: "PUT",
-          headers: { "Content-Type": "application/json" },
+          headers: authHeaders(wallet, { "Content-Type": "application/json" }),
           body: JSON.stringify(body),
         })
         if (!res.ok) {
@@ -484,7 +490,7 @@ export default function VendorsPage() {
       } else {
         const res = await fetch("/api/vendors", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: authHeaders(wallet, { "Content-Type": "application/json" }),
           body: JSON.stringify({
             name: formData.name,
             wallet_address: formData.wallet_address,
@@ -520,7 +526,7 @@ export default function VendorsPage() {
     try {
       const res = await fetch("/api/vendors/batch-update", {
         method: "PUT",
-        headers: { "Content-Type": "application/json" },
+        headers: authHeaders(wallet, { "Content-Type": "application/json" }),
         body: JSON.stringify({ updates, owner_address: wallet }),
       })
       if (!res.ok) {

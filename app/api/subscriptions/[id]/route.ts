@@ -17,19 +17,9 @@ interface RouteParams {
 }
 
 async function getOwnerAddress(request: NextRequest): Promise<string | null> {
-  try {
-    const { createClient } = await import('@/lib/supabase/server');
-    const supabase = await createClient();
-    const { data: { user } } = await supabase.auth.getUser();
-    if (user) {
-      return user.user_metadata?.wallet_address || user.email || null;
-    }
-  } catch {
-    // Supabase not configured
-  }
-  const walletAddress = request.headers.get('x-wallet-address');
-  if (walletAddress && /^0x[a-fA-F0-9]{40}$/.test(walletAddress)) {
-    return walletAddress;
+  const walletHeader = request.headers.get('x-wallet-address');
+  if (walletHeader && /^0x[a-fA-F0-9]{40}$/i.test(walletHeader)) {
+    return walletHeader;
   }
   return null;
 }

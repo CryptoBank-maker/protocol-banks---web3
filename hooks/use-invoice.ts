@@ -2,6 +2,7 @@
 
 import { useState, useCallback } from "react"
 import { useToast } from "./use-toast"
+import { authHeaders } from "@/lib/authenticated-fetch"
 
 export interface Invoice {
   id: string
@@ -39,7 +40,7 @@ export interface InvoiceResult {
   error?: string
 }
 
-export function useInvoice() {
+export function useInvoice(walletAddress?: string | null) {
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const { toast } = useToast()
@@ -55,7 +56,7 @@ export function useInvoice() {
       try {
         const response = await fetch("/api/invoice", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: authHeaders(walletAddress, { "Content-Type": "application/json" }),
           body: JSON.stringify(params),
         })
 
@@ -134,7 +135,7 @@ export function useInvoice() {
       try {
         const response = await fetch("/api/invoice", {
           method: "PATCH",
-          headers: { "Content-Type": "application/json" },
+          headers: authHeaders(walletAddress, { "Content-Type": "application/json" }),
           body: JSON.stringify({
             invoiceId,
             status: "paid",
@@ -182,7 +183,7 @@ export function useInvoice() {
       try {
         const response = await fetch("/api/invoice", {
           method: "PATCH",
-          headers: { "Content-Type": "application/json" },
+          headers: authHeaders(walletAddress, { "Content-Type": "application/json" }),
           body: JSON.stringify({
             invoiceId,
             status: "cancelled",

@@ -5,6 +5,7 @@
  */
 
 import { useState, useCallback, useEffect } from 'react'
+import { authHeaders } from '@/lib/authenticated-fetch'
 
 export interface Subscription {
   id: string
@@ -40,7 +41,7 @@ export interface SubscriptionListOptions {
   offset?: number
 }
 
-export function useSubscription() {
+export function useSubscription(walletAddress?: string | null) {
   const [subscriptions, setSubscriptions] = useState<Subscription[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -58,7 +59,9 @@ export function useSubscription() {
       if (options?.limit) params.set('limit', options.limit.toString())
       if (options?.offset) params.set('offset', options.offset.toString())
 
-      const response = await fetch(`/api/subscriptions?${params}`)
+      const response = await fetch(`/api/subscriptions?${params}`, {
+        headers: authHeaders(walletAddress),
+      })
       
       if (!response.ok) {
         throw new Error('Failed to fetch subscriptions')
@@ -84,7 +87,9 @@ export function useSubscription() {
     setError(null)
 
     try {
-      const response = await fetch(`/api/subscriptions/${id}`)
+      const response = await fetch(`/api/subscriptions/${id}`, {
+        headers: authHeaders(walletAddress),
+      })
       
       if (!response.ok) {
         if (response.status === 404) return null
@@ -111,7 +116,7 @@ export function useSubscription() {
     try {
       const response = await fetch('/api/subscriptions', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: authHeaders(walletAddress, { 'Content-Type': 'application/json' }),
         body: JSON.stringify(params),
       })
 
@@ -145,7 +150,7 @@ export function useSubscription() {
     try {
       const response = await fetch(`/api/subscriptions/${id}`, {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
+        headers: authHeaders(walletAddress, { 'Content-Type': 'application/json' }),
         body: JSON.stringify(updates),
       })
 
@@ -192,6 +197,7 @@ export function useSubscription() {
     try {
       const response = await fetch(`/api/subscriptions/${id}`, {
         method: 'DELETE',
+        headers: authHeaders(walletAddress),
       })
 
       if (!response.ok) {

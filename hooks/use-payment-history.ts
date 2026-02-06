@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect, useCallback } from "react"
+import { authHeaders } from "@/lib/authenticated-fetch"
 import type { Payment, PaymentHistory, MonthlyPaymentData } from "@/types"
 
 // Generate realistic demo payment history
@@ -99,7 +100,9 @@ export function usePaymentHistory(options: UsePaymentHistoryOptions = {}) {
         params.set("type", type)
       }
 
-      const res = await fetch(`/api/payments?${params.toString()}`)
+      const res = await fetch(`/api/payments?${params.toString()}`, {
+        headers: authHeaders(walletAddress),
+      })
       if (!res.ok) {
         const errorData = await res.json().catch(() => ({}))
         throw new Error(errorData.error || `Failed to fetch payments (${res.status})`)
@@ -133,7 +136,7 @@ export function usePaymentHistory(options: UsePaymentHistoryOptions = {}) {
       // POST to Prisma-backed API route
       const res = await fetch("/api/payments", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: authHeaders(walletAddress, { "Content-Type": "application/json" }),
         body: JSON.stringify(payment),
       })
 
@@ -147,7 +150,7 @@ export function usePaymentHistory(options: UsePaymentHistoryOptions = {}) {
       setPayments((prev) => [data, ...prev])
       return data
     },
-    [isDemoMode],
+    [isDemoMode, walletAddress],
   )
 
   const getMonthlyData = useCallback((): MonthlyPaymentData[] => {

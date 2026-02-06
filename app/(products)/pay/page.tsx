@@ -20,6 +20,7 @@ import { Loader2, Wallet, CheckCircle2, AlertCircle, ShieldAlert, ShieldCheck, E
 import { useUnifiedWallet } from "@/hooks/use-unified-wallet"
 import { useToast } from "@/hooks/use-toast"
 import { useDemo } from "@/contexts/demo-context"
+import { authHeaders } from "@/lib/authenticated-fetch"
 import { useVendors } from "@/hooks/use-vendors"
 import { usePaymentHistory } from "@/hooks/use-payment-history"
 import { getTokenAddress, signERC3009Authorization, executeERC3009Transfer, sendToken, getTokenBalance } from "@/lib/web3"
@@ -462,7 +463,7 @@ function PaymentContent() {
 
         const response = await fetch('/api/payments', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: authHeaders(wallets.EVM, { 'Content-Type': 'application/json' }),
           body: JSON.stringify(payload)
         })
 
@@ -485,7 +486,7 @@ function PaymentContent() {
         try {
           await fetch('/api/payment/retry-queue', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: authHeaders(wallets.EVM, { 'Content-Type': 'application/json' }),
             body: JSON.stringify({
               txHash: hash,
               paymentData: {

@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react"
 import { useUnifiedWallet } from "@/hooks/use-unified-wallet"
 import { useDemo } from "@/contexts/demo-context"
+import { authHeaders } from "@/lib/authenticated-fetch"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
@@ -151,7 +152,9 @@ export default function AnalyticsPage() {
     try {
       setLoading(true) // Ensure loading state is set
       // Load payments from Prisma-backed API
-      const paymentsResponse = await fetch(`/api/payments?wallet=${wallet}&type=sent`)
+      const paymentsResponse = await fetch(`/api/payments?wallet=${wallet}&type=sent`, {
+        headers: authHeaders(wallet),
+      })
       if (!paymentsResponse.ok) {
         throw new Error("Failed to load payments")
       }
@@ -191,7 +194,9 @@ export default function AnalyticsPage() {
 
       // Load batch payments
       // Load batch payments from Prisma-backed API
-      const batchesResponse = await fetch(`/api/batch-payment?fromAddress=${wallet}`)
+      const batchesResponse = await fetch(`/api/batch-payment?fromAddress=${wallet}`, {
+        headers: authHeaders(wallet),
+      })
       if (batchesResponse.ok) {
         const batchesPayload = await batchesResponse.json()
         const mappedBatches = (batchesPayload.batches || []).map((batch: any) => ({
@@ -251,7 +256,7 @@ export default function AnalyticsPage() {
       const updatedTags = [...(selectedPayment.tags || []), newTag.trim()]
       const response = await fetch("/api/payments", {
         method: "PATCH",
-        headers: { "Content-Type": "application/json" },
+        headers: authHeaders(wallet, { "Content-Type": "application/json" }),
         body: JSON.stringify({ id: selectedPayment.id, tags: updatedTags }),
       })
 
@@ -276,7 +281,7 @@ export default function AnalyticsPage() {
       const updatedTags = (payment.tags || []).filter((t) => t !== tagToRemove)
       const response = await fetch("/api/payments", {
         method: "PATCH",
-        headers: { "Content-Type": "application/json" },
+        headers: authHeaders(wallet, { "Content-Type": "application/json" }),
         body: JSON.stringify({ id: paymentId, tags: updatedTags }),
       })
 

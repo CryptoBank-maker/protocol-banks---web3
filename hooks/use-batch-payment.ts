@@ -4,6 +4,7 @@ import { useState, useCallback } from "react"
 import { useUnifiedWallet } from "@/hooks/use-unified-wallet"
 import { useDemo } from "@/contexts/demo-context"
 import { useToast } from "@/hooks/use-toast"
+import { authHeaders } from "@/lib/authenticated-fetch"
 import type { PaymentRecipient } from "@/types"
 
 export interface BatchPaymentState {
@@ -238,7 +239,7 @@ export function useBatchPayment(): UseBatchPaymentReturn {
         // Real API call
         const response = await fetch('/api/batch-payment', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: authHeaders(currentWallet, { 'Content-Type': 'application/json' }),
           body: JSON.stringify({
             recipients: recipients.map(r => ({
               address: r.address,
