@@ -62,6 +62,11 @@ export async function GET(request: NextRequest) {
     const payments = await prisma.payment.findMany({
       where,
       orderBy: { created_at: "desc" },
+      include: {
+        vendor: {
+          select: { name: true },
+        },
+      },
     })
 
     // Map Prisma result to match Payment type (add timestamp field)
@@ -76,6 +81,57 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ payments: mapped })
   } catch (error: unknown) {
     console.error("[API] GET /api/payments error:", error)
+    const message = error instanceof Error ? error.message : "Internal Server Error"
+    return NextResponse.json({ error: message }, { status: 500 })
+  }
+}
+
+/**
+ * PATCH /api/payments
+ * Update payment tags (authenticated)
+ */
+export async function PATCH(request: NextRequest) {
+  try {
+    const callerAddress = await getAuthenticatedAddress(request)
+    if (!callerAddress) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    }
+
+    const body = await request.json()
+    const { id, tags } = body as { id?: string; tags?: string[] }
+
+    if (!id || !Array.isArray(tags)) {
+      return NextResponse.json({ error: "Missing or invalid fields: id, tags" }, { status: 400 })
+    }
+
+    const payment = await prisma.payment.findUnique({
+      where: { id },
+      select: { id: true, from_address: true },
+    })
+
+    if (!payment) {
+      return NextResponse.json({ error: "Payment not found" }, { status: 404 })
+    }
+
+    if (payment.from_address.toLowerCase() !== callerAddress.toLowerCase()) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 })
+    }
+
+    const updated = await prisma.payment.update({
+      where: { id },
+      data: { tags },
+    })
+
+    return NextResponse.json({
+      payment: {
+        ...updated,
+        timestamp: updated.created_at.toISOString(),
+        created_at: updated.created_at.toISOString(),
+        completed_at: updated.completed_at?.toISOString() ?? undefined,
+      },
+    })
+  } catch (error: unknown) {
+    console.error("[API] PATCH /api/payments error:", error)
     const message = error instanceof Error ? error.message : "Internal Server Error"
     return NextResponse.json({ error: message }, { status: 500 })
   }

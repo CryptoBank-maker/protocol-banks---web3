@@ -18,7 +18,6 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog"
 import { ArrowUpRight, TrendingUp, Users, DollarSign, X, Plus, FileText, TableIcon } from "lucide-react"
-import { getSupabase } from "@/lib/supabase"
 import {
   ResponsiveContainer,
   LineChart,
@@ -151,22 +150,14 @@ export default function AnalyticsPage() {
   const loadData = async () => {
     try {
       setLoading(true) // Ensure loading state is set
-      const supabase = getSupabase()
+      // Load payments from Prisma-backed API
+      const paymentsResponse = await fetch(`/api/payments?wallet=${wallet}&type=sent`)
+      if (!paymentsResponse.ok) {
+        throw new Error("Failed to load payments")
+      }
 
-      // Load payments with vendor info from Supabase
-      const { data: supabaseData, error: paymentsError } = await supabase
-        .from("payments")
-        .select(`
-          *,
-          vendor:vendors(name)
-        `)
-        .eq("from_address", wallet)
-        .order("timestamp", { ascending: false })
-        .limit(50)
-
-      if (paymentsError) throw paymentsError
-
-      let allPayments = supabaseData || []
+      const paymentsData = await paymentsResponse.json()
+      let allPayments = paymentsData.payments || []
 
       if (wallet) {
         try {
@@ -199,17 +190,24 @@ export default function AnalyticsPage() {
       }
 
       // Load batch payments
-      const { data: batchesData, error: batchesError } = await supabase
-        .from("batch_payments")
-        .select("*")
-        .eq("wallet_address", wallet)
-        .order("created_at", { ascending: false })
-        .limit(20)
-
-      if (batchesError) throw batchesError
+      // Load batch payments from Prisma-backed API
+      const batchesResponse = await fetch(`/api/batch-payment?fromAddress=${wallet}`)
+      if (batchesResponse.ok) {
+        const batchesPayload = await batchesResponse.json()
+        const mappedBatches = (batchesPayload.batches || []).map((batch: any) => ({
+          id: batch.batch_id || batch.id,
+          batch_name: batch.memo || batch.batch_id || "Batch Payment",
+          total_recipients: batch.total_items ?? 0,
+          total_amount_usd: batch.total_amount ?? 0,
+          status: batch.status || "pending",
+          created_at: batch.created_at,
+        }))
+        setBatches(mappedBatches)
+      } else {
+        setBatches([])
+      }
 
       setPayments(allPayments) // Set merged payments
-      setBatches(batchesData || [])
 
       // Calculate stats
       const totalSent = allPayments.reduce((sum: number, p: any) => sum + (p.amount_usd || 0), 0)
@@ -250,12 +248,14 @@ export default function AnalyticsPage() {
     if (!selectedPayment || !newTag.trim()) return
 
     try {
-      const supabase = getSupabase()
       const updatedTags = [...(selectedPayment.tags || []), newTag.trim()]
+      const response = await fetch("/api/payments", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: selectedPayment.id, tags: updatedTags }),
+      })
 
-      const { error } = await supabase.from("payments").update({ tags: updatedTags }).eq("id", selectedPayment.id)
-
-      if (error) throw error
+      if (!response.ok) throw new Error("Failed to update tags")
 
       // Update local state
       setPayments(payments.map((p) => (p.id === selectedPayment.id ? { ...p, tags: updatedTags } : p)))
@@ -270,15 +270,17 @@ export default function AnalyticsPage() {
 
   const removeTag = async (paymentId: string, tagToRemove: string) => {
     try {
-      const supabase = getSupabase()
       const payment = payments.find((p) => p.id === paymentId)
       if (!payment) return
 
       const updatedTags = (payment.tags || []).filter((t) => t !== tagToRemove)
+      const response = await fetch("/api/payments", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: paymentId, tags: updatedTags }),
+      })
 
-      const { error } = await supabase.from("payments").update({ tags: updatedTags }).eq("id", paymentId)
-
-      if (error) throw error
+      if (!response.ok) throw new Error("Failed to update tags")
 
       // Update local state
       setPayments(payments.map((p) => (p.id === paymentId ? { ...p, tags: updatedTags } : p)))
