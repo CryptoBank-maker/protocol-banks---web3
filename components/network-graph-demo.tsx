@@ -90,39 +90,61 @@ export function NetworkGraphDemo() {
       y: centerY,
     })
 
-    // Position subsidiaries in inner ring
+    // Position subsidiaries in a clean plus layout (inner ring)
     const subsidiaries = DEMO_NODES.filter((n) => n.type === "subsidiary")
+    const innerRadius = Math.min(width, height) * 0.22
+    const innerOffsets = [
+      { x: 0, y: -innerRadius },
+      { x: -innerRadius, y: 0 },
+      { x: innerRadius, y: 0 },
+      { x: 0, y: innerRadius },
+    ]
     subsidiaries.forEach((node, i) => {
-      const angle = (i / subsidiaries.length) * Math.PI * 2 - Math.PI / 2
-      const radius = Math.min(width, height) * 0.22
+      const offset = innerOffsets[i % innerOffsets.length]
       positioned.push({
         ...node,
-        x: centerX + Math.cos(angle) * radius,
-        y: centerY + Math.sin(angle) * radius,
+        x: centerX + offset.x,
+        y: centerY + offset.y,
       })
     })
 
-    // Position partners in middle ring
+    // Position partners on the diagonal ring (middle ring)
     const partners = DEMO_NODES.filter((n) => n.type === "partner")
+    const midRadius = Math.min(width, height) * 0.36
+    const midOffsets = [
+      { x: -midRadius, y: -midRadius },
+      { x: midRadius, y: -midRadius },
+      { x: -midRadius, y: midRadius },
+      { x: midRadius, y: midRadius },
+    ]
     partners.forEach((node, i) => {
-      const angle = (i / partners.length) * Math.PI * 2 - Math.PI / 4
-      const radius = Math.min(width, height) * 0.38
+      const offset = midOffsets[i % midOffsets.length]
       positioned.push({
         ...node,
-        x: centerX + Math.cos(angle) * radius + (Math.random() - 0.5) * 20,
-        y: centerY + Math.sin(angle) * radius + (Math.random() - 0.5) * 20,
+        x: centerX + offset.x,
+        y: centerY + offset.y,
       })
     })
 
-    // Position vendors in outer ring
+    // Position vendors on a larger plus ring + diagonals (outer ring)
     const vendors = DEMO_NODES.filter((n) => n.type === "vendor")
+    const outerRadius = Math.min(width, height) * 0.48
+    const outerOffsets = [
+      { x: 0, y: -outerRadius },
+      { x: -outerRadius, y: 0 },
+      { x: outerRadius, y: 0 },
+      { x: 0, y: outerRadius },
+      { x: -outerRadius * 0.7, y: -outerRadius * 0.7 },
+      { x: outerRadius * 0.7, y: -outerRadius * 0.7 },
+      { x: -outerRadius * 0.7, y: outerRadius * 0.7 },
+      { x: outerRadius * 0.7, y: outerRadius * 0.7 },
+    ]
     vendors.forEach((node, i) => {
-      const angle = (i / vendors.length) * Math.PI * 2
-      const radius = Math.min(width, height) * 0.46
+      const offset = outerOffsets[i % outerOffsets.length]
       positioned.push({
         ...node,
-        x: centerX + Math.cos(angle) * radius + (Math.random() - 0.5) * 30,
-        y: centerY + Math.sin(angle) * radius + (Math.random() - 0.5) * 30,
+        x: centerX + offset.x,
+        y: centerY + offset.y,
       })
     })
 
