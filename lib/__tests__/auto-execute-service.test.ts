@@ -14,18 +14,52 @@ import { budgetService, setUseDatabaseStorage as setBudgetDb } from '../services
 import { agentService, AutoExecuteRules, setUseDatabaseStorage as setAgentDb } from '../services/agent-service';
 import { notificationService } from '../services/notification-service';
 
-// Mock Prisma to prevent DB calls from notification-service
+// Mock Prisma to prevent DB calls from notification-service and payout-bridge
 jest.mock('@/lib/prisma', () => ({
   prisma: {
     notificationPreference: {
       findUnique: jest.fn().mockResolvedValue(null),
-      create: jest.fn().mockResolvedValue({}),
+      create: jest.fn().mockResolvedValue({
+        id: 'mock-pref-id',
+        user_address: '0xtest',
+        payment_received: true,
+        payment_sent: true,
+        subscription_reminder: true,
+        subscription_payment: true,
+        multisig_proposal: true,
+        multisig_executed: true,
+        agent_proposal_created: true,
+        agent_proposal_approved: true,
+        agent_payment_executed: true,
+        agent_payment_failed: true,
+        created_at: new Date(),
+        updated_at: new Date(),
+      }),
     },
     pushSubscription: {
       findMany: jest.fn().mockResolvedValue([]),
     },
+    $executeRawUnsafe: jest.fn().mockResolvedValue([]),
+    $queryRawUnsafe: jest.fn().mockResolvedValue([]),
   },
 }));
+
+// Mock payout-bridge to avoid real payment execution and DB calls
+jest.mock('@/lib/grpc/payout-bridge', () => ({
+  submitBatchPayment: jest.fn().mockResolvedValue({
+    batchId: 'mock-batch-001',
+    status: 'completed',
+    totalRecipients: 1,
+    successCount: 1,
+    failureCount: 0,
+    transactions: [{
+      address: '0xabcdef1234567890123456789012345678901234',
+      txHash: '0x' + 'a'.repeat(64),
+      status: 'confirmed',
+    }],
+  }),
+}));
+
 // Test Helpers
 // ============================================
 

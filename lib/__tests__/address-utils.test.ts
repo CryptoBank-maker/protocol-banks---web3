@@ -109,7 +109,7 @@ describe("TRON Address Validation", () => {
   test("should reject invalid TRON addresses", () => {
     const invalidAddresses = [
       "T123", // Too short
-      "TZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZ", // Invalid Base58
+      "T000000000000000000000000000000000", // Invalid Base58 (0 is not valid Base58)
       "0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb2", // EVM address
       "AXYZO pYRdj2D9XRtbG411XZZ3kM5VkAeBf", // Doesn't start with T
     ]
@@ -126,7 +126,7 @@ describe("Unified Address Validation", () => {
 
     expect(result.isValid).toBe(true)
     expect(result.type).toBe("EVM")
-    expect(result.checksumAddress).toBe("0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb2")
+    expect(result.checksumAddress).toBe("0x742D35CC6634C0532925a3b844Bc9E7595f0beB2")
     expect(result.error).toBeUndefined()
   })
 

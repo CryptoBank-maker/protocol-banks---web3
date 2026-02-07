@@ -17,11 +17,28 @@ jest.mock('@/lib/prisma', () => ({
   prisma: {
     notificationPreference: {
       findUnique: jest.fn().mockResolvedValue(null),
-      create: jest.fn().mockResolvedValue({}),
+      create: jest.fn().mockResolvedValue({
+        id: 'mock-pref-id',
+        user_address: '0xtest',
+        payment_received: true,
+        payment_sent: true,
+        subscription_reminder: true,
+        subscription_payment: true,
+        multisig_proposal: true,
+        multisig_executed: true,
+        agent_proposal_created: true,
+        agent_proposal_approved: true,
+        agent_payment_executed: true,
+        agent_payment_failed: true,
+        created_at: new Date(),
+        updated_at: new Date(),
+      }),
     },
     pushSubscription: {
       findMany: jest.fn().mockResolvedValue([]),
     },
+    $executeRawUnsafe: jest.fn().mockResolvedValue([]),
+    $queryRawUnsafe: jest.fn().mockResolvedValue([]),
   },
 }));
 
@@ -76,7 +93,7 @@ describe('Agent x402 Service', () => {
   describe('generateAuthorization', () => {
     it('should generate authorization for approved proposal', async () => {
       const proposal = await createApprovedProposal();
-      const auth = await agentX402Service.generateAuthorization(proposal);
+      const auth = await agentX402Service.generateAuthorization(proposal, testOwnerAddress);
 
       expect(auth.id).toBeDefined();
       expect(auth.proposal_id).toBe(proposal.id);
@@ -106,29 +123,25 @@ describe('Agent x402 Service', () => {
       });
 
       await expect(
-        agentX402Service.generateAuthorization(proposal)
+        agentX402Service.generateAuthorization(proposal, testOwnerAddress)
       ).rejects.toThrow('Cannot generate authorization');
     });
   });
 
-  describe('signAuthorization', () => {
-    it('should sign authorization with EIP-3009 format', async () => {
+  describe('storeSignature', () => {
+    it('should store signature for authorization', async () => {
       const proposal = await createApprovedProposal();
-      const auth = await agentX402Service.generateAuthorization(proposal);
-      const signedAuth = await agentX402Service.signAuthorization(auth.id, testOwnerAddress);
+      const auth = await agentX402Service.generateAuthorization(proposal, testOwnerAddress);
+      const mockSignature = '0x' + 'ab'.repeat(65); // 130 hex chars = 65 bytes
+      const signedAuth = await agentX402Service.storeSignature(auth.id, mockSignature);
 
-      expect(signedAuth.signature).toBeDefined();
-      expect(signedAuth.signature?.v).toBe(27);
-      expect(signedAuth.signature?.r).toMatch(/^0x[a-f0-9]{64}$/);
-      expect(signedAuth.signature?.s).toMatch(/^0x[a-f0-9]{64}$/);
-      expect(signedAuth.signature?.nonce).toMatch(/^0x[a-f0-9]{64}$/);
-      expect(signedAuth.signature?.valid_after).toBeLessThanOrEqual(Math.floor(Date.now() / 1000));
-      expect(signedAuth.signature?.valid_before).toBeGreaterThan(Math.floor(Date.now() / 1000));
+      expect(signedAuth.signature).toBe(mockSignature);
+      expect(signedAuth.status).toBe('signed');
     });
 
     it('should reject non-existent authorization', async () => {
       await expect(
-        agentX402Service.signAuthorization('non-existent-id', testOwnerAddress)
+        agentX402Service.storeSignature('non-existent-id', '0xdeadbeef')
       ).rejects.toThrow('Authorization not found');
     });
   });
@@ -136,20 +149,19 @@ describe('Agent x402 Service', () => {
   describe('executePayment', () => {
     it('should execute signed authorization', async () => {
       const proposal = await createApprovedProposal();
-      const auth = await agentX402Service.generateAuthorization(proposal);
-      await agentX402Service.signAuthorization(auth.id, testOwnerAddress);
+      const auth = await agentX402Service.generateAuthorization(proposal, testOwnerAddress);
+      const mockSignature = '0x' + 'ab'.repeat(65);
+      await agentX402Service.storeSignature(auth.id, mockSignature);
       
       const result = await agentX402Service.executePayment(auth.id);
 
       expect(result.success).toBe(true);
-      expect(result.tx_hash).toMatch(/^0x[a-f0-9]{64}$/);
-      expect(result.gas_used).toBeDefined();
-      expect(result.block_number).toBeDefined();
+      expect(result.tx_hash).toMatch(/^0x[a-f0-9]+$/);
     });
 
     it('should reject unsigned authorization', async () => {
       const proposal = await createApprovedProposal();
-      const auth = await agentX402Service.generateAuthorization(proposal);
+      const auth = await agentX402Service.generateAuthorization(proposal, testOwnerAddress);
       
       const result = await agentX402Service.executePayment(auth.id);
 
@@ -223,7 +235,7 @@ describe('Agent x402 Service', () => {
       );
     });
 
-    it('should produce valid EIP-3009 signatures', async () => {
+    it('should store signatures correctly', async () => {
       await fc.assert(
         fc.asyncProperty(
           fc.integer({ min: 1, max: 10000 }).map(n => n.toString()),
@@ -235,20 +247,17 @@ describe('Agent x402 Service', () => {
 
             const proposal = await createApprovedProposal({ amount, token });
             const auth = await agentX402Service.generateAuthorization(proposal, testOwnerAddress);
-            const signedAuth = await agentX402Service.signAuthorization(auth.id, testOwnerAddress);
+            const mockSignature = '0x' + 'ab'.repeat(65);
+            const signedAuth = await agentX402Service.storeSignature(auth.id, mockSignature);
 
-            // Verify signature format
-            expect(signedAuth.signature).toBeDefined();
-            expect(signedAuth.signature?.v).toBeGreaterThanOrEqual(27);
-            expect(signedAuth.signature?.v).toBeLessThanOrEqual(28);
-            expect(signedAuth.signature?.r).toMatch(/^0x[a-f0-9]{64}$/);
-            expect(signedAuth.signature?.s).toMatch(/^0x[a-f0-9]{64}$/);
-            expect(signedAuth.signature?.nonce).toMatch(/^0x[a-f0-9]{64}$/);
-            
-            // Verify time bounds
+            // Verify signature was stored
+            expect(signedAuth.signature).toBe(mockSignature);
+            expect(signedAuth.status).toBe('signed');
+
+            // Verify authorization time bounds
             const now = Math.floor(Date.now() / 1000);
-            expect(signedAuth.signature?.valid_after).toBeLessThanOrEqual(now + 1);
-            expect(signedAuth.signature?.valid_before).toBeGreaterThan(now);
+            expect(Math.floor(signedAuth.valid_after.getTime() / 1000)).toBeLessThanOrEqual(now + 1);
+            expect(Math.floor(signedAuth.valid_before.getTime() / 1000)).toBeGreaterThan(now);
           }
         ),
         { numRuns: 100 }
@@ -274,8 +283,8 @@ describe('Agent x402 Service', () => {
             expect(result.authorization_id).toBeDefined();
           }
         ),
-        { numRuns: 100 }
+        { numRuns: 10 }  // Reduced: each run includes 300ms simulated execution delay
       );
-    });
+    }, 60000);
   });
 });

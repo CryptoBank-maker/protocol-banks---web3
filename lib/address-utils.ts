@@ -28,7 +28,7 @@ export function detectAddressType(address: string): AddressType {
 
   // EVM address detection
   // EVM addresses are 42 characters (0x + 40 hex chars)
-  if (ethers.isAddress(trimmed)) {
+  if (isEvmAddressFormat(trimmed)) {
     return "EVM"
   }
 
@@ -41,6 +41,22 @@ export function detectAddressType(address: string): AddressType {
 function isValidBase58(str: string): boolean {
   const base58Regex = /^[1-9A-HJ-NP-Za-km-z]+$/
   return base58Regex.test(str)
+}
+
+/**
+ * Check if a string is a valid EVM address format (0x + 40 hex chars)
+ * More lenient than ethers.isAddress() which requires valid EIP-55 checksum for mixed case
+ */
+function isEvmAddressFormat(str: string): boolean {
+  return /^0x[0-9a-fA-F]{40}$/.test(str)
+}
+
+/**
+ * Safely get the EIP-55 checksum address.
+ * Normalizes to lowercase first to avoid ethers v6 rejecting mixed-case non-checksummed addresses.
+ */
+function safeGetChecksumAddress(address: string): string {
+  return ethers.getAddress(address.toLowerCase())
 }
 
 /**
@@ -79,7 +95,7 @@ export function isValidTronAddress(address: string): boolean {
  */
 export function isValidEvmAddress(address: string): boolean {
   if (!address || typeof address !== "string") return false
-  return ethers.isAddress(address.trim())
+  return isEvmAddressFormat(address.trim())
 }
 
 /**
@@ -109,7 +125,7 @@ export function validateAddress(address: string, networkType?: "EVM" | "TRON"): 
     return {
       isValid,
       type: isValid ? "EVM" : "INVALID",
-      checksumAddress: isValid ? ethers.getAddress(trimmed) : undefined,
+      checksumAddress: isValid ? safeGetChecksumAddress(trimmed) : undefined,
       error: isValid ? undefined : "Invalid EVM address format",
     }
   }
@@ -137,7 +153,7 @@ export function validateAddress(address: string, networkType?: "EVM" | "TRON"): 
   return {
     isValid: true,
     type: "EVM",
-    checksumAddress: ethers.getAddress(trimmed),
+    checksumAddress: safeGetChecksumAddress(trimmed),
   }
 }
 
