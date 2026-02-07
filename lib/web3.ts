@@ -1,5 +1,6 @@
 import { ethers } from "ethers"
 import TronWeb from "tronweb"
+import { isEvmAddressFormat, safeGetChecksumAddress } from "@/lib/address-utils"
 
 // Chain type definition
 export type ChainType = "EVM" | "SOLANA" | "BITCOIN" | "TRON"

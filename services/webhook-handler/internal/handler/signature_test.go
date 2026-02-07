@@ -4,6 +4,7 @@ import (
 	"crypto/hmac"
 	"crypto/sha256"
 	"encoding/hex"
+	"encoding/json"
 	"testing"
 	"time"
 
@@ -44,7 +45,7 @@ func TestVerifyHMACSignature(t *testing.T) {
 
 func TestVerifyTimestamp(t *testing.T) {
 	now := time.Now()
-	
+
 	tests := []struct {
 		name      string
 		timestamp int64
@@ -157,9 +158,9 @@ func generateIdempotencyKey(source, eventID string) string {
 }
 
 type RainEvent struct {
-	Event     string    `json:"event"`
-	Data      RainData  `json:"data"`
-	Timestamp int64     `json:"timestamp"`
+	Event     string   `json:"event"`
+	Data      RainData `json:"data"`
+	Timestamp int64    `json:"timestamp"`
 }
 
 type RainData struct {
@@ -178,5 +179,3 @@ func parseRainEvent(payload []byte) (*RainEvent, error) {
 	}
 	return &event, nil
 }
-
-import "encoding/json"

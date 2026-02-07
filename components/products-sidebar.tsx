@@ -60,7 +60,7 @@ function SidebarSection({ title, items }: { title: string, items: ProductItem[] 
 
 export function ProductsSidebar() {
   return (
-    <aside className="w-64 border-r hidden md:block shrink-0">
+    <aside className="w-64 hidden md:block shrink-0 border-r border-white/10 dark:border-white/5 bg-white/40 dark:bg-slate-900/40 backdrop-blur-[12px] backdrop-saturate-[1.2]">
       <div className="sticky top-16 h-[calc(100vh-4rem)]">
         <ScrollArea className="h-full py-4">
           <SidebarSection title="Overview" items={overviewItems} />

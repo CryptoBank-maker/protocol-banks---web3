@@ -331,16 +331,17 @@ export default function HistoryPage() {
   }
 
   return (
-    <main className="container mx-auto px-4 py-8 max-w-5xl">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
+    <main className="container mx-auto px-3 sm:px-4 py-6 sm:py-8 max-w-5xl pb-24 md:pb-8">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4 mb-6 sm:mb-8">
         <div>
-          <h1 className="text-3xl font-bold mb-2">Transaction History</h1>
-          <p className="text-muted-foreground">View all your payments and receipts</p>
+          <h1 className="text-2xl sm:text-3xl font-bold mb-1 sm:mb-2">Transaction History</h1>
+          <p className="text-sm sm:text-base text-muted-foreground">View all your payments and receipts</p>
         </div>
         <div className="flex gap-2">
           <Button variant="outline" size="sm" onClick={exportToCSV} className="gap-2 bg-transparent">
             <Download className="h-4 w-4" />
-            Export CSV
+            <span className="hidden sm:inline">Export CSV</span>
+            <span className="sm:hidden">Export</span>
           </Button>
           <Link href="/analytics">
             <Button variant="outline" size="sm" className="gap-2 bg-transparent">
@@ -373,31 +374,33 @@ export default function HistoryPage() {
       ) : (
         <GlassCard className="bg-card border-border">
           <GlassCardHeader>
-            <div className="flex flex-col sm:flex-row gap-4 justify-between">
-              <Tabs value={activeTab} onValueChange={setActiveTab}>
-                <TabsList className="bg-secondary/50">
-                  <TabsTrigger value="all">All</TabsTrigger>
-                  <TabsTrigger value="sent">Sent</TabsTrigger>
-                  <TabsTrigger value="received">Received</TabsTrigger>
-                  <TabsTrigger value="groups">Groups</TabsTrigger>
-                </TabsList>
-              </Tabs>
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input
-                  placeholder="Search transactions..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-9 w-full sm:w-64 bg-secondary/50 border-border"
-                />
-              </div>
-              
+            <div className="flex flex-col gap-3 sm:gap-4">
+              <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 justify-between">
+                <Tabs value={activeTab} onValueChange={setActiveTab}>
+                  <TabsList className="bg-secondary/50 w-full sm:w-auto">
+                    <TabsTrigger value="all" className="text-xs sm:text-sm">All</TabsTrigger>
+                    <TabsTrigger value="sent" className="text-xs sm:text-sm">Sent</TabsTrigger>
+                    <TabsTrigger value="received" className="text-xs sm:text-sm">Received</TabsTrigger>
+                    <TabsTrigger value="groups" className="text-xs sm:text-sm">Groups</TabsTrigger>
+                  </TabsList>
+                </Tabs>
+                <div className="flex gap-2">
+                  <div className="relative flex-1 sm:flex-none">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      placeholder="Search..."
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      className="pl-9 w-full sm:w-48 bg-secondary/50 border-border"
+                    />
+                  </div>
+
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button variant="outline" className="gap-2 bg-secondary/50 border-border">
+                  <Button variant="outline" size="sm" className="gap-1 sm:gap-2 bg-secondary/50 border-border shrink-0 h-9">
                     <Filter className="h-4 w-4" />
-                    {filterType === "all" ? "All Types" : filterType === "batch" ? "Batch Payments" : "Individual"}
-                    <ChevronDown className="h-4 w-4 opacity-50" />
+                    <span className="hidden sm:inline">{filterType === "all" ? "All Types" : filterType === "batch" ? "Batch" : "Individual"}</span>
+                    <ChevronDown className="h-3 w-3 opacity-50" />
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
@@ -412,6 +415,8 @@ export default function HistoryPage() {
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
+                </div>
+              </div>
             </div>
           </GlassCardHeader>
           <GlassCardContent>
@@ -537,17 +542,17 @@ export default function HistoryPage() {
                     const isExpanded = expandedBatches.has(item.tx_hash);
                     return (
                       <div key={item.id} className="border border-border/50 rounded-lg overflow-hidden bg-secondary/20">
-                         <div 
-                            className="flex items-center justify-between p-4 cursor-pointer hover:bg-secondary/40 transition-colors"
+                         <div
+                            className="flex items-center justify-between p-3 sm:p-4 cursor-pointer hover:bg-secondary/40 transition-colors"
                             onClick={() => toggleBatch(item.tx_hash)}
                          >
-                            <div className="flex items-center gap-4">
-                              <div className="h-10 w-10 rounded-full bg-blue-500/10 text-blue-500 flex items-center justify-center">
-                                <Layers className="h-5 w-5" />
+                            <div className="flex items-center gap-3 sm:gap-4 min-w-0 flex-1">
+                              <div className="h-8 w-8 sm:h-10 sm:w-10 rounded-full bg-blue-500/10 text-blue-500 flex items-center justify-center shrink-0">
+                                <Layers className="h-4 w-4 sm:h-5 sm:w-5" />
                               </div>
-                              <div>
-                                <div className="font-medium flex items-center gap-2">
-                                  Batch Payment
+                              <div className="min-w-0">
+                                <div className="font-medium flex items-center gap-2 flex-wrap">
+                                  <span className="text-sm sm:text-base">Batch Payment</span>
                                   <Badge variant="secondary" className="text-xs">{item.count} recipients</Badge>
                                 </div>
                                 <div className="text-xs text-muted-foreground">
@@ -555,13 +560,13 @@ export default function HistoryPage() {
                                 </div>
                               </div>
                             </div>
-                            
-                            <div className="flex items-center gap-6">
+
+                            <div className="flex items-center gap-2 sm:gap-6 shrink-0 ml-2">
                               <div className="text-right">
-                                <div className="font-mono font-medium text-foreground">
+                                <div className="font-mono font-medium text-foreground text-sm sm:text-base truncate max-w-[120px] sm:max-w-none">
                                   {item.amount} {item.token}
                                 </div>
-                                <div className="text-xs text-muted-foreground">Total sent</div>
+                                <div className="text-xs text-muted-foreground hidden sm:block">Total sent</div>
                               </div>
                               {isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
                             </div>
@@ -570,26 +575,26 @@ export default function HistoryPage() {
                          {isExpanded && (
                            <div className="border-t border-border/50 bg-secondary/10">
                               {item.transactions.map((tx: Transaction) => (
-                                <div key={tx.id} className="flex items-center justify-between p-3 pl-16 hover:bg-secondary/20 transition-colors border-b last:border-0 border-border/30">
-                                   <div className="flex items-center gap-3">
-                                      <div className={`h-8 w-8 rounded-full flex items-center justify-center ${
+                                <div key={tx.id} className="flex items-center justify-between p-2 sm:p-3 pl-10 sm:pl-16 hover:bg-secondary/20 transition-colors border-b last:border-0 border-border/30">
+                                   <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+                                      <div className={`h-6 w-6 sm:h-8 sm:w-8 rounded-full flex items-center justify-center shrink-0 ${
                                           tx.type === "sent" ? "bg-red-500/5 text-red-500" : "bg-green-500/5 text-green-500"
                                       }`}>
-                                        {tx.type === "sent" ? <ArrowUpRight className="h-4 w-4" /> : <ArrowDownLeft className="h-4 w-4" />}
+                                        {tx.type === "sent" ? <ArrowUpRight className="h-3 w-3 sm:h-4 sm:w-4" /> : <ArrowDownLeft className="h-3 w-3 sm:h-4 sm:w-4" />}
                                       </div>
-                                      <div>
-                                        <div className="text-sm font-medium">To: {tx.to_address.slice(0, 6)}...{tx.to_address.slice(-4)}</div>
+                                      <div className="min-w-0">
+                                        <div className="text-xs sm:text-sm font-medium truncate">To: {tx.to_address.slice(0, 6)}...{tx.to_address.slice(-4)}</div>
                                       </div>
                                    </div>
-                                   <div className="flex items-center gap-3 pr-4">
+                                   <div className="flex items-center gap-2 sm:gap-3 pr-2 sm:pr-4 shrink-0">
                                       <div className="text-right">
-                                         <div className="text-sm font-mono">{tx.amount} {tx.token_symbol || tx.token}</div>
+                                         <div className="text-xs sm:text-sm font-mono">{tx.amount} {tx.token_symbol || tx.token}</div>
                                       </div>
                                       <a
                                         href={getExplorerUrl(tx.tx_hash || '')}
                                         target="_blank"
                                         rel="noopener noreferrer"
-                                        className="text-muted-foreground hover:text-foreground"
+                                        className="text-muted-foreground hover:text-foreground hidden sm:block"
                                       >
                                         <ExternalLink className="h-3 w-3" />
                                       </a>
@@ -607,59 +612,59 @@ export default function HistoryPage() {
                   return (
                   <div
                     key={tx.id}
-                    className="flex items-center justify-between p-4 rounded-lg bg-secondary/30 hover:bg-secondary/50 transition-colors"
+                    className="flex items-center justify-between p-3 sm:p-4 rounded-lg bg-secondary/30 hover:bg-secondary/50 transition-colors gap-2 sm:gap-4"
                   >
-                    <div className="flex items-center gap-4">
+                    <div className="flex items-center gap-3 sm:gap-4 min-w-0 flex-1">
                       <div
-                        className={`h-10 w-10 rounded-full flex items-center justify-center ${
+                        className={`h-8 w-8 sm:h-10 sm:w-10 rounded-full flex items-center justify-center shrink-0 ${
                           tx.type === "sent" ? "bg-red-500/10 text-red-500" : "bg-green-500/10 text-green-500"
                         }`}
                       >
                         {tx.type === "sent" ? (
-                          <ArrowUpRight className="h-5 w-5" />
+                          <ArrowUpRight className="h-4 w-4 sm:h-5 sm:w-5" />
                         ) : (
-                          <ArrowDownLeft className="h-5 w-5" />
+                          <ArrowDownLeft className="h-4 w-4 sm:h-5 sm:w-5" />
                         )}
                       </div>
-                      <div>
-                        <div className="font-medium">
+                      <div className="min-w-0">
+                        <div className="font-medium text-sm sm:text-base truncate">
                           {tx.type === "sent" ? "Sent" : "Received"} {tx.token_symbol || tx.token}
                         </div>
-                        <div className="text-sm text-muted-foreground">
+                        <div className="text-xs sm:text-sm text-muted-foreground truncate">
                           {tx.type === "sent"
                             ? `To: ${tx.to_address.slice(0, 6)}...${tx.to_address.slice(-4)}`
                             : `From: ${tx.from_address.slice(0, 6)}...${tx.from_address.slice(-4)}`}
                         </div>
                         {tx.notes && (
-                          <div className="text-xs text-muted-foreground/70 mt-0.5">
+                          <div className="text-xs text-muted-foreground/70 mt-0.5 truncate max-w-[200px] sm:max-w-none">
                             {tx.notes}
                           </div>
                         )}
                         <div className="text-xs text-muted-foreground">
-                          {new Date(tx.timestamp || tx.created_at).toLocaleDateString()} {new Date(tx.timestamp || tx.created_at).toLocaleTimeString()}
+                          {new Date(tx.timestamp || tx.created_at).toLocaleDateString()} <span className="hidden sm:inline">{new Date(tx.timestamp || tx.created_at).toLocaleTimeString()}</span>
                         </div>
                       </div>
                     </div>
-                    <div className="flex items-center gap-4">
+                    <div className="flex items-center gap-2 sm:gap-4 shrink-0">
                       <div className="text-right">
                         <div
-                          className={`font-mono font-medium ${tx.type === "sent" ? "text-red-500" : "text-green-500"}`}
+                          className={`font-mono font-medium text-sm sm:text-base ${tx.type === "sent" ? "text-red-500" : "text-green-500"}`}
                         >
                           {tx.type === "sent" ? "-" : "+"}
-                          {tx.amount} {tx.token_symbol || tx.token}
+                          {tx.amount} <span className="hidden sm:inline">{tx.token_symbol || tx.token}</span>
                         </div>
-                        <div className="text-xs text-muted-foreground">
+                        <div className="text-xs text-muted-foreground hidden sm:block">
                           ${((tx.amount_usd ?? Number.parseFloat(String(tx.amount))) || 0).toFixed(2)}
                         </div>
                       </div>
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-1 sm:gap-2">
                         <Badge
                           variant="secondary"
-                          className={
+                          className={`text-xs ${
                             tx.status === "completed"
                               ? "bg-green-500/10 text-green-500"
                               : "bg-yellow-500/10 text-yellow-500"
-                          }
+                          }`}
                         >
                           {tx.status}
                         </Badge>
@@ -667,7 +672,7 @@ export default function HistoryPage() {
                           href={getExplorerUrl(tx.tx_hash || '')}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="text-muted-foreground hover:text-foreground transition-colors"
+                          className="text-muted-foreground hover:text-foreground transition-colors hidden sm:block"
                         >
                           <ExternalLink className="h-4 w-4" />
                         </a>

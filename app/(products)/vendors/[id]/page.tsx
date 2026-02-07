@@ -4,7 +4,7 @@ import { useState, useEffect, use } from "react"
 import { useUnifiedWallet } from "@/hooks/use-unified-wallet"
 import { useDemo } from "@/contexts/demo-context"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/glass-card"
+import { GlassCard, GlassCardContent, GlassCardHeader, GlassCardTitle, GlassCardDescription } from "@/components/ui/glass-card"
 import { Badge } from "@/components/ui/badge"
 import { ArrowLeft, Send, Copy, ExternalLink, Building2, Mail, Calendar, Wallet, TrendingUp, Activity, History } from "lucide-react"
 import Link from "next/link"
@@ -179,25 +179,28 @@ export default function VendorDetailPage({ params }: { params: Promise<{ id: str
 
   return (
     <div className="min-h-screen bg-background">
-      <div className="container mx-auto px-4 py-6 max-w-6xl pb-24 md:pb-6">
+      <div className="container mx-auto px-3 sm:px-4 py-4 sm:py-6 max-w-6xl pb-24 md:pb-6">
         {/* Header */}
-        <div className="flex items-center gap-4 mb-6">
+        <div className="flex items-start sm:items-center gap-3 sm:gap-4 mb-4 sm:mb-6">
           <Link href="/vendors">
-            <Button variant="ghost" size="icon">
+            <Button variant="ghost" size="icon" className="shrink-0 mt-0.5 sm:mt-0">
               <ArrowLeft className="w-5 h-5" />
             </Button>
           </Link>
-          <div className="flex-1">
-            <div className="flex items-center gap-3">
-              <h1 className="text-2xl md:text-3xl font-bold">{getVendorDisplayName(vendor)}</h1>
-              <Badge variant="outline" className={getTierColor(vendor.tier)}>
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
+              <h1 className="text-xl sm:text-2xl md:text-3xl font-bold truncate">{getVendorDisplayName(vendor)}</h1>
+              <Badge variant="outline" className={`shrink-0 ${getTierColor(vendor.tier)}`}>
                 {vendor.tier || "vendor"}
               </Badge>
             </div>
-            <p className="text-muted-foreground">{vendor.category}</p>
+            <p className="text-sm sm:text-base text-muted-foreground">{vendor.category}</p>
           </div>
-          <Link href={`/send?to=${vendor.wallet_address}`}>
-            <Button>
+          <Link href={`/send?to=${vendor.wallet_address}`} className="shrink-0">
+            <Button size="sm" className="sm:hidden">
+              <Send className="w-4 h-4" />
+            </Button>
+            <Button className="hidden sm:flex">
               <Send className="w-4 h-4 mr-2" />
               Send Payment
             </Button>
@@ -205,9 +208,9 @@ export default function VendorDetailPage({ params }: { params: Promise<{ id: str
         </div>
 
         {/* Main Content Grid */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
           {/* Left Column - Details */}
-          <div className="lg:col-span-2 space-y-6">
+          <div className="lg:col-span-2 space-y-4 sm:space-y-6">
             {/* Wallet Info */}
             <GlassCard>
               <GlassCardHeader>
@@ -219,17 +222,18 @@ export default function VendorDetailPage({ params }: { params: Promise<{ id: str
               <GlassCardContent className="space-y-4">
                 <div>
                   <label className="text-sm text-muted-foreground">Wallet Address</label>
-                  <div className="flex items-center gap-2 mt-1">
-                    <code className="flex-1 bg-muted px-3 py-2 rounded-lg font-mono text-sm break-all">
+                  <div className="flex items-center gap-1 sm:gap-2 mt-1">
+                    <code className="flex-1 bg-muted px-2 sm:px-3 py-2 rounded-lg font-mono text-xs sm:text-sm break-all min-w-0">
                       {vendor.wallet_address}
                     </code>
-                    <Button variant="ghost" size="icon" onClick={copyAddress}>
+                    <Button variant="ghost" size="icon" onClick={copyAddress} className="shrink-0">
                       <Copy className="w-4 h-4" />
                     </Button>
                     <a
                       href={`https://etherscan.io/address/${vendor.wallet_address}`}
                       target="_blank"
                       rel="noopener noreferrer"
+                      className="shrink-0"
                     >
                       <Button variant="ghost" size="icon">
                         <ExternalLink className="w-4 h-4" />
@@ -284,15 +288,15 @@ export default function VendorDetailPage({ params }: { params: Promise<{ id: str
                 <GlassCardDescription>Last 5 transactions with this entity</GlassCardDescription>
               </GlassCardHeader>
               <GlassCardContent>
-                <div className="space-y-3">
+                <div className="space-y-2 sm:space-y-3">
                   {mockTransactions.map((tx) => (
                     <div
                       key={tx.id}
-                      className="flex items-center justify-between p-3 bg-muted/50 rounded-lg"
+                      className="flex items-center justify-between p-2.5 sm:p-3 bg-muted/50 rounded-lg gap-2"
                     >
-                      <div className="flex items-center gap-3">
+                      <div className="flex items-center gap-2 sm:gap-3">
                         <div
-                          className={`w-8 h-8 rounded-full flex items-center justify-center ${
+                          className={`w-7 h-7 sm:w-8 sm:h-8 rounded-full flex items-center justify-center shrink-0 text-sm ${
                             tx.type === "received"
                               ? "bg-green-500/10 text-green-600 dark:text-green-400"
                               : "bg-orange-500/10 text-orange-600 dark:text-orange-400"
@@ -301,14 +305,14 @@ export default function VendorDetailPage({ params }: { params: Promise<{ id: str
                           {tx.type === "received" ? "↓" : "↑"}
                         </div>
                         <div>
-                          <p className="font-medium">
+                          <p className="font-medium text-sm sm:text-base">
                             {tx.type === "received" ? "Received" : "Sent"}
                           </p>
                           <p className="text-xs text-muted-foreground">{tx.date}</p>
                         </div>
                       </div>
-                      <div className="text-right">
-                        <p className={`font-mono font-medium ${
+                      <div className="text-right shrink-0">
+                        <p className={`font-mono font-medium text-sm sm:text-base ${
                           tx.type === "received" ? "text-green-600 dark:text-green-400" : "text-orange-600 dark:text-orange-400"
                         }`}>
                           {tx.type === "received" ? "+" : "-"}${tx.amount.toLocaleString()}
@@ -325,7 +329,7 @@ export default function VendorDetailPage({ params }: { params: Promise<{ id: str
           </div>
 
           {/* Right Column - Stats */}
-          <div className="space-y-6">
+          <div className="space-y-4 sm:space-y-6">
             {/* Financial Summary */}
             <GlassCard>
               <GlassCardHeader>
@@ -334,26 +338,28 @@ export default function VendorDetailPage({ params }: { params: Promise<{ id: str
                   Financial Summary
                 </GlassCardTitle>
               </GlassCardHeader>
-              <GlassCardContent className="space-y-4">
-                <div className="p-4 bg-muted/50 rounded-lg">
-                  <p className="text-sm text-muted-foreground mb-1">Total Received</p>
-                  <p className="text-2xl font-bold font-mono">
-                    ${(vendor.totalReceived || 0).toLocaleString()}
-                  </p>
-                </div>
-                <div className="p-4 bg-muted/50 rounded-lg">
-                  <p className="text-sm text-muted-foreground mb-1">Transaction Count</p>
-                  <p className="text-2xl font-bold font-mono">
-                    {vendor.transaction_count || 0}
-                  </p>
-                </div>
-                <div className="p-4 bg-muted/50 rounded-lg">
-                  <p className="text-sm text-muted-foreground mb-1">Average Transaction</p>
-                  <p className="text-2xl font-bold font-mono">
-                    ${vendor.transaction_count && vendor.totalReceived
-                      ? Math.round(vendor.totalReceived / vendor.transaction_count).toLocaleString()
-                      : 0}
-                  </p>
+              <GlassCardContent>
+                <div className="grid grid-cols-3 lg:grid-cols-1 gap-3 sm:gap-4">
+                  <div className="p-3 sm:p-4 bg-muted/50 rounded-lg">
+                    <p className="text-xs sm:text-sm text-muted-foreground mb-1">Total Received</p>
+                    <p className="text-lg sm:text-2xl font-bold font-mono">
+                      ${(vendor.totalReceived || 0).toLocaleString()}
+                    </p>
+                  </div>
+                  <div className="p-3 sm:p-4 bg-muted/50 rounded-lg">
+                    <p className="text-xs sm:text-sm text-muted-foreground mb-1">Tx Count</p>
+                    <p className="text-lg sm:text-2xl font-bold font-mono">
+                      {vendor.transaction_count || 0}
+                    </p>
+                  </div>
+                  <div className="p-3 sm:p-4 bg-muted/50 rounded-lg">
+                    <p className="text-xs sm:text-sm text-muted-foreground mb-1">Avg Transaction</p>
+                    <p className="text-lg sm:text-2xl font-bold font-mono">
+                      ${vendor.transaction_count && vendor.totalReceived
+                        ? Math.round(vendor.totalReceived / vendor.transaction_count).toLocaleString()
+                        : 0}
+                    </p>
+                  </div>
                 </div>
               </GlassCardContent>
             </GlassCard>

@@ -1024,13 +1024,13 @@ export default function BatchPaymentPage() {
   }
 
   return (
-    <main className="container mx-auto py-6 px-4 max-w-7xl">
+    <main className="container mx-auto py-4 sm:py-6 px-3 sm:px-4 max-w-7xl pb-24 md:pb-6">
       {/* Mode Toggle - REMOVED */}
 
-      <div className="flex flex-col gap-4 mb-6">
+      <div className="flex flex-col gap-3 sm:gap-4 mb-4 sm:mb-6">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Business Payments</h1>
-          <p className="text-muted-foreground">Manage batch payments and auto-payments for your business</p>
+          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Business Payments</h1>
+          <p className="text-sm sm:text-base text-muted-foreground">Manage batch payments and auto-payments</p>
         </div>
       </div>
 
@@ -1084,7 +1084,7 @@ export default function BatchPaymentPage() {
                     <Label>Purpose</Label>
                     <PurposeTagSelector value={batchPurpose} onChange={setBatchPurpose} />
                   </div>
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                     <div className="space-y-2">
                       <Label>Payment Group (optional)</Label>
                       <PaymentGroupSelector
@@ -1133,22 +1133,22 @@ export default function BatchPaymentPage() {
               <GlassCardContent>
                  <div className="space-y-4">
                     {asyncJobStatus && (
-                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm bg-background/50 p-4 rounded-lg border">
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4 text-sm bg-background/50 p-3 sm:p-4 rounded-lg border">
                             <div>
                                 <div className="text-muted-foreground text-xs">Total Records</div>
-                                <div className="font-mono text-lg">{asyncJobStatus.totalLines}</div>
+                                <div className="font-mono text-base sm:text-lg">{asyncJobStatus.totalLines}</div>
                             </div>
                             <div>
                                 <div className="text-muted-foreground text-xs">Valid</div>
-                                <div className="font-mono text-lg text-green-600">{asyncJobStatus.parsedCount}</div>
+                                <div className="font-mono text-base sm:text-lg text-green-600">{asyncJobStatus.parsedCount}</div>
                             </div>
                             <div>
                                 <div className="text-muted-foreground text-xs">Invalid</div>
-                                <div className="font-mono text-lg text-red-500">{asyncJobStatus.invalidCount}</div>
+                                <div className="font-mono text-base sm:text-lg text-red-500">{asyncJobStatus.invalidCount}</div>
                             </div>
                              <div>
                                 <div className="text-muted-foreground text-xs">Status</div>
-                                <div className="font-medium">{asyncJobStatus.status}</div>
+                                <div className="font-medium text-sm">{asyncJobStatus.status}</div>
                             </div>
                         </div>
                     )}
@@ -1226,22 +1226,22 @@ export default function BatchPaymentPage() {
           <div className="grid lg:grid-cols-12 gap-6">
             {/* Recipients Card */}
             <GlassCard className="lg:col-span-8 bg-card">
-              <GlassCardHeader className="flex flex-row items-center justify-between">
+              <GlassCardHeader className="flex flex-col sm:flex-row sm:items-center gap-3 sm:justify-between">
                 <div>
                   <GlassCardTitle>Recipients</GlassCardTitle>
-                  <GlassCardDescription>Add payment recipients from your contacts or import from file</GlassCardDescription>
+                  <GlassCardDescription className="hidden sm:block">Add payment recipients from your contacts or import from file</GlassCardDescription>
                 </div>
-                <div className="flex gap-2">
+                <div className="flex gap-2 flex-wrap">
                   <Button variant="outline" size="sm" onClick={() => openTagDialog()}>
-                    <Tag className="h-4 w-4 mr-2" />
-                    New Tag
+                    <Tag className="h-4 w-4 sm:mr-2" />
+                    <span className="hidden sm:inline">New Tag</span>
                   </Button>
 
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
                       <Button variant="outline" size="sm">
-                        <FileUp className="h-4 w-4 mr-2" />
-                        Import
+                        <FileUp className="h-4 w-4 sm:mr-2" />
+                        <span className="hidden sm:inline">Import</span>
                         <ChevronDown className="h-4 w-4 ml-1" />
                       </Button>
                     </DropdownMenuTrigger>
@@ -1262,8 +1262,8 @@ export default function BatchPaymentPage() {
                   </DropdownMenu>
 
                   <Button variant="outline" size="sm" onClick={handleExportCSV}>
-                    <Download className="h-4 w-4 mr-2" />
-                    Export
+                    <Download className="h-4 w-4 sm:mr-2" />
+                    <span className="hidden sm:inline">Export</span>
                   </Button>
                 </div>
               </GlassCardHeader>
@@ -1510,22 +1510,22 @@ export default function BatchPaymentPage() {
                 {displayAutoPayments.map((payment) => (
                   <div
                     key={payment.id}
-                    className={`flex items-center justify-between p-4 rounded-lg border ${
+                    className={`flex items-center justify-between p-3 sm:p-4 rounded-lg border gap-2 ${
                       payment.status === "paused" ? "bg-amber-500/5 border-amber-500/20" : "bg-muted/30 border-border"
                     }`}
                   >
-                    <div className="flex items-center gap-4">
-                      <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
-                        <Building2 className="h-5 w-5 text-primary" />
+                    <div className="flex items-center gap-3 sm:gap-4 min-w-0 flex-1">
+                      <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+                        <Building2 className="h-4 w-4 sm:h-5 sm:w-5 text-primary" />
                       </div>
-                      <div>
-                        <div className="font-medium flex items-center gap-2">
-                          {payment.vendorName}
-                          <Badge variant={payment.status === "active" ? "default" : "secondary"}>
+                      <div className="min-w-0">
+                        <div className="font-medium flex items-center gap-2 flex-wrap text-sm sm:text-base">
+                          <span className="truncate">{payment.vendorName}</span>
+                          <Badge variant={payment.status === "active" ? "default" : "secondary"} className="text-xs">
                             {payment.status}
                           </Badge>
                         </div>
-                        <div className="text-sm text-muted-foreground">
+                        <div className="text-xs sm:text-sm text-muted-foreground">
                           ${payment.amount} {payment.token} / {payment.frequency}
                         </div>
                         <div className="text-xs text-muted-foreground">
@@ -1533,11 +1533,11 @@ export default function BatchPaymentPage() {
                         </div>
                       </div>
                     </div>
-                    <div className="flex items-center gap-2">
-                      <Button size="sm" variant="ghost" onClick={() => toggleAutoPaymentStatus(payment.id)}>
+                    <div className="flex items-center gap-1 sm:gap-2 shrink-0">
+                      <Button size="sm" variant="ghost" className="h-8 w-8 p-0" onClick={() => toggleAutoPaymentStatus(payment.id)}>
                         {payment.status === "active" ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
                       </Button>
-                      <Button size="sm" variant="ghost">
+                      <Button size="sm" variant="ghost" className="h-8 w-8 p-0 hidden sm:flex">
                         <Settings className="h-4 w-4" />
                       </Button>
                     </div>

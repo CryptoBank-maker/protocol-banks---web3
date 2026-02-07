@@ -418,7 +418,7 @@ export default function BalancesPage() {
             )}
           </div>
 
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
             <Button
               variant="outline"
               size="sm"
@@ -427,12 +427,12 @@ export default function BalancesPage() {
               disabled={isRefreshing}
             >
               <RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
-              Refresh
+              <span className="hidden xs:inline">Refresh</span>
             </Button>
             <Link href="/receive">
               <Button variant="outline" size="sm" className="gap-2">
                 <ArrowDownLeft className="h-4 w-4" />
-                Receive
+                <span className="hidden xs:inline">Receive</span>
               </Button>
             </Link>
             <Link href="/pay">
@@ -460,7 +460,7 @@ export default function BalancesPage() {
             <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
               <div>
                 <p className="text-sm text-muted-foreground mb-1">Total Balance</p>
-                <h2 className="text-4xl sm:text-5xl font-bold tracking-tight" style={{ fontVariantNumeric: "tabular-nums" }}>
+                <h2 className="text-3xl sm:text-4xl md:text-5xl font-bold tracking-tight break-all" style={{ fontVariantNumeric: "tabular-nums" }}>
                   <span className="font-mono">${displayBalance}</span>
                 </h2>
               </div>
@@ -524,9 +524,9 @@ export default function BalancesPage() {
                 </GlassCardHeader>
                 <GlassCardContent>
                   {balance?.tokenDistribution && balance.tokenDistribution.length > 0 ? (
-                    <div className="flex flex-col sm:flex-row items-center gap-8">
+                    <div className="flex flex-col sm:flex-row items-center gap-6 sm:gap-8">
                       {/* Donut Chart */}
-                      <div className="w-[250px] h-[250px] flex-shrink-0">
+                      <div className="w-[200px] h-[200px] sm:w-[250px] sm:h-[250px] flex-shrink-0">
                         <ResponsiveContainer width="100%" height="100%">
                           <PieChart>
                             <Pie
@@ -565,16 +565,16 @@ export default function BalancesPage() {
                         </ResponsiveContainer>
                       </div>
                       {/* Legend */}
-                      <div className="flex-1 space-y-3 w-full">
+                      <div className="flex-1 space-y-3 w-full min-w-0">
                         {balance.tokenDistribution.map((t) => (
-                          <div key={t.token} className="flex items-center justify-between">
-                            <div className="flex items-center gap-2.5">
+                          <div key={t.token} className="flex items-center justify-between gap-2 min-w-0">
+                            <div className="flex items-center gap-2.5 min-w-0 flex-1">
                               <div
                                 className="w-3 h-3 rounded-full flex-shrink-0"
                                 style={{ backgroundColor: TOKEN_COLORS[t.token] || "#888" }}
                               />
-                              <span className="font-medium text-sm">{t.token}</span>
-                              <div className="flex gap-1">
+                              <span className="font-medium text-sm shrink-0">{t.token}</span>
+                              <div className="hidden sm:flex gap-1 flex-wrap">
                                 {t.chains.map((chain) => (
                                   <span
                                     key={chain}
@@ -607,7 +607,7 @@ export default function BalancesPage() {
               </GlassCard>
 
               {/* Quick Stats */}
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
                 <GlassCard>
                   <GlassCardContent className="pt-4">
                     <div className="flex items-center gap-2">

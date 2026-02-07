@@ -21,6 +21,7 @@ import {
   Wallet,
   Code,
   Settings,
+  ShieldCheck,
 } from "lucide-react"
 
 export interface ProductItem {
@@ -96,6 +97,12 @@ export const paymentProducts: ProductItem[] = [
     title: "Transactions",
     description: "Payment history and activity",
     icon: ArrowRightLeft,
+  },
+  {
+    href: "/reconciliation",
+    title: "Reconciliation",
+    description: "Match on-chain vs database records",
+    icon: ShieldCheck,
   },
   {
     href: "/analytics",

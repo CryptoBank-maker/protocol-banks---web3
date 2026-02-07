@@ -334,7 +334,7 @@ function SplitPaymentCard({
   const completionPct = getCompletionPercentage(payment)
 
   return (
-    <Card
+    <GlassCard
       className="bg-card cursor-pointer hover:border-primary/30 transition-colors"
       onClick={onToggle}
     >

@@ -92,6 +92,11 @@ export default function AnalyticsPage() {
   const [startDate, setStartDate] = useState("")
   const [endDate, setEndDate] = useState("")
 
+  // Multi-dimensional filters
+  const [chainFilter, setChainFilter] = useState("all")
+  const [tokenFilter, setTokenFilter] = useState("all")
+  const [statusFilter, setStatusFilter] = useState("all")
+
   const [selectedPayment, setSelectedPayment] = useState<Payment | null>(null)
   const [newTag, setNewTag] = useState("")
   const [isTagDialogOpen, setIsTagDialogOpen] = useState(false)
@@ -113,7 +118,7 @@ export default function AnalyticsPage() {
 
   useEffect(() => {
     filterPayments()
-  }, [startDate, endDate, payments])
+  }, [startDate, endDate, chainFilter, tokenFilter, statusFilter, payments])
 
   const handleDateRangeChange = (value: string) => {
     setDateRange(value)
@@ -246,6 +251,18 @@ export default function AnalyticsPage() {
       filtered = filtered.filter((p) => new Date(p.timestamp) <= endDateTime)
     }
 
+    if (chainFilter !== "all") {
+      filtered = filtered.filter((p: any) => (p.chain || "").toLowerCase() === chainFilter)
+    }
+
+    if (tokenFilter !== "all") {
+      filtered = filtered.filter((p) => p.token_symbol === tokenFilter)
+    }
+
+    if (statusFilter !== "all") {
+      filtered = filtered.filter((p) => p.status === statusFilter)
+    }
+
     setFilteredPayments(filtered)
   }
 
@@ -303,6 +320,9 @@ export default function AnalyticsPage() {
     setStartDate("")
     setEndDate("")
     setDateRange("all")
+    setChainFilter("all")
+    setTokenFilter("all")
+    setStatusFilter("all")
   }
 
   const formatAddress = (address: string) => {
@@ -456,13 +476,14 @@ export default function AnalyticsPage() {
   }
 
   const exportCSV = () => {
-    const headers = ["Date", "Recipient", "Wallet Tag", "Token", "Amount (USD)", "Status", "Tx Hash"]
+    const headers = ["Date", "Counterparty", "Vendor", "Token", "Debit (Out)", "Credit (In)", "Status", "Tx Hash"]
     const rows = displayPayments.map((p) => [
       formatDate(p.timestamp),
       p.to_address,
       p.vendor?.name || "-",
       p.token_symbol,
       p.amount_usd.toFixed(2),
+      "0.00",
       p.status,
       p.tx_hash,
     ])
@@ -486,19 +507,21 @@ export default function AnalyticsPage() {
     const doc = new jsPDF()
 
     doc.setFontSize(18)
-    doc.text("Protocol Banks - Financial Report", 14, 22)
+    doc.text("Protocol Banks - Accounting Ledger", 14, 22)
 
     doc.setFontSize(11)
     doc.setTextColor(100)
     doc.text(`Generated on: ${new Date().toLocaleDateString()}`, 14, 30)
 
     // Stats Summary
-    doc.text(`Total Sent: $${displayStats.totalSent.toFixed(2)}`, 14, 40)
+    doc.text(`Total Payable (Debit): $${displayStats.totalSent.toFixed(2)}`, 14, 40)
     doc.text(`Total Transactions: ${displayStats.totalTransactions}`, 14, 46)
+    doc.text(`Counterparties: ${displayStats.totalVendors}`, 14, 52)
+    doc.text(`Average per Transaction: $${displayStats.avgTransaction.toFixed(2)}`, 14, 58)
 
     autoTable(doc, {
-      startY: 55,
-      head: [["Date", "Recipient", "Tag", "Token", "Amount", "Status"]],
+      startY: 68,
+      head: [["Date", "Counterparty", "Vendor", "Token", "Debit (Out)", "Status"]],
       body: displayPayments.map((p) => [
         formatDate(p.timestamp),
         formatAddress(p.to_address),
@@ -511,7 +534,34 @@ export default function AnalyticsPage() {
       headStyles: { fillColor: [0, 47, 167] }, // Klein Blue
     })
 
-    doc.save(`protocol-banks-report-${new Date().toISOString().split("T")[0]}.pdf`)
+    doc.save(`protocol-banks-ledger-${new Date().toISOString().split("T")[0]}.pdf`)
+  }
+
+  const exportAnomalies = () => {
+    const anomalies = displayPayments.filter((p) => p.status === "failed" || p.status === "pending")
+    if (anomalies.length === 0) return
+
+    const headers = ["Date", "Counterparty", "Vendor", "Token", "Amount (USD)", "Status", "Tx Hash"]
+    const rows = anomalies.map((p) => [
+      formatDate(p.timestamp),
+      p.to_address,
+      p.vendor?.name || "-",
+      p.token_symbol,
+      p.amount_usd.toFixed(2),
+      p.status,
+      p.tx_hash,
+    ])
+
+    const csvContent = [headers.join(","), ...rows.map((row) => row.join(","))].join("\n")
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" })
+    const link = document.createElement("a")
+    const url = URL.createObjectURL(blob)
+    link.setAttribute("href", url)
+    link.setAttribute("download", `anomalies-${new Date().toISOString().split("T")[0]}.csv`)
+    link.style.visibility = "hidden"
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
   }
 
   return (
@@ -521,7 +571,11 @@ export default function AnalyticsPage() {
           <h1 className="text-4xl font-bold text-foreground">Financial Intelligence</h1>
           <p className="text-muted-foreground">Advanced analytics and network topology analysis</p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 flex-wrap">
+          <Button variant="outline" onClick={exportAnomalies} className="border-border bg-transparent text-yellow-500 hover:text-yellow-400">
+            <ArrowUpRight className="mr-2 h-4 w-4" />
+            Export Anomalies
+          </Button>
           <Button variant="outline" onClick={exportCSV} className="border-border bg-transparent">
             <TableIcon className="mr-2 h-4 w-4" />
             Export CSV
@@ -617,15 +671,16 @@ export default function AnalyticsPage() {
 
       <GlassCard className="bg-card border-border">
         <GlassCardHeader>
-          <GlassCardTitle className="text-foreground">Filter by Date Range</GlassCardTitle>
+          <GlassCardTitle className="text-foreground">Multi-Dimensional Filters</GlassCardTitle>
           <GlassCardDescription className="text-muted-foreground">
-            Select a date range to filter your transactions
+            Filter transactions by date, chain, token, and status
           </GlassCardDescription>
         </GlassCardHeader>
-        <GlassCardContent>
+        <GlassCardContent className="space-y-4">
+          {/* Row 1: Date range */}
           <div className="flex flex-wrap gap-4 items-end">
             <div className="flex-1 min-w-[200px] space-y-2">
-              <label className="text-sm text-muted-foreground">Range</label>
+              <label className="text-sm text-muted-foreground">Date Range</label>
               <Select value={dateRange} onValueChange={handleDateRangeChange}>
                 <SelectTrigger className="bg-background border-border text-foreground">
                   <SelectValue placeholder="Select range" />
@@ -662,14 +717,68 @@ export default function AnalyticsPage() {
                 </div>
               </>
             )}
+          </div>
+
+          {/* Row 2: Chain, Token, Status filters */}
+          <div className="flex flex-wrap gap-4 items-end">
+            <div className="flex-1 min-w-[150px] space-y-2">
+              <label className="text-sm text-muted-foreground">Chain</label>
+              <Select value={chainFilter} onValueChange={setChainFilter}>
+                <SelectTrigger className="bg-background border-border text-foreground">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Chains</SelectItem>
+                  <SelectItem value="ethereum">Ethereum</SelectItem>
+                  <SelectItem value="base">Base</SelectItem>
+                  <SelectItem value="arbitrum">Arbitrum</SelectItem>
+                  <SelectItem value="polygon">Polygon</SelectItem>
+                  <SelectItem value="tron">TRON</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex-1 min-w-[150px] space-y-2">
+              <label className="text-sm text-muted-foreground">Token</label>
+              <Select value={tokenFilter} onValueChange={setTokenFilter}>
+                <SelectTrigger className="bg-background border-border text-foreground">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Tokens</SelectItem>
+                  <SelectItem value="USDC">USDC</SelectItem>
+                  <SelectItem value="USDT">USDT</SelectItem>
+                  <SelectItem value="DAI">DAI</SelectItem>
+                  <SelectItem value="ETH">ETH</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex-1 min-w-[150px] space-y-2">
+              <label className="text-sm text-muted-foreground">Status</label>
+              <Select value={statusFilter} onValueChange={setStatusFilter}>
+                <SelectTrigger className="bg-background border-border text-foreground">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Statuses</SelectItem>
+                  <SelectItem value="completed">Completed</SelectItem>
+                  <SelectItem value="pending">Pending</SelectItem>
+                  <SelectItem value="failed">Failed</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
 
             <Button onClick={clearFilters} variant="outline" className="border-border bg-transparent">
               Clear Filters
             </Button>
           </div>
-          {(startDate || endDate) && (
-            <p className="text-sm text-muted-foreground mt-4">
+
+          {/* Active filter summary */}
+          {(startDate || endDate || chainFilter !== "all" || tokenFilter !== "all" || statusFilter !== "all") && (
+            <p className="text-sm text-muted-foreground">
               Showing {displayPayments.length} of {payments.length} transactions
+              {chainFilter !== "all" && ` on ${chainFilter}`}
+              {tokenFilter !== "all" && ` in ${tokenFilter}`}
+              {statusFilter !== "all" && ` (${statusFilter})`}
             </p>
           )}
         </GlassCardContent>
@@ -678,15 +787,15 @@ export default function AnalyticsPage() {
       <div className="grid gap-6 lg:grid-cols-2 lg:grid-cols-4">
         <GlassCard className="bg-card border-border">
           <GlassCardHeader className="flex flex-row items-center justify-between pb-2">
-            <GlassCardTitle className="text-sm font-medium text-muted-foreground">Total Sent</GlassCardTitle>
+            <GlassCardTitle className="text-sm font-medium text-muted-foreground">Total Payable (Debit)</GlassCardTitle>
             <DollarSign className="h-4 w-4 text-muted-foreground" />
           </GlassCardHeader>
           <GlassCardContent>
-            <div className="text-2xl font-bold text-foreground font-mono">
+            <div className="text-2xl font-bold text-red-500 font-mono">
               $
               {displayStats.totalSent.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
             </div>
-            <p className="text-xs text-muted-foreground mt-1">Lifetime payments</p>
+            <p className="text-xs text-muted-foreground mt-1">Total outgoing payments</p>
           </GlassCardContent>
         </GlassCard>
 
@@ -703,12 +812,12 @@ export default function AnalyticsPage() {
 
         <GlassCard className="bg-card border-border">
           <GlassCardHeader className="flex flex-row items-center justify-between pb-2">
-            <GlassCardTitle className="text-sm font-medium text-muted-foreground">Wallet Tags</GlassCardTitle>
+            <GlassCardTitle className="text-sm font-medium text-muted-foreground">Counterparties</GlassCardTitle>
             <Users className="h-4 w-4 text-muted-foreground" />
           </GlassCardHeader>
           <GlassCardContent>
             <div className="text-2xl font-bold text-foreground">{displayStats.totalVendors.toLocaleString()}</div>
-            <p className="text-xs text-muted-foreground mt-1">Unique tags used</p>
+            <p className="text-xs text-muted-foreground mt-1">Unique vendors / recipients</p>
           </GlassCardContent>
         </GlassCard>
 
@@ -801,7 +910,7 @@ export default function AnalyticsPage() {
         <TabsContent value="payments">
           <GlassCard className="bg-card border-border">
             <GlassCardHeader>
-              <GlassCardTitle className="text-foreground">Recent Payments</GlassCardTitle>
+              <GlassCardTitle className="text-foreground">Payment Ledger</GlassCardTitle>
               <GlassCardDescription className="text-muted-foreground">
                 {isDemoMode
                   ? "Showing test transaction data"
@@ -816,10 +925,10 @@ export default function AnalyticsPage() {
                   <TableHeader>
                     <TableRow className="bg-secondary/50 hover:bg-secondary/50">
                       <TableHead className="text-foreground whitespace-nowrap">Date</TableHead>
-                      <TableHead className="text-foreground whitespace-nowrap">Recipient</TableHead>
-                      <TableHead className="text-foreground whitespace-nowrap">Wallet Tag</TableHead>
+                      <TableHead className="text-foreground whitespace-nowrap">Counterparty</TableHead>
+                      <TableHead className="text-foreground whitespace-nowrap">Vendor</TableHead>
                       <TableHead className="text-foreground whitespace-nowrap">Token</TableHead>
-                      <TableHead className="text-foreground text-right whitespace-nowrap">Amount</TableHead>
+                      <TableHead className="text-foreground text-right whitespace-nowrap">Debit (Out)</TableHead>
                       <TableHead className="text-foreground whitespace-nowrap">Status</TableHead>
                       <TableHead className="text-foreground whitespace-nowrap">Tags</TableHead>
                       <TableHead className="text-foreground whitespace-nowrap">Tx Hash</TableHead>

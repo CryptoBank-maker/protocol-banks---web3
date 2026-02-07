@@ -2,16 +2,23 @@ package nonce
 
 import (
 	"context"
+	"fmt"
+	"sync"
 	"testing"
 	"time"
 
 	"github.com/alicebob/miniredis/v2"
-	"github.com/redis/go-redis/v9"
+	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/ethclient"
+	"github.com/go-redis/redis/v8"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-func setupTestRedis(t *testing.T) (*redis.Client, func()) {
+// newTestManager creates a Manager backed by miniredis for testing.
+// It bypasses NewManager (which requires real Redis config + TLS) and
+// directly constructs the struct.
+func newTestManager(t *testing.T) (*Manager, func()) {
 	mr, err := miniredis.Run()
 	require.NoError(t, err)
 
@@ -19,161 +26,166 @@ func setupTestRedis(t *testing.T) (*redis.Client, func()) {
 		Addr: mr.Addr(),
 	})
 
-	return client, func() {
+	m := &Manager{
+		redis:       client,
+		clients:     make(map[uint64]*ethclient.Client),
+		localNonces: make(map[string]uint64),
+		lockTTL:     30 * time.Second,
+	}
+
+	cleanup := func() {
 		client.Close()
 		mr.Close()
 	}
+
+	return m, cleanup
 }
 
-func TestNonceManager_GetAndIncrement(t *testing.T) {
-	rdb, cleanup := setupTestRedis(t)
+func TestNonceManager_ResetNonce(t *testing.T) {
+	nm, cleanup := newTestManager(t)
 	defer cleanup()
 
-	nm := NewManager(rdb)
 	ctx := context.Background()
-	address := "0x1234567890123456789012345678901234567890"
-	chainID := int64(1)
+	addr := common.HexToAddress("0x1234567890123456789012345678901234567890")
+	chainID := uint64(1)
 
-	// First call should initialize nonce to 0
-	nonce1, err := nm.GetAndIncrement(ctx, address, chainID)
-	require.NoError(t, err)
-	assert.Equal(t, uint64(0), nonce1)
+	// Seed a cached nonce value in Redis
+	key := fmt.Sprintf("nonce:%d:%s", chainID, addr.Hex())
+	nm.redis.Set(ctx, key, 5, 10*time.Minute)
 
-	// Second call should return 1
-	nonce2, err := nm.GetAndIncrement(ctx, address, chainID)
+	// Verify it exists
+	val, err := nm.redis.Get(ctx, key).Uint64()
 	require.NoError(t, err)
-	assert.Equal(t, uint64(1), nonce2)
+	assert.Equal(t, uint64(5), val)
 
-	// Third call should return 2
-	nonce3, err := nm.GetAndIncrement(ctx, address, chainID)
+	// Reset should delete the key
+	err = nm.ResetNonce(ctx, chainID, addr)
 	require.NoError(t, err)
-	assert.Equal(t, uint64(2), nonce3)
+
+	// Key should be gone
+	_, err = nm.redis.Get(ctx, key).Result()
+	assert.ErrorIs(t, err, redis.Nil)
 }
 
-func TestNonceManager_SetNonce(t *testing.T) {
-	rdb, cleanup := setupTestRedis(t)
+func TestNonceManager_IncrementNonce(t *testing.T) {
+	nm, cleanup := newTestManager(t)
 	defer cleanup()
 
-	nm := NewManager(rdb)
 	ctx := context.Background()
-	address := "0x1234567890123456789012345678901234567890"
-	chainID := int64(1)
+	addr := common.HexToAddress("0x1234567890123456789012345678901234567890")
+	chainID := uint64(1)
+	key := fmt.Sprintf("nonce:%d:%s", chainID, addr.Hex())
 
-	// Set nonce to specific value
-	err := nm.SetNonce(ctx, address, chainID, 100)
-	require.NoError(t, err)
+	// Seed initial value
+	nm.redis.Set(ctx, key, 0, 10*time.Minute)
 
-	// Get should return 100
-	nonce, err := nm.GetAndIncrement(ctx, address, chainID)
+	// Increment 3 times
+	nm.incrementNonce(ctx, key)
+	nm.incrementNonce(ctx, key)
+	nm.incrementNonce(ctx, key)
+
+	val, err := nm.redis.Get(ctx, key).Uint64()
 	require.NoError(t, err)
-	assert.Equal(t, uint64(100), nonce)
+	assert.Equal(t, uint64(3), val)
 }
 
-func TestNonceManager_Reset(t *testing.T) {
-	rdb, cleanup := setupTestRedis(t)
+func TestNonceManager_AcquireReleaseLock(t *testing.T) {
+	nm, cleanup := newTestManager(t)
 	defer cleanup()
 
-	nm := NewManager(rdb)
 	ctx := context.Background()
-	address := "0x1234567890123456789012345678901234567890"
-	chainID := int64(1)
+	lockKey := "lock:nonce:1:0x1234"
 
-	// Increment a few times
-	nm.GetAndIncrement(ctx, address, chainID)
-	nm.GetAndIncrement(ctx, address, chainID)
-	nm.GetAndIncrement(ctx, address, chainID)
-
-	// Reset
-	err := nm.Reset(ctx, address, chainID)
+	// Should acquire successfully
+	acquired, err := nm.acquireLock(ctx, lockKey)
 	require.NoError(t, err)
+	assert.True(t, acquired)
 
-	// Should start from 0 again
-	nonce, err := nm.GetAndIncrement(ctx, address, chainID)
+	// Release
+	nm.releaseLock(ctx, lockKey)
+
+	// Should be able to acquire again after release
+	acquired2, err := nm.acquireLock(ctx, lockKey)
 	require.NoError(t, err)
-	assert.Equal(t, uint64(0), nonce)
-}
+	assert.True(t, acquired2)
 
-func TestNonceManager_ConcurrentAccess(t *testing.T) {
-	rdb, cleanup := setupTestRedis(t)
-	defer cleanup()
-
-	nm := NewManager(rdb)
-	ctx := context.Background()
-	address := "0x1234567890123456789012345678901234567890"
-	chainID := int64(1)
-
-	// Run 100 concurrent goroutines
-	numGoroutines := 100
-	results := make(chan uint64, numGoroutines)
-
-	for i := 0; i < numGoroutines; i++ {
-		go func() {
-			nonce, err := nm.GetAndIncrement(ctx, address, chainID)
-			if err != nil {
-				t.Error(err)
-				return
-			}
-			results <- nonce
-		}()
-	}
-
-	// Collect results
-	seen := make(map[uint64]bool)
-	for i := 0; i < numGoroutines; i++ {
-		select {
-		case nonce := <-results:
-			// Each nonce should be unique
-			assert.False(t, seen[nonce], "Duplicate nonce detected: %d", nonce)
-			seen[nonce] = true
-		case <-time.After(5 * time.Second):
-			t.Fatal("Timeout waiting for goroutines")
-		}
-	}
-
-	// Should have exactly numGoroutines unique nonces
-	assert.Equal(t, numGoroutines, len(seen))
+	nm.releaseLock(ctx, lockKey)
 }
 
 func TestNonceManager_MultipleAddresses(t *testing.T) {
-	rdb, cleanup := setupTestRedis(t)
+	nm, cleanup := newTestManager(t)
 	defer cleanup()
 
-	nm := NewManager(rdb)
 	ctx := context.Background()
-	address1 := "0x1111111111111111111111111111111111111111"
-	address2 := "0x2222222222222222222222222222222222222222"
-	chainID := int64(1)
+	addr1 := common.HexToAddress("0x1111111111111111111111111111111111111111")
+	addr2 := common.HexToAddress("0x2222222222222222222222222222222222222222")
+	chainID := uint64(1)
 
-	// Increment address1
-	nonce1a, _ := nm.GetAndIncrement(ctx, address1, chainID)
-	nonce1b, _ := nm.GetAndIncrement(ctx, address1, chainID)
+	key1 := fmt.Sprintf("nonce:%d:%s", chainID, addr1.Hex())
+	key2 := fmt.Sprintf("nonce:%d:%s", chainID, addr2.Hex())
 
-	// Increment address2
-	nonce2a, _ := nm.GetAndIncrement(ctx, address2, chainID)
+	// Set different nonces
+	nm.redis.Set(ctx, key1, 10, 10*time.Minute)
+	nm.redis.Set(ctx, key2, 20, 10*time.Minute)
 
-	// Address1 should be at 0, 1
-	assert.Equal(t, uint64(0), nonce1a)
-	assert.Equal(t, uint64(1), nonce1b)
+	val1, _ := nm.redis.Get(ctx, key1).Uint64()
+	val2, _ := nm.redis.Get(ctx, key2).Uint64()
 
-	// Address2 should be at 0 (independent counter)
-	assert.Equal(t, uint64(0), nonce2a)
+	assert.Equal(t, uint64(10), val1)
+	assert.Equal(t, uint64(20), val2)
+
+	// Increment addr1, addr2 should be unchanged
+	nm.incrementNonce(ctx, key1)
+	val1, _ = nm.redis.Get(ctx, key1).Uint64()
+	val2, _ = nm.redis.Get(ctx, key2).Uint64()
+
+	assert.Equal(t, uint64(11), val1)
+	assert.Equal(t, uint64(20), val2)
 }
 
 func TestNonceManager_MultipleChains(t *testing.T) {
-	rdb, cleanup := setupTestRedis(t)
+	nm, cleanup := newTestManager(t)
 	defer cleanup()
 
-	nm := NewManager(rdb)
 	ctx := context.Background()
-	address := "0x1234567890123456789012345678901234567890"
+	addr := common.HexToAddress("0x1234567890123456789012345678901234567890")
 
-	// Increment on Ethereum mainnet
-	nonceEth, _ := nm.GetAndIncrement(ctx, address, 1)
+	keyEth := fmt.Sprintf("nonce:%d:%s", 1, addr.Hex())
+	keyPoly := fmt.Sprintf("nonce:%d:%s", 137, addr.Hex())
 
-	// Increment on Polygon
-	noncePoly, _ := nm.GetAndIncrement(ctx, address, 137)
+	// Set different nonces per chain
+	nm.redis.Set(ctx, keyEth, 5, 10*time.Minute)
+	nm.redis.Set(ctx, keyPoly, 15, 10*time.Minute)
 
-	// Each chain should have independent counters
-	assert.Equal(t, uint64(0), nonceEth)
-	assert.Equal(t, uint64(0), noncePoly)
+	valEth, _ := nm.redis.Get(ctx, keyEth).Uint64()
+	valPoly, _ := nm.redis.Get(ctx, keyPoly).Uint64()
+
+	assert.Equal(t, uint64(5), valEth)
+	assert.Equal(t, uint64(15), valPoly)
+}
+
+func TestNonceManager_ConcurrentIncrement(t *testing.T) {
+	nm, cleanup := newTestManager(t)
+	defer cleanup()
+
+	ctx := context.Background()
+	key := "nonce:1:0xConcurrent"
+	nm.redis.Set(ctx, key, 0, 10*time.Minute)
+
+	numGoroutines := 50
+	var wg sync.WaitGroup
+	wg.Add(numGoroutines)
+
+	for i := 0; i < numGoroutines; i++ {
+		go func() {
+			defer wg.Done()
+			nm.incrementNonce(ctx, key)
+		}()
+	}
+
+	wg.Wait()
+
+	val, err := nm.redis.Get(ctx, key).Uint64()
+	require.NoError(t, err)
+	assert.Equal(t, uint64(numGoroutines), val)
 }

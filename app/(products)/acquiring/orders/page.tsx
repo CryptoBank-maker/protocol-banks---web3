@@ -366,7 +366,7 @@ export default function OrdersPage() {
           </GlassCard>
         ) : (
           filteredOrders.map((order) => (
-            <Card
+            <GlassCard
               key={order.id}
               className="cursor-pointer hover:border-primary/50 transition-colors"
               onClick={() => setSelectedOrder(order)}

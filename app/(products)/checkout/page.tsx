@@ -4,7 +4,7 @@ import { Suspense, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
-import { Card, CardContent, CardHeader } from "@/components/ui/glass-card";
+import { GlassCard, GlassCardContent, GlassCardHeader } from "@/components/ui/glass-card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Loader2, CheckCircle2, AlertCircle, Clock, Copy, ArrowLeft, RefreshCw } from "lucide-react";
