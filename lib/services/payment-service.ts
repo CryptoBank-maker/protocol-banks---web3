@@ -1,4 +1,4 @@
-import { ethers } from "ethers"
+import { isEvmAddressFormat } from "@/lib/address-utils"
 import type { Payment, Recipient, PaymentResult } from "@/types"
 import { sendToken, signERC3009Authorization, executeERC3009Transfer } from "@/lib/web3"
 import {
@@ -25,7 +25,7 @@ export function validateRecipients(recipients: Recipient[]): void {
   }
 
   for (const recipient of recipients) {
-    if (!recipient.address || !ethers.isAddress(recipient.address)) {
+    if (!recipient.address || !isEvmAddressFormat(recipient.address)) {
       throw new Error(`Invalid address: ${recipient.address}`)
     }
     if (!recipient.amount || recipient.amount <= 0) {

@@ -1,5 +1,6 @@
 import type { Vendor, VendorInput, VendorStats } from "@/types"
 import { ethers } from "ethers"
+import { isEvmAddressFormat, safeGetChecksumAddress } from "@/lib/address-utils"
 
 /**
  * Validate wallet address
@@ -10,10 +11,10 @@ export function validateAddress(address: string): { isValid: boolean; checksumAd
   }
 
   try {
-    if (!ethers.isAddress(address)) {
+    if (!isEvmAddressFormat(address)) {
       return { isValid: false, error: "Invalid wallet address format" }
     }
-    const checksumAddress = ethers.getAddress(address)
+    const checksumAddress = safeGetChecksumAddress(address)
     return { isValid: true, checksumAddress }
   } catch {
     return { isValid: false, error: "Invalid wallet address" }

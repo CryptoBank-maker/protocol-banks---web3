@@ -11,6 +11,7 @@
  */
 
 import { ethers } from "ethers"
+import { safeGetChecksumAddress } from "@/lib/address-utils"
 
 // Web Crypto API compatible hash function
 async function sha256(data: string): Promise<string> {
@@ -87,8 +88,8 @@ export function validateAndChecksumAddress(address: string): {
   }
 
   try {
-    // ethers.getAddress returns checksummed address or throws
-    const checksummed = ethers.getAddress(cleaned)
+    // safeGetChecksumAddress normalizes to lowercase first to avoid ethers v6 checksum rejection
+    const checksummed = safeGetChecksumAddress(cleaned)
     return { valid: true, checksummed }
   } catch {
     return { valid: false, checksummed: null, error: "Invalid EVM address checksum" }

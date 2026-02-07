@@ -4,6 +4,7 @@
  */
 
 import { ethers } from 'ethers'
+import { isEvmAddressFormat, safeGetChecksumAddress } from '@/lib/address-utils'
 import prisma from '@/lib/prisma'
 
 /**
@@ -11,7 +12,7 @@ import prisma from '@/lib/prisma'
  */
 export function isValidAddress(address: string): boolean {
   try {
-    return ethers.isAddress(address)
+    return isEvmAddressFormat(address)
   } catch {
     return false
   }
@@ -54,7 +55,7 @@ export function isValidChainAddress(address: string, chain: string = 'EVM'): boo
  */
 export function normalizeAddress(address: string): string {
   try {
-    return ethers.getAddress(address)
+    return safeGetChecksumAddress(address)
   } catch {
     throw new Error('Invalid address format')
   }

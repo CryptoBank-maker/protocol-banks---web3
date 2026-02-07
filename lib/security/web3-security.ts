@@ -4,6 +4,7 @@
  * cross-chain attacks, double spending, malicious approvals, and more.
  */
 
+import { isEvmAddressFormat } from "@/lib/address-utils"
 import { ethers } from "ethers"
 
 // ============================================================================
@@ -415,7 +416,7 @@ export async function validateBridgeTransaction(
   }
 
   // 4. Validate recipient address
-  const recipientValid = ethers.isAddress(tx.recipientAddress)
+  const recipientValid = isEvmAddressFormat(tx.recipientAddress)
   if (!recipientValid) {
     warnings.push("Invalid recipient address")
   }

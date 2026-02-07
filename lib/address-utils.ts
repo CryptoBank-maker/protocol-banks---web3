@@ -47,7 +47,7 @@ function isValidBase58(str: string): boolean {
  * Check if a string is a valid EVM address format (0x + 40 hex chars)
  * More lenient than ethers.isAddress() which requires valid EIP-55 checksum for mixed case
  */
-function isEvmAddressFormat(str: string): boolean {
+export function isEvmAddressFormat(str: string): boolean {
   return /^0x[0-9a-fA-F]{40}$/.test(str)
 }
 
@@ -55,7 +55,7 @@ function isEvmAddressFormat(str: string): boolean {
  * Safely get the EIP-55 checksum address.
  * Normalizes to lowercase first to avoid ethers v6 rejecting mixed-case non-checksummed addresses.
  */
-function safeGetChecksumAddress(address: string): string {
+export function safeGetChecksumAddress(address: string): string {
   return ethers.getAddress(address.toLowerCase())
 }
 

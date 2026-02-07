@@ -5,6 +5,7 @@
  * Supports ERC-721 (NFT) and ERC-20 (Token) distributions.
  */
 
+import { isEvmAddressFormat } from "@/lib/address-utils"
 import { ethers } from "ethers"
 import { RPC_URLS, CHAIN_IDS } from "@/lib/web3"
 
@@ -123,7 +124,7 @@ export async function distributeAsset(
 ): Promise<DistributionResult> {
   try {
     // Validate recipient address
-    if (!ethers.isAddress(recipientAddress)) {
+    if (!isEvmAddressFormat(recipientAddress)) {
       return {
         success: false,
         error: "Invalid recipient address",

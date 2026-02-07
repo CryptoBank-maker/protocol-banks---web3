@@ -342,7 +342,7 @@ export async function getTokenBalance(walletAddress: string, tokenAddress: strin
     return "0"
   }
 
-  if (!ethers.isAddress(walletAddress) || !ethers.isAddress(tokenAddress)) {
+  if (!isEvmAddressFormat(walletAddress) || !isEvmAddressFormat(tokenAddress)) {
     console.warn("[v0] Invalid address provided to getTokenBalance")
     return "0"
   }
@@ -425,10 +425,10 @@ export async function sendToken(tokenAddress: string, toAddress: string, amount:
     throw new Error("Wallet is not available")
   }
 
-  if (!ethers.isAddress(toAddress)) {
+  if (!isEvmAddressFormat(toAddress)) {
     throw new Error("Invalid recipient address")
   }
-  if (!ethers.isAddress(tokenAddress)) {
+  if (!isEvmAddressFormat(tokenAddress)) {
     throw new Error("Invalid token contract address")
   }
 
@@ -667,7 +667,7 @@ export async function executeERC3009Transfer(
 }
 
 export function addressToBytes32(address: string): string {
-  if (!ethers.isAddress(address)) throw new Error("Invalid address")
+  if (!isEvmAddressFormat(address)) throw new Error("Invalid address")
   return ethers.zeroPadValue(address, 32)
 }
 
@@ -684,13 +684,13 @@ export function validateAndChecksumAddress(address: string): {
   const trimmed = address.trim()
 
   // Check if it's a valid Ethereum address
-  if (!ethers.isAddress(trimmed)) {
+  if (!isEvmAddressFormat(trimmed)) {
     return { isValid: false, checksumAddress: null, error: "Invalid Ethereum address format" }
   }
 
   try {
     // Get checksummed address
-    const checksumAddress = ethers.getAddress(trimmed)
+    const checksumAddress = safeGetChecksumAddress(trimmed)
     return { isValid: true, checksumAddress }
   } catch (error: any) {
     return { isValid: false, checksumAddress: null, error: error.message || "Failed to validate address" }
