@@ -3,7 +3,7 @@
  */
 
 import { cookies } from "next/headers"
-import { createClient } from "@/lib/supabase/server"
+import { prisma } from "@/lib/prisma"
 import { generateSecureToken, sha256 } from "./crypto"
 import { AUTH_CONFIG } from "./config"
 
@@ -27,8 +27,6 @@ export async function createSession(
     deviceFingerprint?: string
   },
 ): Promise<string> {
-  const supabase = await createClient()
-
   // Generate session token
   const sessionToken = generateSecureToken()
   const tokenHash = await sha256(sessionToken)
@@ -38,16 +36,18 @@ export async function createSession(
   expiresAt.setDate(expiresAt.getDate() + AUTH_CONFIG.session.expiresInDays)
 
   // Store session in database
-  const { error } = await supabase.from("auth_sessions").insert({
-    user_id: userId,
-    session_token_hash: tokenHash,
-    device_fingerprint: metadata?.deviceFingerprint,
-    ip_address: metadata?.ipAddress,
-    user_agent: metadata?.userAgent,
-    expires_at: expiresAt.toISOString(),
-  })
-
-  if (error) {
+  try {
+    await prisma.$executeRawUnsafe(
+      `INSERT INTO auth_sessions (user_id, session_token_hash, device_fingerprint, ip_address, user_agent, expires_at)
+       VALUES ($1, $2, $3, $4, $5, $6)`,
+      userId,
+      tokenHash,
+      metadata?.deviceFingerprint || null,
+      metadata?.ipAddress || null,
+      metadata?.userAgent || null,
+      expiresAt.toISOString(),
+    )
+  } catch (error) {
     console.error("[Auth] Failed to create session:", error)
     throw new Error("Failed to create session")
   }
@@ -76,43 +76,37 @@ export async function getSession(): Promise<Session | null> {
     return null
   }
 
-  const supabase = await createClient()
   const tokenHash = await sha256(sessionToken)
 
-  // Get session from database
-  const { data: session, error } = await supabase
-    .from("auth_sessions")
-    .select(
-      `
-      id,
-      user_id,
-      expires_at,
-      auth_users (
-        id,
-        email,
-        embedded_wallets (
-          address
-        )
-      )
-    `,
-    )
-    .eq("session_token_hash", tokenHash)
-    .gt("expires_at", new Date().toISOString())
-    .single()
+  // Get session from database with user info
+  const rows: any[] = await prisma.$queryRawUnsafe(
+    `SELECT s.id, s.user_id, s.expires_at, u.email, ew.address as wallet_address
+     FROM auth_sessions s
+     JOIN auth_users u ON u.id = s.user_id
+     LEFT JOIN embedded_wallets ew ON ew.user_id = s.user_id
+     WHERE s.session_token_hash = $1 AND s.expires_at > $2
+     LIMIT 1`,
+    tokenHash,
+    new Date().toISOString(),
+  )
 
-  if (error || !session) {
+  if (!rows || rows.length === 0) {
     return null
   }
 
-  // Update last active
-  await supabase.from("auth_sessions").update({ last_active_at: new Date().toISOString() }).eq("id", session.id)
+  const session = rows[0]
 
-  const user = session.auth_users as any
+  // Update last active
+  await prisma.$executeRawUnsafe(
+    `UPDATE auth_sessions SET last_active_at = $1 WHERE id = $2`,
+    new Date().toISOString(),
+    session.id,
+  )
 
   return {
     userId: session.user_id,
-    email: user?.email || "",
-    walletAddress: user?.embedded_wallets?.[0]?.address,
+    email: session.email || "",
+    walletAddress: session.wallet_address,
     expiresAt: new Date(session.expires_at),
   }
 }
@@ -125,11 +119,13 @@ export async function destroySession(): Promise<void> {
   const sessionToken = cookieStore.get(AUTH_CONFIG.session.cookieName)?.value
 
   if (sessionToken) {
-    const supabase = await createClient()
     const tokenHash = await sha256(sessionToken)
 
     // Delete from database
-    await supabase.from("auth_sessions").delete().eq("session_token_hash", tokenHash)
+    await prisma.$executeRawUnsafe(
+      `DELETE FROM auth_sessions WHERE session_token_hash = $1`,
+      tokenHash,
+    )
   }
 
   // Clear cookie

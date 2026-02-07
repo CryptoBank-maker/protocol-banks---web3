@@ -6,7 +6,7 @@
  */
 
 import { type NextRequest, NextResponse } from "next/server"
-import { createClient } from "@/lib/supabase/server"
+import { prisma } from "@/lib/prisma"
 import { generateSecureToken, sha256 } from "@/lib/auth/crypto"
 import { AUTH_CONFIG } from "@/lib/auth/config"
 import { Resend } from "resend"
@@ -25,20 +25,20 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Invalid email format" }, { status: 400 })
     }
 
-    const supabase = await createClient()
-
     // Check rate limiting
     const cooldownTime = new Date()
     cooldownTime.setMinutes(cooldownTime.getMinutes() - AUTH_CONFIG.magicLink.cooldownMinutes)
 
-    const { data: recentLinks } = await supabase
-      .from("magic_links")
-      .select("id")
-      .eq("email", email.toLowerCase())
-      .gt("created_at", cooldownTime.toISOString())
-      .eq("used", false)
+    const recentLinks = await prisma.magicLink.findMany({
+      where: {
+        email: email.toLowerCase(),
+        created_at: { gt: cooldownTime },
+        used: false,
+      },
+      select: { id: true },
+    })
 
-    if (recentLinks && recentLinks.length > 0) {
+    if (recentLinks.length > 0) {
       return NextResponse.json({ error: "Please wait before requesting another link" }, { status: 429 })
     }
 
@@ -55,15 +55,17 @@ export async function POST(request: NextRequest) {
     const userAgent = request.headers.get("user-agent") || "unknown"
 
     // Store magic link in database
-    const { error: insertError } = await supabase.from("magic_links").insert({
-      email: email.toLowerCase(),
-      token_hash: tokenHash,
-      expires_at: expiresAt.toISOString(),
-      ip_address: ipAddress,
-      user_agent: userAgent,
-    })
-
-    if (insertError) {
+    try {
+      await prisma.magicLink.create({
+        data: {
+          email: email.toLowerCase(),
+          token_hash: tokenHash,
+          expires_at: expiresAt,
+          ip_address: ipAddress,
+          user_agent: userAgent,
+        },
+      })
+    } catch (insertError) {
       console.error("[Auth] Failed to create magic link:", insertError)
       return NextResponse.json({ error: "Failed to send magic link" }, { status: 500 })
     }

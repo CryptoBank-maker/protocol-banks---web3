@@ -18,7 +18,6 @@ import {
 } from "@/components/ui/dialog"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Globe, Plus, CheckCircle, XCircle, Trash2, Loader2, ExternalLink, Info } from "lucide-react"
-import { getSupabase } from "@/lib/supabase"
 import { toast } from "sonner"
 
 export const dynamic = "force-dynamic"
@@ -65,19 +64,13 @@ export default function DomainsPage() {
 
   async function fetchDomains() {
     setLoading(true)
-    const supabase = getSupabase()
-    if (!supabase) {
-      setLoading(false)
-      return
-    }
-
-    const { data, error } = await supabase
-      .from("domain_whitelist")
-      .select("*")
-      .order("service_type", { ascending: true })
-
-    if (!error && data) {
-      setDomains(data)
+    try {
+      const stored = localStorage.getItem("admin_domain_whitelist")
+      if (stored) {
+        setDomains(JSON.parse(stored))
+      }
+    } catch (e) {
+      console.error("Failed to load domains:", e)
     }
     setLoading(false)
   }
@@ -89,63 +82,52 @@ export default function DomainsPage() {
     }
 
     setSaving(true)
-    const supabase = getSupabase()
-    if (!supabase) {
+
+    // Check for duplicates
+    if (domains.some((d) => d.domain === domain && d.service_type === serviceType)) {
+      toast.error("Domain already exists")
       setSaving(false)
       return
     }
 
-    const { error } = await supabase.from("domain_whitelist").insert({
+    const newEntry: DomainEntry = {
+      id: crypto.randomUUID(),
       domain,
       service_type: serviceType,
       environment,
       notes: notes || null,
       is_active: true,
-    })
-
-    if (error) {
-      if (error.code === "23505") {
-        toast.error("Domain already exists")
-      } else {
-        toast.error("Failed to add domain")
-      }
-    } else {
-      toast.success("Domain added successfully")
-      setDialogOpen(false)
-      setDomain("")
-      setServiceType("")
-      setEnvironment("production")
-      setNotes("")
-      fetchDomains()
+      created_at: new Date().toISOString(),
+      verified_at: null,
     }
+
+    const updated = [...domains, newEntry]
+    setDomains(updated)
+    localStorage.setItem("admin_domain_whitelist", JSON.stringify(updated))
+
+    toast.success("Domain added successfully")
+    setDialogOpen(false)
+    setDomain("")
+    setServiceType("")
+    setEnvironment("production")
+    setNotes("")
     setSaving(false)
   }
 
   async function deleteDomain(id: string) {
-    const supabase = getSupabase()
-    if (!supabase) return
-
-    const { error } = await supabase.from("domain_whitelist").delete().eq("id", id)
-
-    if (!error) {
-      toast.success("Domain removed")
-      fetchDomains()
-    }
+    const updated = domains.filter((d) => d.id !== id)
+    setDomains(updated)
+    localStorage.setItem("admin_domain_whitelist", JSON.stringify(updated))
+    toast.success("Domain removed")
   }
 
   async function verifyDomain(id: string) {
-    const supabase = getSupabase()
-    if (!supabase) return
-
-    const { error } = await supabase
-      .from("domain_whitelist")
-      .update({ verified_at: new Date().toISOString() })
-      .eq("id", id)
-
-    if (!error) {
-      toast.success("Domain marked as verified")
-      fetchDomains()
-    }
+    const updated = domains.map((d) =>
+      d.id === id ? { ...d, verified_at: new Date().toISOString() } : d,
+    )
+    setDomains(updated)
+    localStorage.setItem("admin_domain_whitelist", JSON.stringify(updated))
+    toast.success("Domain marked as verified")
   }
 
   function getServiceConfig(type: string) {

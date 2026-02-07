@@ -5,7 +5,6 @@ import type React from "react"
 import type { Vendor } from "@/types/vendor"
 import { useState, useMemo, useRef, useEffect, useCallback } from "react"
 import { ExternalLink, ZoomIn, ZoomOut, RotateCcw, Search } from "lucide-react"
-import { createBrowserClient } from "@supabase/ssr"
 import { useMediaQuery } from "@/hooks/use-media-query"
 import { useTheme } from "next-themes"
 import { Drawer, DrawerContent, DrawerHeader, DrawerTitle } from "@/components/ui/drawer"
@@ -78,10 +77,6 @@ export function NetworkGraph({
   const [selectedNode, setSelectedNode] = useState<Node | null>(null)
 
   const initialSetupDone = useRef(false)
-
-  const supabase = useMemo(() => {
-    return createBrowserClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!)
-  }, [])
 
   const { nodes, edges } = useMemo(() => {
     if (!vendors.length) {
@@ -293,23 +288,18 @@ export function NetworkGraph({
 
     const position = customPositions[draggingNode]
     if (position && userAddress) {
-      await supabase.from("node_positions").upsert(
-        {
-          user_address: userAddress,
-          vendor_id: draggingNode,
-          x: position.x,
-          y: position.y,
-          node_type: nodes.find((n) => n.id === draggingNode)?.type || "vendor",
-          updated_at: new Date().toISOString(),
-        },
-        {
-          onConflict: "user_address,vendor_id",
-        },
-      )
+      try {
+        const storageKey = `node_positions_${userAddress}`
+        const existing = JSON.parse(localStorage.getItem(storageKey) || "{}")
+        existing[draggingNode] = { x: position.x, y: position.y }
+        localStorage.setItem(storageKey, JSON.stringify(existing))
+      } catch (e) {
+        console.error("Failed to save node position:", e)
+      }
     }
 
     setDraggingNode(null)
-  }, [draggingNode, customPositions, userAddress, supabase])
+  }, [draggingNode, customPositions, userAddress])
 
   useEffect(() => {
     if (draggingNode) {
@@ -325,7 +315,11 @@ export function NetworkGraph({
   const handleResetLayout = async () => {
     setCustomPositions({})
     if (userAddress) {
-      await supabase.from("node_positions").delete().eq("user_address", userAddress)
+      try {
+        localStorage.removeItem(`node_positions_${userAddress}`)
+      } catch (e) {
+        console.error("Failed to clear node positions:", e)
+      }
     }
   }
 
@@ -406,22 +400,20 @@ export function NetworkGraph({
   useEffect(() => {
     if (!userAddress) return
 
-    const loadPositions = async () => {
-      const { data } = await supabase.from("node_positions").select("vendor_id, x, y").eq("user_address", userAddress)
-
-      if (data && data.length > 0) {
-        const positions: Record<string, { x: number; y: number }> = {}
-        data.forEach((item) => {
-          if (item.vendor_id) {
-            positions[item.vendor_id] = { x: Number(item.x), y: Number(item.y) }
-          }
-        })
-        setCustomPositions(positions)
+    const loadPositions = () => {
+      try {
+        const storageKey = `node_positions_${userAddress}`
+        const stored = JSON.parse(localStorage.getItem(storageKey) || "{}")
+        if (Object.keys(stored).length > 0) {
+          setCustomPositions(stored)
+        }
+      } catch (e) {
+        console.error("Failed to load node positions:", e)
       }
     }
 
     loadPositions()
-  }, [userAddress, supabase])
+  }, [userAddress])
 
   const showEmptyState = !isDemoMode && vendors.length === 0
 

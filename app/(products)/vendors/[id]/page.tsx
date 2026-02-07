@@ -9,7 +9,7 @@ import { Badge } from "@/components/ui/badge"
 import { ArrowLeft, Send, Copy, ExternalLink, Building2, Mail, Calendar, Wallet, TrendingUp, Activity, History } from "lucide-react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
-import { getSupabase } from "@/lib/supabase"
+import { authHeaders } from "@/lib/authenticated-fetch"
 import { useToast } from "@/hooks/use-toast"
 import type { Vendor } from "@/types/vendor"
 import { getVendorDisplayName } from "@/lib/utils"
@@ -93,20 +93,20 @@ export default function VendorDetailPage({ params }: { params: Promise<{ id: str
         return
       }
 
-      // Then try database if connected
+      // Then try database via API if connected
       if (wallet && !isDemoMode) {
         try {
-          const supabase = getSupabase()
-          const { data, error } = await supabase
-            .from("vendors")
-            .select("*")
-            .eq("id", id)
-            .single()
-
-          if (data && !error) {
-            setVendor(data)
-            setLoading(false)
-            return
+          const res = await fetch(`/api/vendors/${id}`, {
+            headers: authHeaders(wallet),
+          })
+          if (res.ok) {
+            const data = await res.json()
+            const vendorData = data.vendor || data
+            if (vendorData && vendorData.id) {
+              setVendor(vendorData)
+              setLoading(false)
+              return
+            }
           }
         } catch (error) {
           console.error("Error fetching vendor:", error)

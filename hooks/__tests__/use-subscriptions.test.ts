@@ -256,7 +256,7 @@ describe("useSubscriptions Property Tests", () => {
   /**
    * Property 2: Subscriptions Hook REST API 迁移正确性
    * For any subscription operation (load, create, update, delete), useSubscriptions Hook
-   * should call REST API instead of direct Supabase, and properly handle errors and retry.
+   * should call REST API instead of direct Prisma, and properly handle errors and retry.
    * Validates: Requirements 2.1, 2.2, 2.3, 2.4, 2.6
    */
   it("Property 2: Create operation always calls POST with correct endpoint", async () => {

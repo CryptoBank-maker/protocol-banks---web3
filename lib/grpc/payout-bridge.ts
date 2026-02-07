@@ -6,7 +6,7 @@
  */
 
 import { getPayoutEngineClient, isGoServicesEnabled, type BatchPayoutRequest, type BatchPayoutResponse } from "./client"
-import { createClient } from "@/lib/supabase/client"
+import { prisma } from "@/lib/prisma"
 
 interface PaymentRecipient {
   address: string
@@ -47,17 +47,18 @@ export async function submitBatchPayment(
   const batchId = `batch_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
 
   // Record batch in database
-  const supabase = createClient()
-  await supabase.from("batch_payments").insert({
-    id: batchId,
-    user_id: userId,
-    sender_address: senderAddress,
-    total_recipients: recipients.length,
-    status: "pending",
-    use_multisig: options.useMultisig || false,
-    multisig_wallet_id: options.multisigWalletId,
-    created_at: new Date().toISOString(),
-  })
+  await prisma.$executeRawUnsafe(
+    `INSERT INTO batch_payments (id, user_id, sender_address, total_recipients, status, use_multisig, multisig_wallet_id, created_at)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+    batchId,
+    userId,
+    senderAddress,
+    recipients.length,
+    "pending",
+    options.useMultisig || false,
+    options.multisigWalletId || null,
+    new Date().toISOString(),
+  )
 
   if (isGoServicesEnabled()) {
     return submitViaGoService(batchId, userId, senderAddress, recipients, options)
@@ -165,15 +166,19 @@ export async function getBatchPaymentStatus(batchId: string, userId: string): Pr
   }
 
   // Fallback: read from database
-  const supabase = createClient()
-  const { data, error } = await supabase
-    .from("batch_payments")
-    .select("*, batch_payment_items(*)")
-    .eq("id", batchId)
-    .eq("user_id", userId)
-    .single()
+  const rows: any[] = await prisma.$queryRawUnsafe(
+    `SELECT bp.*, json_agg(bpi.*) as items
+     FROM batch_payments bp
+     LEFT JOIN batch_payment_items bpi ON bpi.batch_payment_id = bp.id
+     WHERE bp.id = $1 AND bp.user_id = $2
+     GROUP BY bp.id`,
+    batchId,
+    userId,
+  )
 
-  if (error || !data) return null
+  if (!rows || rows.length === 0) return null
+
+  const data = rows[0]
 
   return {
     batchId: data.id,
@@ -181,7 +186,7 @@ export async function getBatchPaymentStatus(batchId: string, userId: string): Pr
     totalRecipients: data.total_recipients,
     successCount: data.success_count || 0,
     failureCount: data.failure_count || 0,
-    transactions: (data.batch_payment_items || []).map((item: any) => ({
+    transactions: (data.items?.[0] ? data.items : []).map((item: any) => ({
       address: item.recipient_address,
       txHash: item.tx_hash || "",
       status: item.status,
@@ -203,15 +208,17 @@ export async function cancelBatchPayment(
   }
 
   // TypeScript fallback: just update database status
-  const supabase = createClient()
-  const { error } = await supabase
-    .from("batch_payments")
-    .update({ status: "cancelled", cancelled_at: new Date().toISOString() })
-    .eq("id", batchId)
-    .eq("user_id", userId)
-    .eq("status", "pending")
+  const result = await prisma.$executeRawUnsafe(
+    `UPDATE batch_payments SET status = $1, cancelled_at = $2
+     WHERE id = $3 AND user_id = $4 AND status = $5`,
+    "cancelled",
+    new Date().toISOString(),
+    batchId,
+    userId,
+    "pending",
+  )
 
-  if (error) {
+  if (result === 0) {
     return { success: false, message: "Cannot cancel batch that is already processing" }
   }
 

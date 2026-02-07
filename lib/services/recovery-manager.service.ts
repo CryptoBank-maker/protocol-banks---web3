@@ -3,6 +3,8 @@
  * Handles retry logic for failed transactions
  */
 
+import prisma from '@/lib/prisma'
+
 export interface FailedItem {
   id: string
   recipient: string
@@ -165,34 +167,22 @@ export function createFailedItem(
  * Store failed items for later recovery
  */
 export async function storeFailedItems(
-  items: FailedItem[],
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  supabase?: any
+  items: FailedItem[]
 ): Promise<{ success: boolean; error?: string }> {
-  if (!supabase) {
-    // Store in localStorage for development
-    const existing = JSON.parse(localStorage.getItem('failedItems') || '[]')
-    localStorage.setItem('failedItems', JSON.stringify([...existing, ...items]))
-    return { success: true }
-  }
-  
   try {
-    const { error } = await supabase
-      .from('failed_transactions')
-      .insert(
-        items.map(item => ({
-          id: item.id,
-          recipient: item.recipient,
-          amount: item.amount,
-          token: item.token,
-          error: item.error,
-          attempts: item.attempts,
-          last_attempt: new Date(item.lastAttempt).toISOString(),
-          original_batch_id: item.originalBatchId,
-        }))
-      )
+    await prisma.failedTransaction.createMany({
+      data: items.map(item => ({
+        id: item.id,
+        recipient: item.recipient,
+        amount: item.amount,
+        token: item.token,
+        error: item.error,
+        attempts: item.attempts,
+        last_attempt: new Date(item.lastAttempt),
+        original_batch_id: item.originalBatchId,
+      })),
+    })
     
-    if (error) throw error
     return { success: true }
   } catch (err) {
     return { success: false, error: String(err) }
@@ -203,43 +193,25 @@ export async function storeFailedItems(
  * Get pending failed items for recovery
  */
 export async function getPendingFailedItems(
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  supabase?: any,
   config: RecoveryConfig = DEFAULT_CONFIG
 ): Promise<FailedItem[]> {
-  if (!supabase) {
-    // Get from localStorage for development
-    const items = JSON.parse(localStorage.getItem('failedItems') || '[]')
-    return items.filter((item: FailedItem) => shouldRetry(item, config))
-  }
-  
   try {
-    const { data, error } = await supabase
-      .from('failed_transactions')
-      .select('*')
-      .lt('attempts', config.maxAttempts)
-      .order('created_at', { ascending: true })
+    const data = await prisma.failedTransaction.findMany({
+      where: {
+        attempts: { lt: config.maxAttempts },
+      },
+      orderBy: { created_at: 'asc' },
+    })
     
-    if (error) throw error
-    
-    return data.map((row: {
-      id: string
-      recipient: string
-      amount: number
-      token: string
-      error: string
-      attempts: number
-      last_attempt: string
-      original_batch_id?: string
-    }) => ({
+    return data.map((row) => ({
       id: row.id,
       recipient: row.recipient,
       amount: row.amount,
       token: row.token,
       error: row.error,
       attempts: row.attempts,
-      lastAttempt: new Date(row.last_attempt).getTime(),
-      originalBatchId: row.original_batch_id,
+      lastAttempt: row.last_attempt ? new Date(row.last_attempt).getTime() : Date.now(),
+      originalBatchId: row.original_batch_id ?? undefined,
     }))
   } catch (err) {
     console.error('[RecoveryManager] Failed to get pending items:', err)

@@ -4,7 +4,8 @@
  */
 
 import { NextRequest, NextResponse } from "next/server"
-import { createClient } from "@/lib/supabase/server"
+import { prisma } from "@/lib/prisma"
+import { getAuthenticatedAddress } from "@/lib/api-auth"
 
 interface RouteParams {
   params: Promise<{ id: string }>
@@ -14,38 +15,22 @@ interface RouteParams {
 export async function GET(request: NextRequest, { params }: RouteParams) {
   try {
     const { id: subscriptionId } = await params
-    const supabase = await createClient()
 
-    // Get user from session
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
-    if (authError || !user) {
+    const walletAddress = await getAuthenticatedAddress(request)
+    if (!walletAddress) {
       return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 })
     }
 
-    // Get owner_address
-    const { data: authUser } = await supabase
-      .from("auth_users")
-      .select("wallet_address")
-      .eq("id", user.id)
-      .single()
-
-    const ownerAddress = authUser?.wallet_address
-    if (!ownerAddress) {
-      return NextResponse.json({ success: false, error: "No wallet associated" }, { status: 400 })
-    }
-
     // Verify the subscription belongs to this user
-    const { data: subscription, error: subError } = await supabase
-      .from("subscriptions")
-      .select("id, owner_address")
-      .eq("id", subscriptionId)
-      .single()
+    const subscription = await prisma.subscription.findFirst({
+      where: { id: subscriptionId },
+    })
 
-    if (subError || !subscription) {
+    if (!subscription) {
       return NextResponse.json({ success: false, error: "Subscription not found" }, { status: 404 })
     }
 
-    if (subscription.owner_address.toLowerCase() !== ownerAddress.toLowerCase()) {
+    if (subscription.owner_address.toLowerCase() !== walletAddress.toLowerCase()) {
       return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 403 })
     }
 
@@ -54,27 +39,27 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     const limit = Math.min(parseInt(searchParams.get("limit") || "50"), 100)
     const offset = parseInt(searchParams.get("offset") || "0")
 
-    // Fetch payment history
-    const { data: payments, error, count } = await supabase
-      .from("subscription_payments")
-      .select("*", { count: "exact" })
-      .eq("subscription_id", subscriptionId)
-      .order("created_at", { ascending: false })
-      .range(offset, offset + limit - 1)
+    // Fetch payment history and count in parallel
+    const where = { subscription_id: subscriptionId }
 
-    if (error) {
-      console.error("[SubscriptionPayments] Failed to fetch:", error)
-      return NextResponse.json({ success: false, error: "Failed to fetch payment history" }, { status: 500 })
-    }
+    const [payments, total] = await Promise.all([
+      prisma.subscriptionPayment.findMany({
+        where,
+        orderBy: { created_at: "desc" },
+        skip: offset,
+        take: limit,
+      }),
+      prisma.subscriptionPayment.count({ where }),
+    ])
 
     return NextResponse.json({
       success: true,
-      payments: payments || [],
+      payments,
       pagination: {
-        total: count || 0,
+        total,
         limit,
         offset,
-        hasMore: (count || 0) > offset + limit,
+        hasMore: total > offset + limit,
       },
     })
   } catch (error) {

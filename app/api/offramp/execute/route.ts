@@ -6,8 +6,7 @@
  */
 
 import { type NextRequest, NextResponse } from "next/server"
-import { createServerClient } from "@supabase/ssr"
-import { cookies } from "next/headers"
+import { prisma } from "@/lib/prisma"
 import crypto from "crypto"
 import { getAuthenticatedAddress } from "@/lib/api-auth"
 
@@ -88,41 +87,19 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Invalid wallet address" }, { status: 400 })
     }
 
-    // Create Supabase client
-    const cookieStore = await cookies()
-    const supabase = createServerClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!,
-      {
-        cookies: {
-          getAll() {
-            return cookieStore.getAll()
-          },
-          setAll(cookiesToSet) {
-            cookiesToSet.forEach(({ name, value, options }) => {
-              cookieStore.set(name, value, options)
-            })
-          },
-        },
-      },
-    )
-
     // Generate transaction ID
     const transactionId = `OFR-${Date.now().toString(36).toUpperCase()}-${crypto.randomBytes(4).toString("hex").toUpperCase()}`
 
     let providerResponse: any = null
     let providerOrderId: string | null = null
-    let depositAddress: string | null = null
 
     // Execute based on provider
     if (provider === "bridge" && PROVIDERS.bridge.enabled) {
       providerResponse = await executeBridgeOfframp(body)
       providerOrderId = providerResponse?.id
-      depositAddress = providerResponse?.source_deposit_instructions?.deposit_address
     } else if (provider === "coinbase" && PROVIDERS.coinbase.enabled) {
       providerResponse = await executeCoinbaseOfframp(body)
       providerOrderId = providerResponse?.order_id
-      depositAddress = providerResponse?.deposit_address
     } else if (provider === "transak" && PROVIDERS.transak.enabled) {
       providerResponse = await executeTransakOfframp(body)
       providerOrderId = providerResponse?.order_id
@@ -131,30 +108,29 @@ export async function POST(request: NextRequest) {
       providerResponse = {
         id: `mock_${crypto.randomUUID().slice(0, 8)}`,
         status: "pending",
-        deposit_address: "0x742d35Cc6634C0532925a3b844Bc9e7595f2bD75",
       }
       providerOrderId = providerResponse.id
-      depositAddress = providerResponse.deposit_address
     }
 
     // Record transaction in database
     try {
-      await supabase.from("offramp_transactions").insert({
-        transaction_id: transactionId,
-        wallet_address: walletAddress.toLowerCase(),
-        provider: provider,
-        provider_order_id: providerOrderId,
-        source_amount: parseFloat(sourceAmount),
-        source_token: sourceToken,
-        source_chain: sourceChain,
-        target_amount: parseFloat(targetAmount),
-        target_currency: targetCurrency,
-        payment_method: paymentMethod,
-        status: "pending",
-        deposit_address: depositAddress,
-        tx_hash: txHash,
-        quote_id: quoteId,
-        bank_reference: bankDetails ? JSON.stringify(bankDetails) : null,
+      await prisma.offrampTransaction.create({
+        data: {
+          reference_id: transactionId,
+          wallet_address: walletAddress.toLowerCase(),
+          provider: provider,
+          provider_tx_id: providerOrderId,
+          crypto_amount: parseFloat(sourceAmount),
+          token: sourceToken,
+          chain_id: sourceChain,
+          fiat_amount: parseFloat(targetAmount),
+          fiat_currency: targetCurrency,
+          payout_method: paymentMethod,
+          status: "pending",
+          tx_hash: txHash,
+          quote_id: quoteId,
+          bank_details: bankDetails ? JSON.stringify(bankDetails) : null,
+        },
       })
     } catch (dbError) {
       console.warn("[Offramp] DB recording failed:", dbError)
@@ -164,16 +140,13 @@ export async function POST(request: NextRequest) {
       success: true,
       transactionId,
       providerOrderId,
-      depositAddress,
       status: "pending",
       provider,
       sourceAmount,
       sourceToken,
       targetAmount,
       targetCurrency,
-      message: depositAddress
-        ? `Please send ${sourceAmount} ${sourceToken} to ${depositAddress}`
-        : "Transaction initiated. Check status for updates.",
+      message: "Transaction initiated. Check status for updates.",
     })
   } catch (error: any) {
     console.error("[Offramp] Execution error:", error)
@@ -274,43 +247,22 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "transactionId required" }, { status: 400 })
     }
 
-    const cookieStore = await cookies()
-    const supabase = createServerClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!,
-      {
-        cookies: {
-          getAll() {
-            return cookieStore.getAll()
-          },
-          setAll(cookiesToSet) {
-            cookiesToSet.forEach(({ name, value, options }) => {
-              cookieStore.set(name, value, options)
-            })
-          },
-        },
-      },
-    )
+    const data = await prisma.offrampTransaction.findUnique({
+      where: { reference_id: transactionId },
+    })
 
-    const { data, error } = await supabase
-      .from("offramp_transactions")
-      .select("*")
-      .eq("transaction_id", transactionId)
-      .single()
-
-    if (error || !data) {
+    if (!data) {
       return NextResponse.json({ error: "Transaction not found" }, { status: 404 })
     }
 
     return NextResponse.json({
-      transactionId: data.transaction_id,
+      transactionId: data.reference_id,
       status: data.status,
       provider: data.provider,
-      sourceAmount: data.source_amount,
-      sourceToken: data.source_token,
-      targetAmount: data.target_amount,
-      targetCurrency: data.target_currency,
-      depositAddress: data.deposit_address,
+      sourceAmount: data.crypto_amount,
+      sourceToken: data.token,
+      targetAmount: data.fiat_amount,
+      targetCurrency: data.fiat_currency,
       txHash: data.tx_hash,
       createdAt: data.created_at,
     })

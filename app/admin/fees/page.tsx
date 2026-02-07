@@ -28,7 +28,6 @@ import {
   BarChart3,
 } from "lucide-react"
 import { useUnifiedWallet } from "@/hooks/use-unified-wallet"
-import { getSupabase } from "@/lib/supabase"
 import { formatFee } from "@/lib/protocol-fees"
 
 interface FeeStats {
@@ -83,72 +82,30 @@ export default function AdminFeesPage() {
   async function loadData() {
     setLoading(true)
     try {
-      const supabase = getSupabase()
-      if (!supabase) {
-        setLoading(false)
-        return
-      }
-
-      // Calculate date range
-      let startDate = new Date()
-      switch (dateRange) {
-        case "7d":
-          startDate.setDate(startDate.getDate() - 7)
-          break
-        case "30d":
-          startDate.setDate(startDate.getDate() - 30)
-          break
-        case "90d":
-          startDate.setDate(startDate.getDate() - 90)
-          break
-        case "all":
-          startDate = new Date(0)
-          break
-      }
-
-      // Fetch fee stats using RPC
-      const { data: statsData } = await supabase.rpc("get_protocol_fee_stats", {
-        p_wallet: null,
-        p_start_date: startDate.toISOString(),
-        p_end_date: new Date().toISOString(),
-      })
-
-      if (statsData && statsData.length > 0) {
-        setStats({
-          totalFeesCollected: Number(statsData[0].total_fees_collected) || 0,
-          totalTransactionVolume: Number(statsData[0].total_transaction_volume) || 0,
-          transactionCount: Number(statsData[0].transaction_count) || 0,
-          averageFeeRate: Number(statsData[0].average_fee_rate) || 0,
-          pendingFees: Number(statsData[0].pending_fees) || 0,
-          collectedFees: Number(statsData[0].collected_fees) || 0,
-        })
-      }
-
-      // Fetch recent fees
-      const { data: feesData } = await supabase
-        .from("protocol_fees")
-        .select("*")
-        .order("created_at", { ascending: false })
-        .limit(50)
-
-      if (feesData) {
-        setRecentFees(feesData)
-      }
-
-      // Fetch fee config
-      const { data: configData } = await supabase.from("fee_config").select("*")
-
-      if (configData) {
-        setFeeConfig(configData)
-
-        // Set editing values from config
-        const baseConfig = configData.find((c: { config_key: string; config_value: { rate?: number; min_fee_usd?: number; max_fee_usd?: number } }) => c.config_key === "base_fee_rate")
-        if (baseConfig) {
-          setNewBaseRate(String(baseConfig.config_value.rate || 0.001))
-          setNewMinFee(String(baseConfig.config_value.min_fee_usd || 0.5))
-          setNewMaxFee(String(baseConfig.config_value.max_fee_usd || 500))
+      // Load fee config from localStorage (no dedicated API route exists yet)
+      const storedConfig = localStorage.getItem("admin_fee_config")
+      if (storedConfig) {
+        try {
+          const parsed = JSON.parse(storedConfig)
+          if (parsed.baseRate) setNewBaseRate(parsed.baseRate)
+          if (parsed.minFee) setNewMinFee(parsed.minFee)
+          if (parsed.maxFee) setNewMaxFee(parsed.maxFee)
+          if (parsed.feeConfig) setFeeConfig(parsed.feeConfig)
+        } catch (e) {
+          console.error("Failed to parse stored fee config:", e)
         }
       }
+
+      // Stats and recent fees will be empty until dedicated API routes exist
+      setStats({
+        totalFeesCollected: 0,
+        totalTransactionVolume: 0,
+        transactionCount: 0,
+        averageFeeRate: 0.001,
+        pendingFees: 0,
+        collectedFees: 0,
+      })
+      setRecentFees([])
     } catch (error) {
       console.error("Error loading fee data:", error)
     } finally {
@@ -164,23 +121,24 @@ export default function AdminFeesPage() {
 
   async function updateFeeConfig() {
     try {
-      const supabase = getSupabase()
-      if (!supabase) return
-
-      const { error } = await supabase
-        .from("fee_config")
-        .update({
+      // Save fee config to localStorage (no dedicated API route exists yet)
+      const config = {
+        baseRate: newBaseRate,
+        minFee: newMinFee,
+        maxFee: newMaxFee,
+        feeConfig: [{
+          config_key: "base_fee_rate",
           config_value: {
             rate: Number(newBaseRate),
             min_fee_usd: Number(newMinFee),
             max_fee_usd: Number(newMaxFee),
           },
-          updated_by: address || "admin",
-          updated_at: new Date().toISOString(),
-        })
-        .eq("config_key", "base_fee_rate")
-
-      if (error) throw error
+          description: "Base protocol fee rate configuration",
+        }],
+        updatedBy: address || "admin",
+        updatedAt: new Date().toISOString(),
+      }
+      localStorage.setItem("admin_fee_config", JSON.stringify(config))
 
       setEditingConfig(null)
       await loadData()

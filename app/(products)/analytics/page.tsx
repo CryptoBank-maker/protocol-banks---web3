@@ -188,7 +188,7 @@ export default function AnalyticsPage() {
           }
         } catch (err) {
           console.error("[Analytics] Failed to fetch external transactions:", err)
-          // Continue with just Supabase data if external fetch fails
+          // Continue with just Prisma data if external fetch fails
         }
       }
 

@@ -3,23 +3,23 @@ generator client {
 }
 
 datasource db {
-  provider  = "postgresql"
+  provider = "postgresql"
 }
 
 model BatchJob {
-  id            String       @id @default(uuid())
+  id            String   @id @default(uuid())
   user_id       String
-  status        String       @default("QUEUED")
-  total_lines   Int          @default(0)
-  parsed_count  Int          @default(0)
-  invalid_count Int          @default(0)
-  chunks        Int          @default(0)
+  status        String   @default("QUEUED")
+  total_lines   Int      @default(0)
+  parsed_count  Int      @default(0)
+  invalid_count Int      @default(0)
+  chunks        Int      @default(0)
   error_message String?
   file_url      String?
-  created_at    DateTime     @default(now())
-  updated_at    DateTime     @updatedAt
+  created_at    DateTime @default(now())
+  updated_at    DateTime @updatedAt
 
-  batch_chunks  BatchChunk[]
+  batch_chunks BatchChunk[]
 
   @@map("batch_jobs")
 }
@@ -34,7 +34,7 @@ model BatchChunk {
   created_at      DateTime @default(now())
   updated_at      DateTime @updatedAt
 
-  job             BatchJob @relation(fields: [job_id], references: [id], onDelete: Cascade)
+  job BatchJob @relation(fields: [job_id], references: [id], onDelete: Cascade)
 
   @@index([job_id])
   @@map("batch_chunks")
@@ -71,8 +71,8 @@ model Payment {
   token_symbol String?
   chain        String
   status       String    @default("pending")
-  type         String    // "sent" | "received"
-  method       String?   // "eip3009" | "direct" | "batch"
+  type         String // "sent" | "received"
+  method       String? // "eip3009" | "direct" | "batch"
   tx_hash      String?
   created_at   DateTime  @default(now())
   completed_at DateTime?
@@ -86,9 +86,9 @@ model Payment {
   tags         String[]  @default([])
   vendor_id    String?
 
-  group_id     String?
-  vendor       Vendor?   @relation(fields: [vendor_id], references: [id])
-  group        PaymentGroup? @relation(fields: [group_id], references: [id])
+  group_id String?
+  vendor   Vendor?       @relation(fields: [vendor_id], references: [id])
+  group    PaymentGroup? @relation(fields: [group_id], references: [id])
 
   @@index([created_by])
   @@index([status])
@@ -99,19 +99,19 @@ model Payment {
 }
 
 model PaymentGroup {
-  id            String    @id @default(uuid())
+  id            String   @id @default(uuid())
   name          String
   description   String?
   owner_address String
   purpose       String?
-  tags          String[]  @default([])
-  total_amount  String    @default("0")
-  payment_count Int       @default(0)
-  status        String    @default("open")
-  created_at    DateTime  @default(now())
-  updated_at    DateTime  @updatedAt
+  tags          String[] @default([])
+  total_amount  String   @default("0")
+  payment_count Int      @default(0)
+  status        String   @default("open")
+  created_at    DateTime @default(now())
+  updated_at    DateTime @updatedAt
 
-  payments      Payment[]
+  payments Payment[]
 
   @@index([owner_address])
   @@index([status])
@@ -119,28 +119,28 @@ model PaymentGroup {
 }
 
 model Vendor {
-  id                String    @id @default(uuid())
-  name              String
-  wallet_address    String
-  owner_address     String
-  ens_name          String?
-  company_name      String?
-  category          String?
-  tier              String?   @default("vendor") // "subsidiary" | "partner" | "vendor"
-  chain             String?   @default("Ethereum")
-  last_chain        String?   // Last chain used for payment
-  last_wallet_type  String?   // Last wallet type used (MetaMask, Safe, etc.)
-  email             String?
-  contact_email     String?
-  contact_name      String?
-  notes             String?
-  tags              String[]  @default([])
-  reputation_tag    String?   // "whale" | "active" | "newbie" | "inactive"
-  monthly_volume    String?
-  transaction_count Int       @default(0)
-  on_chain_balance  Float?    @default(0)
-  ltv               Float?    @default(0)
-  last_payment_at   DateTime?
+  id                       String    @id @default(uuid())
+  name                     String
+  wallet_address           String
+  owner_address            String
+  ens_name                 String?
+  company_name             String?
+  category                 String?
+  tier                     String?   @default("vendor") // "subsidiary" | "partner" | "vendor"
+  chain                    String?   @default("Ethereum")
+  last_chain               String? // Last chain used for payment
+  last_wallet_type         String? // Last wallet type used (MetaMask, Safe, etc.)
+  email                    String?
+  contact_email            String?
+  contact_name             String?
+  notes                    String?
+  tags                     String[]  @default([])
+  reputation_tag           String? // "whale" | "active" | "newbie" | "inactive"
+  monthly_volume           String?
+  transaction_count        Int       @default(0)
+  on_chain_balance         Float?    @default(0)
+  ltv                      Float?    @default(0)
+  last_payment_at          DateTime?
   integrity_hash           String?
   created_by               String?
   address_changed_at       DateTime?
@@ -148,7 +148,7 @@ model Vendor {
   created_at               DateTime  @default(now())
   updated_at               DateTime  @updatedAt
 
-  payments          Payment[]
+  payments Payment[]
 
   @@index([owner_address])
   @@index([created_by])
@@ -157,24 +157,24 @@ model Vendor {
 }
 
 model ApiKey {
-  id                    String   @id @default(uuid())
+  id                    String    @id @default(uuid())
   name                  String
-  key_hash              String   @unique
+  key_hash              String    @unique
   key_prefix            String
   owner_address         String
-  permissions           String[]  // Array of permissions
-  rate_limit_per_minute Int      @default(60)
-  rate_limit_per_day    Int      @default(10000)
-  allowed_ips           String[] @default([])
-  allowed_origins       String[] @default([])
-  usage_count           Int      @default(0)
-  is_active             Boolean  @default(true)
+  permissions           String[] // Array of permissions
+  rate_limit_per_minute Int       @default(60)
+  rate_limit_per_day    Int       @default(10000)
+  allowed_ips           String[]  @default([])
+  allowed_origins       String[]  @default([])
+  usage_count           Int       @default(0)
+  is_active             Boolean   @default(true)
   expires_at            DateTime?
   last_used_at          DateTime?
-  created_at            DateTime @default(now())
-  updated_at            DateTime @updatedAt
-  
-  usage_logs            ApiKeyUsageLog[]
+  created_at            DateTime  @default(now())
+  updated_at            DateTime  @updatedAt
+
+  usage_logs ApiKeyUsageLog[]
 
   @@index([key_prefix])
   @@index([owner_address])
@@ -192,18 +192,18 @@ model ApiKeyUsageLog {
   user_agent       String?
   created_at       DateTime @default(now())
 
-  api_key          ApiKey   @relation(fields: [api_key_id], references: [id], onDelete: Cascade)
+  api_key ApiKey @relation(fields: [api_key_id], references: [id], onDelete: Cascade)
 
   @@index([api_key_id])
   @@map("api_key_usage_logs")
 }
 
 model NotificationPreference {
-  id              String   @id @default(uuid())
-  user_address    String   @unique
-  preferences     Json     // Stores all boolean flags
-  created_at      DateTime @default(now())
-  updated_at      DateTime @updatedAt
+  id           String   @id @default(uuid())
+  user_address String   @unique
+  preferences  Json // Stores all boolean flags
+  created_at   DateTime @default(now())
+  updated_at   DateTime @updatedAt
 
   @@map("notification_preferences")
 }
@@ -221,107 +221,107 @@ model PushSubscription {
 }
 
 model Webhook {
-  id              String            @id @default(uuid())
-  name            String
-  url             String
-  owner_address   String
-  events          String[]
-  secret_hash     String
-  is_active       Boolean           @default(true)
-  retry_count     Int               @default(3)
-  timeout_ms      Int               @default(30000)
-  created_at      DateTime          @default(now())
-  updated_at      DateTime          @updatedAt
+  id            String   @id @default(uuid())
+  name          String
+  url           String
+  owner_address String
+  events        String[]
+  secret_hash   String
+  is_active     Boolean  @default(true)
+  retry_count   Int      @default(3)
+  timeout_ms    Int      @default(30000)
+  created_at    DateTime @default(now())
+  updated_at    DateTime @updatedAt
 
-  deliveries      WebhookDelivery[]
+  deliveries WebhookDelivery[]
 
   @@index([owner_address])
   @@map("webhooks")
 }
 
 model WebhookDelivery {
-  id                String    @id @default(uuid())
-  webhook_id        String
-  event_type        String
-  payload           Json
-  status            String    @default("pending")
-  attempts          Int       @default(0)
-  last_attempt_at   DateTime?
-  next_retry_at     DateTime?
-  response_status   Int?
-  response_body     String?
-  error_message     String?
-  created_at        DateTime  @default(now())
-  delivered_at      DateTime?
+  id              String    @id @default(uuid())
+  webhook_id      String
+  event_type      String
+  payload         Json
+  status          String    @default("pending")
+  attempts        Int       @default(0)
+  last_attempt_at DateTime?
+  next_retry_at   DateTime?
+  response_status Int?
+  response_body   String?
+  error_message   String?
+  created_at      DateTime  @default(now())
+  delivered_at    DateTime?
 
-  webhook           Webhook   @relation(fields: [webhook_id], references: [id], onDelete: Cascade)
+  webhook Webhook @relation(fields: [webhook_id], references: [id], onDelete: Cascade)
 
   @@index([webhook_id])
   @@map("webhook_deliveries")
 }
 
 model Team {
-  id          String       @id @default(uuid())
-  name        String
-  description String?
+  id            String   @id @default(uuid())
+  name          String
+  description   String?
   owner_address String
-  created_at  DateTime     @default(now())
-  updated_at  DateTime     @updatedAt
+  created_at    DateTime @default(now())
+  updated_at    DateTime @updatedAt
 
-  members     TeamMember[]
-  audit_logs  TeamAuditLog[]
+  members    TeamMember[]
+  audit_logs TeamAuditLog[]
 
   @@map("teams")
 }
 
 model TeamMember {
-  id              String    @id @default(uuid())
-  team_id         String
-  member_address  String
-  role            String
-  status          String
-  invited_by      String
-  invited_at      DateTime  @default(now())
-  accepted_at     DateTime?
+  id             String    @id @default(uuid())
+  team_id        String
+  member_address String
+  role           String
+  status         String
+  invited_by     String
+  invited_at     DateTime  @default(now())
+  accepted_at    DateTime?
 
-  team            Team      @relation(fields: [team_id], references: [id], onDelete: Cascade)
+  team Team @relation(fields: [team_id], references: [id], onDelete: Cascade)
 
   @@unique([team_id, member_address])
   @@map("team_members")
 }
 
 model TeamAuditLog {
-  id            String   @id @default(uuid())
-  team_id       String
-  user_address  String
-  action        String
-  details       Json
-  created_at    DateTime @default(now())
+  id           String   @id @default(uuid())
+  team_id      String
+  user_address String
+  action       String
+  details      Json
+  created_at   DateTime @default(now())
 
-  team          Team     @relation(fields: [team_id], references: [id], onDelete: Cascade)
+  team Team @relation(fields: [team_id], references: [id], onDelete: Cascade)
 
   @@map("team_audit_logs")
 }
 
 model PaymentProposal {
-  id                   String   @id @default(uuid())
-  agent_id             String
-  owner_address        String
-  recipient_address    String
-  amount               String
-  token                String
-  chain_id             Int
-  reason               String
-  metadata             Json?
-  status               String   @default("pending")
-  rejection_reason     String?
-  budget_id            String?
+  id                    String    @id @default(uuid())
+  agent_id              String
+  owner_address         String
+  recipient_address     String
+  amount                String
+  token                 String
+  chain_id              Int
+  reason                String
+  metadata              Json?
+  status                String    @default("pending")
+  rejection_reason      String?
+  budget_id             String?
   x402_authorization_id String?
-  tx_hash              String?
-  created_at           DateTime @default(now())
-  updated_at           DateTime @updatedAt
-  approved_at          DateTime?
-  executed_at          DateTime?
+  tx_hash               String?
+  created_at            DateTime  @default(now())
+  updated_at            DateTime  @updatedAt
+  approved_at           DateTime?
+  executed_at           DateTime?
 
   @@index([owner_address])
   @@index([agent_id])
@@ -330,27 +330,27 @@ model PaymentProposal {
 }
 
 model ScheduledPayment {
-  id                   String   @id @default(uuid())
-  owner_address        String
-  team_id              String?
-  name                 String
-  description          String?
-  recipients           Json
-  schedule_type        String
-  schedule_config      Json?
-  timezone             String   @default("UTC")
-  next_execution       DateTime
-  max_executions       Int?
-  execution_count      Int      @default(0)
-  chain_id             Int      @default(42161)
-  token                String   @default("USDT")
-  status               String   @default("active")
-  created_at           DateTime @default(now())
-  updated_at           DateTime @updatedAt
-  last_execution       DateTime?
-  total_executions     Int      @default(0)
+  id               String    @id @default(uuid())
+  owner_address    String
+  team_id          String?
+  name             String
+  description      String?
+  recipients       Json
+  schedule_type    String
+  schedule_config  Json?
+  timezone         String    @default("UTC")
+  next_execution   DateTime
+  max_executions   Int?
+  execution_count  Int       @default(0)
+  chain_id         Int       @default(42161)
+  token            String    @default("USDT")
+  status           String    @default("active")
+  created_at       DateTime  @default(now())
+  updated_at       DateTime  @updatedAt
+  last_execution   DateTime?
+  total_executions Int       @default(0)
 
-  logs                 ScheduledPaymentLog[]
+  logs ScheduledPaymentLog[]
 
   @@index([owner_address])
   @@index([team_id])
@@ -371,8 +371,8 @@ model ScheduledPaymentLog {
   details              Json?
   tx_hash              String?
   error_message        String?
-  
-  scheduled_payment    ScheduledPayment @relation(fields: [scheduled_payment_id], references: [id], onDelete: Cascade)
+
+  scheduled_payment ScheduledPayment @relation(fields: [scheduled_payment_id], references: [id], onDelete: Cascade)
 
   @@index([scheduled_payment_id])
   @@index([executed_at])
@@ -380,36 +380,36 @@ model ScheduledPaymentLog {
 }
 
 model Subscription {
-  id                       String   @id @default(uuid())
-  owner_address            String
-  service_name             String
-  wallet_address           String
-  amount                   String
-  token                    String
-  frequency                String
-  status                   String   @default("active")
-  next_payment_date        DateTime?
-  last_payment_date        DateTime?
-  last_tx_hash             String?
-  total_paid               String   @default("0")
-  payment_count            Int      @default(0)
-  chain_id                 Int
-  memo                     String?
-  created_at               DateTime @default(now())
-  updated_at               DateTime @updatedAt
+  id                String    @id @default(uuid())
+  owner_address     String
+  service_name      String
+  wallet_address    String
+  amount            String
+  token             String
+  frequency         String
+  status            String    @default("active")
+  next_payment_date DateTime?
+  last_payment_date DateTime?
+  last_tx_hash      String?
+  total_paid        String    @default("0")
+  payment_count     Int       @default(0)
+  chain_id          Int
+  memo              String?
+  created_at        DateTime  @default(now())
+  updated_at        DateTime  @updatedAt
 
   // Auto Pay fields
-  use_case                 String   @default("individual")
+  use_case                 String    @default("individual")
   max_authorized_amount    String?
   authorization_expires_at DateTime?
   schedule_day             Int?
   schedule_time            String?
-  timezone                 String   @default("UTC")
+  timezone                 String    @default("UTC")
   description              String?
   recipients               Json?
 
-  payments                 SubscriptionPayment[]
-  authorizations           SubscriptionAuthorization[]
+  payments       SubscriptionPayment[]
+  authorizations SubscriptionAuthorization[]
 
   @@index([owner_address])
   @@index([status])
@@ -418,38 +418,35 @@ model Subscription {
   @@map("subscriptions")
 }
 
-
 model SubscriptionPayment {
-  id              String       @id @default(uuid())
+  id              String   @id @default(uuid())
   subscription_id String
   amount          String
   tx_hash         String?
-  status          String       @default("completed")
+  status          String   @default("completed")
   error_message   String?
-  created_at      DateTime     @default(now())
+  created_at      DateTime @default(now())
 
-  subscription    Subscription @relation(fields: [subscription_id], references: [id], onDelete: Cascade)
+  subscription Subscription @relation(fields: [subscription_id], references: [id], onDelete: Cascade)
 
   @@index([subscription_id])
   @@map("subscription_payments")
 }
 
-
 model SubscriptionAuthorization {
-  id              String       @id @default(uuid())
+  id              String    @id @default(uuid())
   subscription_id String
-  status          String       @default("active")
+  status          String    @default("active")
   signature       String
   max_amount      String?
   expires_at      DateTime?
-  created_at      DateTime     @default(now())
+  created_at      DateTime  @default(now())
 
-  subscription    Subscription @relation(fields: [subscription_id], references: [id], onDelete: Cascade)
+  subscription Subscription @relation(fields: [subscription_id], references: [id], onDelete: Cascade)
 
   @@index([subscription_id])
   @@map("subscription_authorizations")
 }
-
 
 model X402Authorization {
   id              String   @id @default(uuid())
@@ -480,50 +477,50 @@ model X402Authorization {
 }
 
 model X402Settlement {
-  id                String    @id @default(uuid())
+  id                String   @id @default(uuid())
   authorization_id  String
   transaction_hash  String
   chain_id          Int
   amount            Float
-  fee               Float     @default(0)
+  fee               Float    @default(0)
   token             String
   from_address      String
   to_address        String
   settlement_method String
-  status            String    @default("completed")
-  settled_at        DateTime  @default(now())
+  status            String   @default("completed")
+  settled_at        DateTime @default(now())
 
   @@index([authorization_id])
   @@map("x402_settlements")
 }
 
 model PaymentLog {
-  id            String   @id @default(uuid())
-  type          String
-  transfer_id   String?
-  from_address  String
-  to_address    String
-  amount        String
-  token         String
-  chain_id      Int?
-  tx_hash       String?
-  status        String
-  created_at    DateTime @default(now())
+  id           String   @id @default(uuid())
+  type         String
+  transfer_id  String?
+  from_address String
+  to_address   String
+  amount       String
+  token        String
+  chain_id     Int?
+  tx_hash      String?
+  status       String
+  created_at   DateTime @default(now())
 
   @@index([transfer_id])
   @@map("payment_logs")
 }
 
 model PaymentSplitTemplate {
-  id              String   @id @default(uuid())
-  owner_address   String
-  team_id         String?
-  name            String
-  description     String?
-  recipients      Json
-  is_active       Boolean  @default(true)
-  created_at      DateTime @default(now())
-  updated_at      DateTime @updatedAt
+  id            String   @id @default(uuid())
+  owner_address String
+  team_id       String?
+  name          String
+  description   String?
+  recipients    Json
+  is_active     Boolean  @default(true)
+  created_at    DateTime @default(now())
+  updated_at    DateTime @updatedAt
 
   @@index([owner_address])
   @@index([team_id])
@@ -531,19 +528,19 @@ model PaymentSplitTemplate {
 }
 
 model PaymentSplitExecution {
-  id              String   @id @default(uuid())
-  owner_address   String
-  template_id     String?
-  team_id         String?
-  total_amount    String
-  token           String
-  chain_id        Int
-  recipients      Json
-  status          String   @default("pending")
-  tx_hash         String?
-  error_message   String?
-  created_at      DateTime @default(now())
-  updated_at      DateTime @updatedAt
+  id            String   @id @default(uuid())
+  owner_address String
+  template_id   String?
+  team_id       String?
+  total_amount  String
+  token         String
+  chain_id      Int
+  recipients    Json
+  status        String   @default("pending")
+  tx_hash       String?
+  error_message String?
+  created_at    DateTime @default(now())
+  updated_at    DateTime @updatedAt
 
   @@index([owner_address])
   @@index([template_id])
@@ -567,8 +564,8 @@ model PaymentChannel {
   created_at             DateTime  @default(now())
   closed_at              DateTime?
   last_activity_at       DateTime?
-  
-  payments               ChannelPayment[]
+
+  payments ChannelPayment[]
 
   @@map("payment_channels")
 }
@@ -582,21 +579,21 @@ model ChannelPayment {
   status           String   @default("pending")
   settled_in_batch String?
   created_at       DateTime @default(now())
-  
-  channel          PaymentChannel @relation(fields: [channel_id], references: [id])
+
+  channel PaymentChannel @relation(fields: [channel_id], references: [id])
 
   @@map("channel_payments")
 }
 
 model ChannelSettlement {
-  id               String   @id
+  id               String    @id
   channel_id       String
   amount           String
-  status           String   @default("processing")
+  status           String    @default("processing")
   transaction_hash String?
-  created_at       DateTime @default(now())
+  created_at       DateTime  @default(now())
   completed_at     DateTime?
-  
+
   @@map("channel_settlements")
 }
 
@@ -610,8 +607,8 @@ model MultisigWallet {
   owner_address String
   created_at    DateTime @default(now())
   updated_at    DateTime @updatedAt
-  
-  transactions  MultisigTransaction[]
+
+  transactions MultisigTransaction[]
 
   @@map("multisig_wallets")
 }
@@ -623,16 +620,16 @@ model MultisigTransaction {
   value             String
   data              String?
   nonce             Int
-  status            String   
+  status            String
   threshold         Int
   execution_tx_hash String?
   error_message     String?
   created_by        String
   created_at        DateTime @default(now())
   updated_at        DateTime @updatedAt
-  
-  multisig_wallet   MultisigWallet @relation(fields: [multisig_id], references: [id]) // Renamed relation field to avoid conflict with field name if any
-  confirmations     MultisigConfirmation[]
+
+  multisig_wallet MultisigWallet         @relation(fields: [multisig_id], references: [id]) // Renamed relation field to avoid conflict with field name if any
+  confirmations   MultisigConfirmation[]
 
   @@map("multisig_transactions")
 }
@@ -643,56 +640,56 @@ model MultisigConfirmation {
   signer_address String
   signature      String
   confirmed_at   DateTime @default(now())
-  
-  transaction    MultisigTransaction @relation(fields: [transaction_id], references: [id])
-  
+
+  transaction MultisigTransaction @relation(fields: [transaction_id], references: [id])
+
   @@unique([transaction_id, signer_address])
   @@map("multisig_confirmations")
 }
 
 model Agent {
-  id                    String   @id @default(uuid())
+  id                    String    @id @default(uuid())
   owner_address         String
   name                  String
   description           String?
-  type                  String   @default("custom")
+  type                  String    @default("custom")
   avatar_url            String?
-  api_key_hash          String   @unique
+  api_key_hash          String    @unique
   api_key_prefix        String
   webhook_url           String?
   webhook_secret_hash   String?
-  status                String   @default("active")
-  auto_execute_enabled  Boolean  @default(false)
+  status                String    @default("active")
+  auto_execute_enabled  Boolean   @default(false)
   auto_execute_rules    Json?
-  rate_limit_per_minute Int      @default(60)
-  created_at            DateTime @default(now())
-  updated_at            DateTime @updatedAt
+  rate_limit_per_minute Int       @default(60)
+  created_at            DateTime  @default(now())
+  updated_at            DateTime  @updatedAt
   last_active_at        DateTime?
-  
-  budgets               AgentBudget[]
-  activities            AgentActivity[]
-  webhook_deliveries    AgentWebhookDelivery[]
-  
+
+  budgets            AgentBudget[]
+  activities         AgentActivity[]
+  webhook_deliveries AgentWebhookDelivery[]
+
   @@map("agents")
 }
 
 model AgentBudget {
-  id               String   @id @default(uuid())
+  id               String    @id @default(uuid())
   agent_id         String
   owner_address    String
   amount           String
   token            String
   chain_id         Int?
   period           String
-  used_amount      String   @default("0")
+  used_amount      String    @default("0")
   remaining_amount String
   period_start     DateTime
   period_end       DateTime?
-  created_at       DateTime @default(now())
-  updated_at       DateTime @updatedAt
-  
-  agent            Agent    @relation(fields: [agent_id], references: [id])
-  
+  created_at       DateTime  @default(now())
+  updated_at       DateTime  @updatedAt
+
+  agent Agent @relation(fields: [agent_id], references: [id])
+
   @@map("agent_budgets")
 }
 
@@ -707,7 +704,7 @@ model AgentActivity {
   created_at    DateTime @default(now())
 
   // Relations
-  agent         Agent    @relation(fields: [agent_id], references: [id], onDelete: Cascade)
+  agent Agent @relation(fields: [agent_id], references: [id], onDelete: Cascade)
 
   @@index([agent_id])
   @@index([owner_address])
@@ -728,7 +725,7 @@ model AgentWebhookDelivery {
   created_at      DateTime  @default(now())
   delivered_at    DateTime?
 
-  agent           Agent     @relation(fields: [agent_id], references: [id], onDelete: Cascade)
+  agent Agent @relation(fields: [agent_id], references: [id], onDelete: Cascade)
 
   @@index([agent_id])
   @@index([status])
@@ -751,58 +748,58 @@ model SubscriptionPlan {
 }
 
 model UserSubscription {
-  id                   String   @id @default(uuid())
-  user_address         String   @unique
+  id                   String    @id @default(uuid())
+  user_address         String    @unique
   plan_id              String
   status               String
   current_period_start DateTime
   current_period_end   DateTime
   cancelled_at         DateTime?
-  created_at           DateTime @default(now())
-  updated_at           DateTime @updatedAt
+  created_at           DateTime  @default(now())
+  updated_at           DateTime  @updatedAt
 
-  plan                 SubscriptionPlan @relation(fields: [plan_id], references: [id])
+  plan SubscriptionPlan @relation(fields: [plan_id], references: [id])
 
   @@index([user_address])
   @@map("user_subscriptions")
 }
 
 model BillingHistory {
-  id            String   @id @default(uuid())
-  user_address  String
-  event_type    String
-  amount        Float
-  description   String?
-  plan_id       String?
-  invoice_url   String?
-  created_at    DateTime @default(now())
+  id           String   @id @default(uuid())
+  user_address String
+  event_type   String
+  amount       Float
+  description  String?
+  plan_id      String?
+  invoice_url  String?
+  created_at   DateTime @default(now())
 
   @@index([user_address])
   @@map("billing_history")
 }
 
 model UsageMetric {
-  id                        String   @id @default(uuid())
-  user_address              String
-  period_start              DateTime
-  recipients_used           Int      @default(0)
-  scheduled_payments_count  Int      @default(0)
-  team_members_count        Int      @default(0)
-  transactions_count        Int      @default(0)
-  total_volume              Float    @default(0)
-  updated_at                DateTime @updatedAt
-  
+  id                       String   @id @default(uuid())
+  user_address             String
+  period_start             DateTime
+  recipients_used          Int      @default(0)
+  scheduled_payments_count Int      @default(0)
+  team_members_count       Int      @default(0)
+  transactions_count       Int      @default(0)
+  total_volume             Float    @default(0)
+  updated_at               DateTime @updatedAt
+
   @@unique([user_address, period_start])
   @@map("usage_metrics")
 }
 
 model TransactionFee {
-  id            String   @id @default(uuid())
-  user_address  String
-  payment_id    String
-  fee_amount    Float
+  id             String   @id @default(uuid())
+  user_address   String
+  payment_id     String
+  fee_amount     Float
   fee_percentage Float
-  created_at    DateTime @default(now())
+  created_at     DateTime @default(now())
 
   @@index([user_address])
   @@index([payment_id])
@@ -810,35 +807,501 @@ model TransactionFee {
 }
 
 model Invoice {
-  id                String    @id @default(uuid())
-  invoice_id        String    @unique
+  id                String  @id @default(uuid())
+  invoice_id        String  @unique
   recipient_address String
   amount            Float
   amount_fiat       Float?
   fiat_currency     String?
-  token             String    @default("USDC")
-  chain             String?   @default("Ethereum") // Ethereum, Polygon, BSC, Arbitrum, Optimism
+  token             String  @default("USDC")
+  chain             String? @default("Ethereum") // Ethereum, Polygon, BSC, Arbitrum, Optimism
   description       String?
   merchant_name     String?
-  status            String    @default("pending") // pending, paid, expired, cancelled
+  status            String  @default("pending") // pending, paid, expired, cancelled
   signature         String?
-  tx_hash           String?   // Transaction hash on chain
-  
+  tx_hash           String? // Transaction hash on chain
+
   // Customer Info
-  customer_name     String?
-  customer_email    String?
-  customer_wallet   String?
-  
+  customer_name   String?
+  customer_email  String?
+  customer_wallet String?
+
   // Metadata
-  metadata          Json?
-  
+  metadata Json?
+
   // Dates
-  paid_at           DateTime?
-  expires_at        DateTime
-  created_at        DateTime  @default(now())
-  updated_at        DateTime  @updatedAt
+  paid_at    DateTime?
+  expires_at DateTime
+  created_at DateTime  @default(now())
+  updated_at DateTime  @updatedAt
 
   @@index([recipient_address])
   @@index([invoice_id])
   @@map("invoices")
+}
+
+// ============================================================================
+// Auth & Identity Models
+// ============================================================================
+
+model AuthUser {
+  id                   String   @id @default(uuid())
+  email                String?  @unique
+  email_verified       Boolean  @default(false)
+  wallet_address       String?
+  has_wallet           Boolean  @default(false)
+  google_id            String?  @unique
+  apple_id             String?  @unique
+  onboarding_completed Boolean  @default(false)
+  created_at           DateTime @default(now())
+
+  embedded_wallets EmbeddedWallet[]
+  magic_links      MagicLink[]
+  merchants        Merchant[]
+
+  @@index([email])
+  @@index([wallet_address])
+  @@index([google_id])
+  @@index([apple_id])
+  @@map("auth_users")
+}
+
+model EmbeddedWallet {
+  id                     String   @id @default(uuid())
+  user_id                String
+  address                String
+  wallet_address         String?
+  server_share           String?
+  server_iv              String?
+  server_share_encrypted String?
+  server_share_iv        String?
+  encrypted_share        String?
+  encrypted_share_b      String?
+  recovery_share         String?
+  recovery_iv            String?
+  recovery_hash          String?
+  share_c_hash           String?
+  encrypted_key_share    String?
+  salt                   String?
+  chain_type             String   @default("EVM")
+  is_primary             Boolean  @default(true)
+  derivation_path        String?
+  created_at             DateTime @default(now())
+
+  user AuthUser @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@index([user_id])
+  @@index([address])
+  @@index([wallet_address])
+  @@map("embedded_wallets")
+}
+
+model MagicLink {
+  id         String    @id @default(uuid())
+  email      String
+  token_hash String
+  expires_at DateTime
+  used       Boolean   @default(false)
+  used_at    DateTime?
+  ip_address String?
+  user_agent String?
+  created_at DateTime  @default(now())
+
+  user AuthUser? @relation(fields: [email], references: [email], onDelete: Cascade)
+
+  @@index([email])
+  @@index([token_hash])
+  @@map("magic_links")
+}
+
+model SessionKey {
+  id              String    @id @default(uuid())
+  owner_address   String
+  session_address String
+  encrypted_key   String
+  chain_id        Int
+  spending_limit  String
+  amount_spent    String    @default("0")
+  allowed_tokens  Json      @default("[]")
+  expires_at      DateTime
+  is_active       Boolean   @default(true)
+  created_at      DateTime  @default(now())
+  last_used_at    DateTime?
+
+  @@index([owner_address])
+  @@index([session_address])
+  @@index([is_active])
+  @@map("session_keys")
+}
+
+// ============================================================================
+// Audit & Security Models
+// ============================================================================
+
+model AuditLog {
+  id          String   @id @default(uuid())
+  action      String
+  actor       String
+  target_type String?
+  target_id   String?
+  details     Json?
+  ip_address  String?
+  user_agent  String?
+  created_at  DateTime @default(now())
+
+  @@index([actor])
+  @@index([action])
+  @@index([created_at])
+  @@map("audit_logs")
+}
+
+model SecurityAlert {
+  id          String   @id @default(uuid())
+  alert_type  String
+  severity    String
+  address     String
+  description String
+  details     Json?
+  created_at  DateTime @default(now())
+
+  @@index([address])
+  @@index([severity])
+  @@map("security_alerts")
+}
+
+model PaymentIntegrity {
+  id              String   @id @default(uuid())
+  payment_id      String
+  client_hash     String
+  server_hash     String
+  integrity_valid Boolean
+  discrepancies   Json?
+  created_at      DateTime @default(now())
+
+  @@index([payment_id])
+  @@map("payment_integrity")
+}
+
+model PaymentRetryQueue {
+  id           String    @id @default(uuid())
+  tx_hash      String
+  payment_data Json
+  retry_count  Int       @default(0)
+  status       String    @default("pending")
+  next_retry   DateTime?
+  created_at   DateTime  @default(now())
+
+  @@index([status])
+  @@index([tx_hash])
+  @@map("payment_retry_queue")
+}
+
+// ============================================================================
+// Offramp (Fiat Off-ramp) Models
+// ============================================================================
+
+model OfframpTransaction {
+  id             String   @id @default(uuid())
+  reference_id   String   @unique
+  wallet_address String
+  provider       String
+  provider_tx_id String?
+  crypto_amount  Float
+  token          String
+  chain_id       Int
+  fiat_amount    Float
+  fiat_currency  String
+  payout_method  String
+  status         String   @default("pending")
+  tx_hash        String?
+  error_message  String?
+  quote_id       String?
+  bank_details   String?
+  created_at     DateTime @default(now())
+
+  @@index([wallet_address])
+  @@index([status])
+  @@index([reference_id])
+  @@map("offramp_transactions")
+}
+
+// ============================================================================
+// Asset Distribution Models
+// ============================================================================
+
+model AssetDistribution {
+  id                String   @id @default(uuid())
+  payment_tx_hash   String
+  distribution_tx   String?
+  recipient_address String
+  asset_type        String
+  contract_address  String
+  chain_id          Int      @default(8453)
+  token_id          String?
+  amount            String?
+  status            String   @default("pending")
+  error_message     String?
+  payment_link_id   String?
+  invoice_id        String?
+  created_at        DateTime @default(now())
+
+  @@index([recipient_address])
+  @@index([payment_tx_hash])
+  @@map("asset_distributions")
+}
+
+// ============================================================================
+// Acquiring / Merchant Models
+// ============================================================================
+
+model Merchant {
+  id             String   @id @default(uuid())
+  user_id        String
+  name           String
+  description    String?
+  logo_url       String?
+  wallet_address String
+  callback_url   String?
+  status         String   @default("active")
+  created_at     DateTime @default(now())
+
+  user     AuthUser          @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  api_keys MerchantApiKey[]
+  orders   AcquiringOrder[]
+  balances MerchantBalance[]
+
+  @@index([user_id])
+  @@index([wallet_address])
+  @@map("merchants")
+}
+
+model MerchantApiKey {
+  id              String   @id @default(uuid())
+  merchant_id     String
+  key_id          String   @unique
+  key_secret_hash String
+  name            String   @default("Default API Key")
+  created_at      DateTime @default(now())
+
+  merchant Merchant @relation(fields: [merchant_id], references: [id], onDelete: Cascade)
+
+  @@index([merchant_id])
+  @@index([key_id])
+  @@map("merchant_api_keys")
+}
+
+model AcquiringOrder {
+  id             String    @id @default(uuid())
+  order_no       String    @unique
+  merchant_id    String
+  amount         Float
+  currency       String    @default("USD")
+  token          String    @default("USDC")
+  notify_url     String?
+  return_url     String?
+  expires_at     DateTime
+  metadata       Json?
+  status         String    @default("pending")
+  payment_method String?
+  payer_address  String?
+  tx_hash        String?
+  paid_at        DateTime?
+  created_at     DateTime  @default(now())
+  updated_at     DateTime  @default(now())
+
+  merchant Merchant @relation(fields: [merchant_id], references: [id], onDelete: Cascade)
+
+  @@index([merchant_id])
+  @@index([order_no])
+  @@index([status])
+  @@map("acquiring_orders")
+}
+
+model MerchantBalance {
+  id          String   @id @default(uuid())
+  merchant_id String
+  token       String
+  balance     String   @default("0")
+  created_at  DateTime @default(now())
+  updated_at  DateTime @default(now())
+
+  merchant Merchant @relation(fields: [merchant_id], references: [id], onDelete: Cascade)
+
+  @@unique([merchant_id, token])
+  @@map("merchant_balances")
+}
+
+// ============================================================================
+// Payment Links Models
+// ============================================================================
+
+model PaymentLink {
+  id                     String    @id @default(uuid())
+  link_id                String    @unique
+  merchant_id            String?
+  title                  String    @default("Payment")
+  description            String?
+  amount                 Float?
+  currency               String    @default("USD")
+  token                  String    @default("USDC")
+  recipient_address      String
+  amount_type            String    @default("fixed")
+  min_amount             Float?
+  max_amount             Float?
+  expires_at             DateTime?
+  redirect_url           String?
+  signature              String?
+  status                 String    @default("active")
+  metadata               Json?     @default("{}")
+  webhook_url            String?
+  success_message        String?
+  require_email          Boolean   @default(false)
+  require_name           String?
+  brand_color            String?
+  logo_url               String?
+  brand_name             String?
+  distribute_asset       Boolean   @default(false)
+  asset_type             String?
+  asset_contract_address String?
+  asset_token_id         String?
+  asset_amount           String?
+  total_payments         Int       @default(0)
+  total_amount           Float     @default(0)
+  total_views            Int       @default(0)
+  created_at             DateTime  @default(now())
+  updated_at             DateTime  @default(now())
+
+  events PaymentLinkEvent[]
+
+  @@index([link_id])
+  @@index([merchant_id])
+  @@index([recipient_address])
+  @@index([status])
+  @@map("payment_links")
+}
+
+model PaymentLinkEvent {
+  id            String   @id @default(uuid())
+  link_id       String
+  event_type    String
+  tx_hash       String?
+  amount        Float?
+  payer_address String?
+  ip_address    String?
+  user_agent    String?
+  created_at    DateTime @default(now())
+
+  payment_link PaymentLink @relation(fields: [link_id], references: [link_id], onDelete: Cascade)
+
+  @@index([link_id])
+  @@index([event_type])
+  @@map("payment_link_events")
+}
+
+// ============================================================================
+// MCP Subscriptions & Monetization Models
+// ============================================================================
+
+model McpSubscription {
+  id                   String    @id @default(uuid())
+  owner_address        String
+  provider_id          String
+  provider_name        String
+  plan                 String
+  status               String    @default("active")
+  usage_count          Int       @default(0)
+  monthly_cost         Int       @default(0)
+  current_period_start DateTime?
+  current_period_end   DateTime?
+  created_at           DateTime  @default(now())
+
+  @@index([owner_address])
+  @@index([provider_id])
+  @@index([status])
+  @@map("mcp_subscriptions")
+}
+
+model MonetizeConfig {
+  id            String   @id @default(uuid())
+  owner_address String   @unique
+  enabled       Boolean  @default(false)
+  tiers         Json     @default("[]")
+  default_tier  String?
+  webhook_url   String?
+  require_auth  Boolean  @default(true)
+  created_at    DateTime @default(now())
+  updated_at    DateTime @default(now())
+
+  @@index([owner_address])
+  @@map("monetize_configs")
+}
+
+model MonetizeApiKey {
+  id            String    @id @default(uuid())
+  owner_address String
+  key           String    @unique
+  name          String
+  tier_id       String
+  status        String    @default("active")
+  usage_count   Int       @default(0)
+  rate_limit    Int       @default(100)
+  created_at    DateTime  @default(now())
+  last_used_at  DateTime?
+
+  @@index([owner_address])
+  @@index([key])
+  @@map("monetize_api_keys")
+}
+
+// ============================================================================
+// Protocol Fee Models
+// ============================================================================
+
+model FeeConfig {
+  id         String   @id @default(uuid())
+  config_key String   @unique
+  value      Json
+  created_at DateTime @default(now())
+
+  @@map("fee_config")
+}
+
+model ProtocolFee {
+  id               String   @id @default(uuid())
+  payment_id       String?
+  batch_id         String?
+  amount           Float
+  fee_rate         Float
+  base_fee         Float
+  discount         Float    @default(0)
+  net_fee          Float
+  from_address     String
+  treasury_address String
+  token            String
+  chain_id         Int
+  status           String   @default("pending")
+  tx_hash          String?
+  tier             String
+  created_at       DateTime @default(now())
+
+  @@index([from_address])
+  @@index([status])
+  @@index([created_at])
+  @@map("protocol_fees")
+}
+
+model MonthlyFeeSummary {
+  id                String  @id @default(uuid())
+  from_address      String
+  month             String
+  total_volume      Float   @default(0)
+  transaction_count Int     @default(0)
+  total_fees        Float   @default(0)
+  total_discounts   Float   @default(0)
+  net_fees          Float   @default(0)
+  tier              String?
+
+  @@unique([from_address, month])
+  @@index([from_address])
+  @@map("monthly_fee_summary")
 }

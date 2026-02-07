@@ -5,7 +5,8 @@
  */
 
 import { NextRequest, NextResponse } from "next/server"
-import { createClient } from "@/lib/supabase/server"
+import { prisma } from "@/lib/prisma"
+import { getAuthenticatedAddress } from "@/lib/api-auth"
 
 interface RouteParams {
   params: Promise<{ id: string }>
@@ -15,35 +16,21 @@ interface RouteParams {
 export async function GET(request: NextRequest, { params }: RouteParams) {
   try {
     const { id } = await params
-    const supabase = await createClient()
 
-    // Get user from session
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
-    if (authError || !user) {
+    const walletAddress = await getAuthenticatedAddress(request)
+    if (!walletAddress) {
       return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 })
     }
 
-    // Get owner_address
-    const { data: authUser } = await supabase
-      .from("auth_users")
-      .select("wallet_address")
-      .eq("id", user.id)
-      .single()
-
-    const ownerAddress = authUser?.wallet_address
-    if (!ownerAddress) {
-      return NextResponse.json({ success: false, error: "No wallet associated" }, { status: 400 })
-    }
-
     // Fetch authorization
-    const { data: authorization, error } = await supabase
-      .from("x402_authorizations")
-      .select("*")
-      .eq("id", id)
-      .eq("from_address", ownerAddress.toLowerCase())
-      .single()
+    const authorization = await prisma.x402Authorization.findFirst({
+      where: {
+        id,
+        from_address: walletAddress.toLowerCase(),
+      },
+    })
 
-    if (error || !authorization) {
+    if (!authorization) {
       return NextResponse.json({ success: false, error: "Authorization not found" }, { status: 404 })
     }
 
@@ -64,24 +51,10 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
 export async function PATCH(request: NextRequest, { params }: RouteParams) {
   try {
     const { id } = await params
-    const supabase = await createClient()
 
-    // Get user from session
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
-    if (authError || !user) {
+    const walletAddress = await getAuthenticatedAddress(request)
+    if (!walletAddress) {
       return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 })
-    }
-
-    // Get owner_address
-    const { data: authUser } = await supabase
-      .from("auth_users")
-      .select("wallet_address")
-      .eq("id", user.id)
-      .single()
-
-    const ownerAddress = authUser?.wallet_address
-    if (!ownerAddress) {
-      return NextResponse.json({ success: false, error: "No wallet associated" }, { status: 400 })
     }
 
     // Parse request body
@@ -89,24 +62,30 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
 
     // Only allow cancellation of pending authorizations
     if (body.status === "cancelled") {
-      const { data: authorization, error } = await supabase
-        .from("x402_authorizations")
-        .update({
+      // Use updateMany to atomically check ownership + status
+      const result = await prisma.x402Authorization.updateMany({
+        where: {
+          id,
+          from_address: walletAddress.toLowerCase(),
+          status: "pending", // Can only cancel pending
+        },
+        data: {
           status: "cancelled",
-          cancelled_at: new Date().toISOString(),
-        })
-        .eq("id", id)
-        .eq("from_address", ownerAddress.toLowerCase())
-        .eq("status", "pending") // Can only cancel pending
-        .select()
-        .single()
+          // Note: no cancelled_at field in schema; updated_at auto-updates
+        },
+      })
 
-      if (error || !authorization) {
+      if (result.count === 0) {
         return NextResponse.json(
           { success: false, error: "Authorization not found or cannot be cancelled" },
           { status: 404 }
         )
       }
+
+      // Fetch the updated record to return
+      const authorization = await prisma.x402Authorization.findUnique({
+        where: { id },
+      })
 
       return NextResponse.json({
         success: true,

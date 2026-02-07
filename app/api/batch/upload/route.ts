@@ -1,32 +1,22 @@
 import { NextRequest, NextResponse } from "next/server"
-import { createServerClient } from "@supabase/ssr"
-import { cookies } from "next/headers"
 import { prisma } from "@/lib/prisma"
+import { getAuthenticatedAddress } from "@/lib/api-auth"
+import { writeFile, mkdir } from "fs/promises"
+import { tmpdir } from "os"
+import path from "path"
 
 /**
  * POST /api/batch/upload
  * Async batch file upload endpoint
- * - Uploads to Storage
+ * - Saves file to local filesystem
  * - Creates Prisma Record (QUEUED)
  * - Vercel Cron will pick it up
  */
 export async function POST(request: NextRequest) {
   try {
-    // 1. Auth Check (Using Supabase Auth Cookies for verification)
-    const cookieStore = await cookies()
-    const supabase = createServerClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-      {
-        cookies: {
-          getAll() { return cookieStore.getAll() },
-          setAll(cookiesToSet) {},
-        },
-      }
-    )
-
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
-    if (authError || !user) {
+    // 1. Auth Check (wallet-address-based)
+    const walletAddress = await getAuthenticatedAddress(request)
+    if (!walletAddress) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
@@ -43,26 +33,23 @@ export async function POST(request: NextRequest) {
     }
 
     const fileExt = file.name.split(".").pop()
-    const fileName = `${user.id}/${Date.now()}_${Math.random().toString(36).substring(7)}.${fileExt}`
+    const fileName = `${Date.now()}_${Math.random().toString(36).substring(7)}.${fileExt}`
 
-    // 3. Upload to Supabase Storage
-    const { data: uploadData, error: uploadError } = await supabase
-      .storage
-      .from("batch-files")
-      .upload(fileName, file)
+    // 3. Save file to local filesystem
+    const uploadDir = path.join(tmpdir(), "batch-files", walletAddress.toLowerCase())
+    await mkdir(uploadDir, { recursive: true })
 
-    if (uploadError) {
-      console.error("Upload failed:", uploadError)
-      return NextResponse.json({ error: "Failed to store file" }, { status: 500 })
-    }
+    const filePath = path.join(uploadDir, fileName)
+    const fileBuffer = Buffer.from(await file.arrayBuffer())
+    await writeFile(filePath, fileBuffer)
 
     // 4. Create Job Record (Prisma)
     // Status "QUEUED" allows the Cron to pick it up automatically
     const job = await prisma.batchJob.create({
       data: {
-        user_id: user.id,
+        user_id: walletAddress.toLowerCase(),
         status: "QUEUED", 
-        file_url: uploadData.path,
+        file_url: filePath,
         total_lines: 0
       }
     })

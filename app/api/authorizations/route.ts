@@ -4,29 +4,15 @@
  */
 
 import { NextRequest, NextResponse } from "next/server"
-import { createClient } from "@/lib/supabase/server"
+import { prisma } from "@/lib/prisma"
+import { getAuthenticatedAddress } from "@/lib/api-auth"
 
 // GET - List authorizations
 export async function GET(request: NextRequest) {
   try {
-    const supabase = await createClient()
-
-    // Get user from session
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
-    if (authError || !user) {
+    const walletAddress = await getAuthenticatedAddress(request)
+    if (!walletAddress) {
       return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 })
-    }
-
-    // Get owner_address
-    const { data: authUser } = await supabase
-      .from("auth_users")
-      .select("wallet_address")
-      .eq("id", user.id)
-      .single()
-
-    const ownerAddress = authUser?.wallet_address
-    if (!ownerAddress) {
-      return NextResponse.json({ success: false, error: "No wallet associated" }, { status: 400 })
     }
 
     // Parse query parameters
@@ -35,35 +21,33 @@ export async function GET(request: NextRequest) {
     const limit = Math.min(parseInt(searchParams.get("limit") || "50"), 100)
     const offset = parseInt(searchParams.get("offset") || "0")
 
-    // Build query
-    let query = supabase
-      .from("x402_authorizations")
-      .select("*", { count: "exact" })
-      .eq("from_address", ownerAddress.toLowerCase())
-      .order("created_at", { ascending: false })
-
+    // Build where clause
+    const where: Record<string, unknown> = {
+      from_address: walletAddress.toLowerCase(),
+    }
     if (status) {
-      query = query.eq("status", status)
+      where.status = status
     }
 
-    // Apply pagination
-    query = query.range(offset, offset + limit - 1)
-
-    const { data: authorizations, error, count } = await query
-
-    if (error) {
-      console.error("[Authorizations] Failed to fetch:", error)
-      return NextResponse.json({ success: false, error: "Failed to fetch authorizations" }, { status: 500 })
-    }
+    // Fetch authorizations and count in parallel
+    const [authorizations, total] = await Promise.all([
+      prisma.x402Authorization.findMany({
+        where,
+        orderBy: { created_at: "desc" },
+        skip: offset,
+        take: limit,
+      }),
+      prisma.x402Authorization.count({ where }),
+    ])
 
     return NextResponse.json({
       success: true,
-      authorizations: authorizations || [],
+      authorizations,
       pagination: {
-        total: count || 0,
+        total,
         limit,
         offset,
-        hasMore: (count || 0) > offset + limit,
+        hasMore: total > offset + limit,
       },
     })
   } catch (error) {

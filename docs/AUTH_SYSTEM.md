@@ -23,7 +23,7 @@ Share Distribution:
 ┌──────────────┐  ┌──────────────┐  ┌──────────────┐
 │   Share A    │  │   Share B    │  │   Share C    │
 │   Device     │  │   Server     │  │ (User Backup)│
-│  (IndexedDB) │  │  (Supabase)  │  │              │
+│  (IndexedDB) │  │ (PostgreSQL) │  │              │
 └──────────────┘  └──────────────┘  └──────────────┘
 ```
 
@@ -63,7 +63,7 @@ Share Distribution:
 1. User initiates transaction
 2. Enter 6-digit PIN
 3. Device share retrieved from IndexedDB
-4. Server share retrieved from Supabase
+4. Server share retrieved from PostgreSQL (via Prisma)
 5. Shares decrypted with PIN-derived key
 6. Private key reconstructed
 7. Transaction signed

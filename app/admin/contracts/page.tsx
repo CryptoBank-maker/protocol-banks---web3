@@ -19,7 +19,6 @@ import {
 } from "@/components/ui/dialog"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { FileCode, Plus, ExternalLink, CheckCircle, Copy, Loader2 } from "lucide-react"
-import { getSupabase } from "@/lib/supabase"
 import { toast } from "sonner"
 
 export const dynamic = "force-dynamic"
@@ -74,19 +73,13 @@ export default function ContractsPage() {
 
   async function fetchContracts() {
     setLoading(true)
-    const supabase = getSupabase()
-    if (!supabase) {
-      setLoading(false)
-      return
-    }
-
-    const { data, error } = await supabase
-      .from("contract_deployments")
-      .select("*")
-      .order("chain_id", { ascending: true })
-
-    if (!error && data) {
-      setContracts(data)
+    try {
+      const stored = localStorage.getItem("admin_contract_deployments")
+      if (stored) {
+        setContracts(JSON.parse(stored))
+      }
+    } catch (e) {
+      console.error("Failed to load contracts:", e)
     }
     setLoading(false)
   }
@@ -98,15 +91,11 @@ export default function ContractsPage() {
     }
 
     setSaving(true)
-    const supabase = getSupabase()
-    if (!supabase) {
-      setSaving(false)
-      return
-    }
 
     const chain = SUPPORTED_CHAINS.find((c) => c.id === Number(chainId))
 
-    const { error } = await supabase.from("contract_deployments").insert({
+    const newContract: ContractDeployment = {
+      id: crypto.randomUUID(),
       contract_name: contractName,
       contract_type: contractType,
       chain_id: Number(chainId),
@@ -115,32 +104,29 @@ export default function ContractsPage() {
       is_verified: false,
       is_active: true,
       version: "1.0.0",
-    })
-
-    if (error) {
-      toast.error("Failed to add contract")
-    } else {
-      toast.success("Contract added successfully")
-      setDialogOpen(false)
-      setContractName("")
-      setContractType("")
-      setChainId("")
-      setContractAddress("")
-      fetchContracts()
+      created_at: new Date().toISOString(),
     }
+
+    const updated = [...contracts, newContract]
+    setContracts(updated)
+    localStorage.setItem("admin_contract_deployments", JSON.stringify(updated))
+
+    toast.success("Contract added successfully")
+    setDialogOpen(false)
+    setContractName("")
+    setContractType("")
+    setChainId("")
+    setContractAddress("")
     setSaving(false)
   }
 
   async function toggleContractStatus(id: string, currentStatus: boolean) {
-    const supabase = getSupabase()
-    if (!supabase) return
-
-    const { error } = await supabase.from("contract_deployments").update({ is_active: !currentStatus }).eq("id", id)
-
-    if (!error) {
-      toast.success(`Contract ${!currentStatus ? "activated" : "deactivated"}`)
-      fetchContracts()
-    }
+    const updated = contracts.map((c) =>
+      c.id === id ? { ...c, is_active: !currentStatus } : c,
+    )
+    setContracts(updated)
+    localStorage.setItem("admin_contract_deployments", JSON.stringify(updated))
+    toast.success(`Contract ${!currentStatus ? "activated" : "deactivated"}`)
   }
 
   function getExplorerUrl(chainId: number, address: string) {

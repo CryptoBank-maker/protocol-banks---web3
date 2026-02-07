@@ -51,7 +51,7 @@ import {
   Shield,
   Users,
 } from "lucide-react"
-import { createClient } from "@/lib/supabase-client"
+import { authHeaders } from "@/lib/authenticated-fetch"
 import { PurposeTagSelector } from "@/components/purpose-tag-selector"
 import { PaymentGroupSelector } from "@/components/payment-group-selector"
 import type { Vendor, PaymentRecipient, AutoPayment, VendorCategory } from "@/types"
@@ -68,7 +68,6 @@ export default function BatchPaymentPage() {
   const { wallets, address: unifiedAddress, sendToken, signERC3009Authorization, isConnected } = useUnifiedWallet()
   const { isDemoMode } = useDemo()
   const { toast } = useToast()
-  const supabase = createClient() // Initialize Supabase client here
 
   // Use the batch payment hook for API integration
   const {
@@ -356,7 +355,7 @@ export default function BatchPaymentPage() {
       (v.category?.toLowerCase() || "").includes(vendorSearchQuery.toLowerCase()),
   )
 
-  // Load vendors from database
+  // Load vendors from database via API
   const loadVendors = useCallback(async () => {
     if (isDemoMode) return
     if (!currentWallet) {
@@ -365,26 +364,22 @@ export default function BatchPaymentPage() {
     }
 
     try {
-      if (!supabase) return
-
-      const { data, error } = await supabase
-        .from("vendors")
-        .select("*")
-        .eq("created_by", currentWallet)
-        .order("created_at", { ascending: false })
-
-      if (error) throw error
-      setVendors(data || [])
+      const res = await fetch(`/api/vendors?owner=${currentWallet}`, {
+        headers: authHeaders(currentWallet),
+      })
+      if (!res.ok) throw new Error("Failed to fetch vendors")
+      const data = await res.json()
+      setVendors(data.vendors || [])
     } catch (err) {
       console.error("[v0] Failed to load vendors:", err)
     }
-  }, [currentWallet, isDemoMode, supabase])
+  }, [currentWallet, isDemoMode])
 
   useEffect(() => {
     loadVendors()
   }, [loadVendors])
 
-  // Load payment history
+  // Load payment history via API
   const loadPaymentHistory = useCallback(async () => {
     if (!currentWallet) {
       setPaymentHistory([])
@@ -393,34 +388,19 @@ export default function BatchPaymentPage() {
 
     setHistoryLoading(true)
     try {
-      if (!supabase) {
-        console.error('[PaymentHistory] Supabase client not available')
-        return
-      }
-
-      const { data, error } = await supabase
-        .from("payments")
-        .select(`
-          *,
-          vendor:vendors(name)
-        `)
-        .or(`from_address.eq.${currentWallet},to_address.eq.${currentWallet}`)
-        .order("timestamp", { ascending: false })
-        .limit(20)
-
-      if (error) {
-        console.error('[PaymentHistory] Error loading payments:', error)
-        throw error
-      }
-
-      setPaymentHistory(data || [])
+      const res = await fetch(`/api/payments?address=${currentWallet}&limit=20`, {
+        headers: authHeaders(currentWallet),
+      })
+      if (!res.ok) throw new Error("Failed to fetch payment history")
+      const data = await res.json()
+      setPaymentHistory(data.payments || data || [])
     } catch (err) {
       console.error("[PaymentHistory] Failed to load payment history:", err)
       setPaymentHistory([])
     } finally {
       setHistoryLoading(false)
     }
-  }, [currentWallet, supabase])
+  }, [currentWallet])
 
   useEffect(() => {
     loadPaymentHistory()
@@ -601,31 +581,37 @@ export default function BatchPaymentPage() {
     }
 
     try {
-      if (!supabase) throw new Error("Database not available")
-
-      const { data, error } = await supabase
-        .from("vendors")
-        .insert({
+      const res = await fetch("/api/vendors", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...authHeaders(currentWallet),
+        },
+        body: JSON.stringify({
           name: tagFormData.name,
           wallet_address: addressValidation.checksumAddress || tagFormData.wallet_address,
           category: tagFormData.category,
           tier: tagFormData.tier,
           notes: tagFormData.notes,
-          created_by: currentWallet,
-        })
-        .select()
-        .single()
+        }),
+      })
 
-      if (error) throw error
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}))
+        throw new Error(errData.error || "Failed to save wallet tag")
+      }
+
+      const data = await res.json()
+      const vendor = data.vendor || data
 
       // Refresh vendors list
       await loadVendors()
 
       // If editing a recipient, update it
-      if (editingRecipientId && data) {
-        updateRecipient(editingRecipientId, "vendorId", data.id)
-        updateRecipient(editingRecipientId, "vendorName", data.name)
-        updateRecipient(editingRecipientId, "address", data.wallet_address)
+      if (editingRecipientId && vendor) {
+        updateRecipient(editingRecipientId, "vendorId", vendor.id)
+        updateRecipient(editingRecipientId, "vendorName", vendor.name)
+        updateRecipient(editingRecipientId, "address", vendor.wallet_address)
       }
 
       toast({ title: "Success", description: "Wallet tagged successfully" })
@@ -633,12 +619,7 @@ export default function BatchPaymentPage() {
     } catch (err: any) {
       console.error("[v0] Failed to save wallet tag:", err)
 
-      // Provide helpful error message based on error type
-      let errorMessage = err.message || "Failed to save wallet tag"
-
-      if (err.code === "42501" || err.message?.includes("row-level security")) {
-        errorMessage = "Database permission error. Please configure Supabase RLS policies for the vendors table."
-      }
+      const errorMessage = err.message || "Failed to save wallet tag"
 
       toast({
         title: "Error",
@@ -748,8 +729,8 @@ export default function BatchPaymentPage() {
             const txHash = await sendToken(recipient.address, recipient.amount, recipient.token || 'USDT')
             successCount++
 
-            // 保存支付记录到数据库
-            if (supabase && txHash) {
+            // 保存支付记录到数据库 via API
+            if (txHash) {
               try {
                 const paymentData = {
                   tx_hash: txHash,
@@ -757,45 +738,32 @@ export default function BatchPaymentPage() {
                   to_address: recipient.address.toLowerCase(),
                   vendor_id: recipient.vendorId || null,
                   token_symbol: recipient.token || 'USDT',
-                  token_address: '0x0000000000000000000000000000000000000000', // 占位符
+                  token_address: '0x0000000000000000000000000000000000000000',
                   amount: recipient.amount,
-                  amount_usd: parseFloat(recipient.amount), // 简化处理，假设稳定币
+                  amount_usd: parseFloat(recipient.amount),
                   status: 'completed',
                   timestamp: new Date().toISOString(),
                   notes: recipient.vendorName ? `Payment to ${recipient.vendorName}` : undefined,
                 }
 
-                const { data: insertedData, error: dbError } = await supabase
-                  .from('payments')
-                  .insert(paymentData)
-                  .select()
+                const saveRes = await fetch('/api/payments', {
+                  method: 'POST',
+                  headers: {
+                    'Content-Type': 'application/json',
+                    ...authHeaders(currentWallet),
+                  },
+                  body: JSON.stringify(paymentData),
+                })
 
-                if (dbError) {
-                  console.error('[IndividualPayment] Failed to save payment record:', {
-                    error: dbError,
-                    code: dbError.code,
-                    message: dbError.message,
-                    details: dbError.details,
-                    hint: dbError.hint,
-                  })
-
-                  // 显示用户友好的错误信息
-                  if (dbError.code === '42501') {
-                    toast({
-                      title: "数据库权限错误",
-                      description: "无法保存支付记录。请检查 Supabase RLS 策略配置。",
-                      variant: "destructive",
-                    })
-                  }
+                if (!saveRes.ok) {
+                  console.error('[IndividualPayment] Failed to save payment record:', await saveRes.text())
                 } else {
-                  // 重新加载支付历史
                   await loadPaymentHistory()
                 }
               } catch (dbErr: any) {
                 console.error('[IndividualPayment] Database exception:', {
                   error: dbErr,
                   message: dbErr.message,
-                  stack: dbErr.stack,
                 })
               }
             }
@@ -921,18 +889,16 @@ export default function BatchPaymentPage() {
         setBatchTransferStep('transferring')
         setBatchTxHash(result.txHash)
 
-        // 保存批量转账记录到数据库
-        if (supabase && result.txHash) {
+        // 保存批量转账记录到数据库 via API
+        if (result.txHash) {
           try {
-            // 为每个收款人创建一条支付记录
-            // 由于 tx_hash 有 UNIQUE 约束，我们为每条记录添加唯一后缀
             const paymentRecords = validRecipients.map((recipient, index) => ({
-              tx_hash: `${result.txHash}-${index}`, // 添加索引后缀使其唯一
+              tx_hash: `${result.txHash}-${index}`,
               from_address: currentWallet.toLowerCase(),
               to_address: recipient.address.toLowerCase(),
               vendor_id: recipient.vendorId || null,
               token_symbol: tokenSymbol,
-              token_address: '0x0000000000000000000000000000000000000000', // 占位符
+              token_address: '0x0000000000000000000000000000000000000000',
               amount: recipient.amount,
               amount_usd: parseFloat(recipient.amount),
               status: 'completed',
@@ -942,30 +908,28 @@ export default function BatchPaymentPage() {
                 : `Batch payment ${index + 1}/${recipientCount} (tx: ${result.txHash})`,
             }))
 
-            // 逐条插入，避免批量插入可能的问题
             let successCount = 0
             let failCount = 0
 
             for (let i = 0; i < paymentRecords.length; i++) {
-              const record = paymentRecords[i]
-
-              const { data: insertedData, error: dbError } = await supabase
-                .from('payments')
-                .insert(record)
-                .select()
-
-              if (dbError) {
-                failCount++
-                console.error(`[BatchPayment] Failed to save payment record ${i + 1}:`, {
-                  error: dbError,
-                  code: dbError.code,
-                  message: dbError.message,
-                  details: dbError.details,
-                  hint: dbError.hint,
-                  record: record,
+              try {
+                const saveRes = await fetch('/api/payments', {
+                  method: 'POST',
+                  headers: {
+                    'Content-Type': 'application/json',
+                    ...authHeaders(currentWallet),
+                  },
+                  body: JSON.stringify(paymentRecords[i]),
                 })
-              } else {
-                successCount++
+                if (saveRes.ok) {
+                  successCount++
+                } else {
+                  failCount++
+                  console.error(`[BatchPayment] Failed to save payment record ${i + 1}:`, await saveRes.text())
+                }
+              } catch (saveErr) {
+                failCount++
+                console.error(`[BatchPayment] Failed to save payment record ${i + 1}:`, saveErr)
               }
             }
 
@@ -976,7 +940,6 @@ export default function BatchPaymentPage() {
                 variant: "default",
               })
             } else {
-              // 重新加载支付历史
               await loadPaymentHistory()
             }
 
@@ -984,7 +947,6 @@ export default function BatchPaymentPage() {
             console.error('[BatchPayment] Database exception:', {
               error: dbErr,
               message: dbErr.message,
-              stack: dbErr.stack,
             })
           }
         }

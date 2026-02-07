@@ -7,7 +7,7 @@
  */
 
 import { NextResponse } from "next/server"
-import { createClient } from "@/lib/supabase/server"
+import { prisma } from "@/lib/prisma"
 import { getSession } from "@/lib/auth/session"
 
 export async function GET() {
@@ -17,15 +17,17 @@ export async function GET() {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
-    const supabase = await createClient()
+    const wallet = await prisma.embeddedWallet.findFirst({
+      where: { user_id: session.userId },
+      select: {
+        address: true,
+        server_share_encrypted: true,
+        server_share_iv: true,
+        salt: true,
+      },
+    })
 
-    const { data: wallet, error } = await supabase
-      .from("embedded_wallets")
-      .select("address, server_share_encrypted, server_share_iv, salt")
-      .eq("user_id", session.userId)
-      .single()
-
-    if (error || !wallet) {
+    if (!wallet) {
       return NextResponse.json({ error: "Wallet not found" }, { status: 404 })
     }
 

@@ -4,6 +4,7 @@
  */
 
 import { ethers } from 'ethers'
+import prisma from '@/lib/prisma'
 
 /**
  * Validate Ethereum address format
@@ -71,9 +72,7 @@ export function isZeroAddress(address: string): boolean {
  */
 export async function validateAccountWalletAssociation(
   accountId: string,
-  walletAddress: string,
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  supabase: any
+  walletAddress: string
 ): Promise<{ valid: boolean; error?: string }> {
   if (!isValidAddress(walletAddress)) {
     return { valid: false, error: 'Invalid wallet address format' }
@@ -84,14 +83,15 @@ export async function validateAccountWalletAssociation(
   }
   
   try {
-    const { data, error } = await supabase
-      .from('user_wallets')
-      .select('id, wallet_address')
-      .eq('user_id', accountId)
-      .eq('wallet_address', walletAddress.toLowerCase())
-      .single()
+    const wallet = await prisma.userWallet.findFirst({
+      where: {
+        user_id: accountId,
+        wallet_address: walletAddress.toLowerCase(),
+      },
+      select: { id: true, wallet_address: true },
+    })
     
-    if (error || !data) {
+    if (!wallet) {
       return { valid: false, error: 'Wallet not associated with this account' }
     }
     

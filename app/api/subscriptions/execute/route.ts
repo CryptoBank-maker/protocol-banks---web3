@@ -12,7 +12,7 @@ import { checkAuthorizationValidity } from "@/lib/subscription-helpers"
 import { webhookTriggerService, type SubscriptionEventData } from "@/lib/services/webhook-trigger-service"
 import { submitBatchPayment } from "@/lib/grpc/payout-bridge"
 import { getTokenAddress, CHAIN_IDS } from "@/lib/web3"
-import { createClient } from "@/lib/supabase/client"
+import { prisma } from "@/lib/prisma"
 import { decryptSessionKey } from "@/lib/security/encryption"
 
 // ============================================
@@ -67,32 +67,29 @@ async function getActiveSessionKey(
   ownerAddress: string,
   chainId: number
 ): Promise<{ sessionKeyAddress: string; privateKey: string } | null> {
-  const supabase = createClient()
+  const data = await prisma.sessionKey.findFirst({
+    where: {
+      owner_address: ownerAddress.toLowerCase(),
+      chain_id: chainId,
+      is_active: true,
+      expires_at: { gt: new Date() },
+    },
+    orderBy: { created_at: "desc" },
+  })
 
-  const { data, error } = await supabase
-    .from("session_keys")
-    .select("*")
-    .eq("owner_address", ownerAddress.toLowerCase())
-    .eq("chain_id", chainId)
-    .eq("is_active", true)
-    .gt("expires_at", new Date().toISOString())
-    .order("created_at", { ascending: false })
-    .limit(1)
-    .single()
-
-  if (error || !data) {
+  if (!data) {
     return null
   }
 
   // Decrypt the private key from storage
-  const privateKey = decryptSessionKey(data.encrypted_private_key)
+  const privateKey = decryptSessionKey(data.encrypted_key)
   if (!privateKey) {
     console.error("[SubscriptionExecute] Failed to decrypt session key for", ownerAddress)
     return null
   }
 
   return {
-    sessionKeyAddress: data.session_key_address,
+    sessionKeyAddress: data.session_address,
     privateKey,
   }
 }

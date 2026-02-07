@@ -2,7 +2,6 @@
 
 import type React from "react"
 import { useState, useEffect } from "react"
-import { supabase } from "@/lib/supabase"
 import { Loader2, Send, CheckCircle2, Shield } from "lucide-react"
 import { getRecaptchaSiteKey } from "@/app/actions/get-recaptcha-key"
 
@@ -84,8 +83,6 @@ export function ContactForm() {
       if (!response.ok) {
         throw new Error(result.message || "Failed to send message")
       }
-
-      await supabase.from("contact_messages").insert([data])
 
       setIsSuccess(true)
       ;(e.target as HTMLFormElement).reset()

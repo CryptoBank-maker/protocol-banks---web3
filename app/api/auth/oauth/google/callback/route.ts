@@ -1,5 +1,5 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { createServerClient } from "@/lib/supabase/server"
+import { prisma } from "@/lib/prisma"
 import { createSession } from "@/lib/auth/session"
 
 const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID
@@ -56,15 +56,15 @@ export async function GET(request: NextRequest) {
       return NextResponse.redirect(new URL("/auth/error?error=user_info_failed", request.url))
     }
 
-    // Create or get user
-    const supabase = await createServerClient()
-
-    // Check if user exists
-    const { data: existingUser } = await supabase
-      .from("auth_users")
-      .select("*")
-      .or(`google_id.eq.${userInfo.id},email.eq.${userInfo.email}`)
-      .single()
+    // Check if user exists by google_id or email
+    let existingUser = await prisma.authUser.findFirst({
+      where: {
+        OR: [
+          { google_id: userInfo.id },
+          { email: userInfo.email },
+        ],
+      },
+    })
 
     let userId: string
 
@@ -72,25 +72,26 @@ export async function GET(request: NextRequest) {
       userId = existingUser.id
       // Update google_id if not set
       if (!existingUser.google_id) {
-        await supabase.from("auth_users").update({ google_id: userInfo.id }).eq("id", existingUser.id)
+        await prisma.authUser.update({
+          where: { id: existingUser.id },
+          data: { google_id: userInfo.id },
+        })
       }
     } else {
       // Create new user
-      const { data: newUser, error: createError } = await supabase
-        .from("auth_users")
-        .insert({
-          email: userInfo.email,
-          google_id: userInfo.id,
+      try {
+        const newUser = await prisma.authUser.create({
+          data: {
+            email: userInfo.email,
+            google_id: userInfo.id,
+            email_verified: true,
+          },
         })
-        .select()
-        .single()
-
-      if (createError || !newUser) {
+        userId = newUser.id
+      } catch (createError) {
         console.error("[OAuth] User creation failed:", createError)
         return NextResponse.redirect(new URL("/auth/error?error=user_creation_failed", request.url))
       }
-
-      userId = newUser.id
     }
 
     // Create session

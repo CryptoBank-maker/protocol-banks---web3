@@ -5,7 +5,8 @@
  */
 
 import { NextRequest, NextResponse } from "next/server"
-import { createClient } from "@/lib/supabase/server"
+import { prisma } from "@/lib/prisma"
+import { getAuthenticatedAddress } from "@/lib/api-auth"
 import { generatePrivateKey, privateKeyToAccount } from "viem/accounts"
 import { encryptSessionKey } from "@/lib/security/encryption"
 
@@ -19,46 +20,25 @@ interface CreateSessionKeyRequest {
 // GET - List session keys
 export async function GET(request: NextRequest) {
   try {
-    const supabase = await createClient()
-
-    // Get user from session
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
-    if (authError || !user) {
+    const walletAddress = await getAuthenticatedAddress(request)
+    if (!walletAddress) {
       return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 })
     }
 
-    // Get owner_address from user metadata or query auth_users
-    const { data: authUser } = await supabase
-      .from("auth_users")
-      .select("wallet_address")
-      .eq("id", user.id)
-      .single()
-
-    const ownerAddress = authUser?.wallet_address
-    if (!ownerAddress) {
-      return NextResponse.json({ success: false, error: "No wallet associated" }, { status: 400 })
-    }
-
     // Fetch session keys
-    const { data: sessionKeys, error } = await supabase
-      .from("session_keys")
-      .select("*")
-      .eq("owner_address", ownerAddress.toLowerCase())
-      .order("created_at", { ascending: false })
+    const sessionKeys = await prisma.sessionKey.findMany({
+      where: { owner_address: walletAddress.toLowerCase() },
+      orderBy: { created_at: "desc" },
+    })
 
-    if (error) {
-      console.error("[SessionKeys] Failed to fetch:", error)
-      return NextResponse.json({ success: false, error: "Failed to fetch session keys" }, { status: 500 })
-    }
-
-    // Map data to safe response (never return encrypted_private_key)
-    const safeKeys = (sessionKeys || []).map((key) => ({
+    // Map data to safe response (never return encrypted_key)
+    const safeKeys = sessionKeys.map((key) => ({
       id: key.id,
       owner_address: key.owner_address,
-      session_key_address: key.session_key_address,
+      session_key_address: key.session_address,
       chain_id: key.chain_id,
       spending_limit: key.spending_limit,
-      spent_amount: key.spent_amount,
+      spent_amount: key.amount_spent,
       allowed_tokens: key.allowed_tokens,
       expires_at: key.expires_at,
       is_active: key.is_active,
@@ -82,24 +62,9 @@ export async function GET(request: NextRequest) {
 // POST - Create session key
 export async function POST(request: NextRequest) {
   try {
-    const supabase = await createClient()
-
-    // Get user from session
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
-    if (authError || !user) {
+    const walletAddress = await getAuthenticatedAddress(request)
+    if (!walletAddress) {
       return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 })
-    }
-
-    // Get owner_address from user metadata or query auth_users
-    const { data: authUser } = await supabase
-      .from("auth_users")
-      .select("wallet_address")
-      .eq("id", user.id)
-      .single()
-
-    const ownerAddress = authUser?.wallet_address
-    if (!ownerAddress) {
-      return NextResponse.json({ success: false, error: "No wallet associated" }, { status: 400 })
     }
 
     // Parse request body
@@ -121,37 +86,30 @@ export async function POST(request: NextRequest) {
     const encryptedPrivateKey = encryptSessionKey(privateKey)
 
     // Insert session key
-    const { data: sessionKey, error } = await supabase
-      .from("session_keys")
-      .insert({
-        owner_address: ownerAddress.toLowerCase(),
-        session_key_address: account.address.toLowerCase(),
-        encrypted_private_key: encryptedPrivateKey,
+    const sessionKey = await prisma.sessionKey.create({
+      data: {
+        owner_address: walletAddress.toLowerCase(),
+        session_address: account.address.toLowerCase(),
+        encrypted_key: encryptedPrivateKey,
         chain_id: body.chain_id,
         spending_limit: body.spending_limit,
-        spent_amount: "0",
+        amount_spent: "0",
         allowed_tokens: body.allowed_tokens || [],
-        expires_at: body.expires_at,
+        expires_at: new Date(body.expires_at),
         is_active: true,
-      })
-      .select()
-      .single()
+      },
+    })
 
-    if (error) {
-      console.error("[SessionKeys] Failed to create:", error)
-      return NextResponse.json({ success: false, error: "Failed to create session key" }, { status: 500 })
-    }
-
-    // Return safe response (never return encrypted_private_key)
+    // Return safe response (never return encrypted_key)
     return NextResponse.json({
       success: true,
       sessionKey: {
         id: sessionKey.id,
         owner_address: sessionKey.owner_address,
-        session_key_address: sessionKey.session_key_address,
+        session_key_address: sessionKey.session_address,
         chain_id: sessionKey.chain_id,
         spending_limit: sessionKey.spending_limit,
-        spent_amount: sessionKey.spent_amount,
+        spent_amount: sessionKey.amount_spent,
         allowed_tokens: sessionKey.allowed_tokens,
         expires_at: sessionKey.expires_at,
         is_active: sessionKey.is_active,

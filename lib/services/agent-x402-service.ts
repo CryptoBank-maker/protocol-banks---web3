@@ -2,7 +2,7 @@
  * Agent x402 Integration Service
  *
  * Handles x402 authorization generation and payment execution for agent proposals.
- * Integrates with Supabase for persistence and relayer service for on-chain execution.
+ * Integrates with Prisma/PostgreSQL for persistence and relayer service for on-chain execution.
  *
  * @module lib/services/agent-x402-service
  */

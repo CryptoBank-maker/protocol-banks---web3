@@ -6,7 +6,7 @@
  */
 
 import { type NextRequest, NextResponse } from "next/server"
-import { createClient } from "@/lib/supabase/server"
+import { prisma } from "@/lib/prisma"
 import { sha256 } from "@/lib/auth/crypto"
 import { createSession } from "@/lib/auth/session"
 
@@ -19,58 +19,64 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const supabase = await createClient()
     const tokenHash = await sha256(token)
 
     // Find magic link
-    const { data: magicLink, error: findError } = await supabase
-      .from("magic_links")
-      .select("*")
-      .eq("token_hash", tokenHash)
-      .eq("used", false)
-      .gt("expires_at", new Date().toISOString())
-      .single()
+    const magicLink = await prisma.magicLink.findFirst({
+      where: {
+        token_hash: tokenHash,
+        used: false,
+        expires_at: { gt: new Date() },
+      },
+    })
 
-    if (findError || !magicLink) {
+    if (!magicLink) {
       return NextResponse.redirect(`${baseUrl}/auth/error?error=invalid_or_expired_link`)
     }
 
     // Mark link as used
-    await supabase.from("magic_links").update({ used: true, used_at: new Date().toISOString() }).eq("id", magicLink.id)
+    await prisma.magicLink.update({
+      where: { id: magicLink.id },
+      data: { used: true, used_at: new Date() },
+    })
 
     // Find or create user
-    let { data: user } = await supabase.from("auth_users").select("*").eq("email", magicLink.email).single()
+    let user = await prisma.authUser.findUnique({
+      where: { email: magicLink.email },
+    })
 
     if (!user) {
       // Create new user
-      const { data: newUser, error: createError } = await supabase
-        .from("auth_users")
-        .insert({
-          email: magicLink.email,
-          email_verified: true,
+      try {
+        user = await prisma.authUser.create({
+          data: {
+            email: magicLink.email,
+            email_verified: true,
+          },
         })
-        .select()
-        .single()
-
-      if (createError) {
+      } catch (createError) {
         console.error("[Auth] Failed to create user:", createError)
         return NextResponse.redirect(`${baseUrl}/auth/error?error=user_creation_failed`)
       }
-
-      user = newUser
     } else {
       // Update email verification status
-      await supabase.from("auth_users").update({ email_verified: true }).eq("id", user.id)
+      await prisma.authUser.update({
+        where: { id: user.id },
+        data: { email_verified: true },
+      })
     }
 
     // Check if user has embedded wallet
-    const { data: wallet } = await supabase.from("embedded_wallets").select("address").eq("user_id", user.id).single()
+    const wallet = await prisma.embeddedWallet.findFirst({
+      where: { user_id: user.id },
+      select: { address: true },
+    })
 
     // Create session
     const ipAddress = request.headers.get("x-forwarded-for") || "unknown"
     const userAgent = request.headers.get("user-agent") || "unknown"
 
-    await createSession(user.id, user.email, wallet?.address, {
+    await createSession(user.id, user.email || '', wallet?.address, {
       ipAddress,
       userAgent,
     })

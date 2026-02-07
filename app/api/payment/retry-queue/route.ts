@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
-import { createClient } from "@supabase/supabase-js"
+import { prisma } from "@/lib/prisma"
 
 /**
  * POST /api/payment/retry-queue
@@ -16,33 +16,16 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    // Use service role key to bypass RLS
-    const supabase = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!,
-      { auth: { persistSession: false } }
-    )
-
     // Store in retry queue table
-    const { data, error } = await supabase
-      .from("payment_retry_queue")
-      .insert({
+    const data = await prisma.paymentRetryQueue.create({
+      data: {
         tx_hash: txHash,
         payment_data: paymentData,
         retry_count: 0,
         status: "pending",
-        next_retry_at: new Date(Date.now() + 60000).toISOString(), // Retry in 1 minute
-      })
-      .select()
-      .single()
-
-    if (error) {
-      console.error("[Retry Queue] Insert error:", error)
-      return NextResponse.json(
-        { error: "Failed to queue payment for retry", details: error.message },
-        { status: 500 }
-      )
-    }
+        next_retry: new Date(Date.now() + 60000), // Retry in 1 minute
+      },
+    })
 
     console.log(`[Retry Queue] Payment ${txHash} queued for retry`)
 

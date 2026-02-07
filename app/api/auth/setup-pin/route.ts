@@ -11,7 +11,8 @@
  */
 
 import { NextRequest, NextResponse } from "next/server"
-import { createClient } from "@/lib/supabase/server"
+import { prisma } from "@/lib/prisma"
+import { getSession } from "@/lib/auth/session"
 import { generateMnemonic, mnemonicToSeedSync } from "@scure/bip39"
 import { wordlist } from "@scure/bip39/wordlists/english"
 import { HDNodeWallet } from "ethers"
@@ -43,20 +44,19 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: false, error: "PIN must contain only numbers" }, { status: 400 })
     }
 
-    const supabase = await createClient()
-
-    // Get authenticated user
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
-    if (authError || !user) {
+    // Get authenticated user via session
+    const session = await getSession()
+    if (!session) {
       return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 })
     }
 
+    const userId = session.userId
+
     // Check if user already has a wallet
-    const { data: existingWallet } = await supabase
-      .from("embedded_wallets")
-      .select("id")
-      .eq("user_id", user.id)
-      .single()
+    const existingWallet = await prisma.embeddedWallet.findFirst({
+      where: { user_id: userId },
+      select: { id: true },
+    })
 
     if (existingWallet) {
       return NextResponse.json({ success: false, error: "Wallet already exists" }, { status: 400 })
@@ -103,29 +103,33 @@ export async function POST(request: NextRequest) {
     }
 
     // Step 7: Store wallet in database
-    const { error: insertError } = await supabase.from("embedded_wallets").insert({
-      user_id: user.id,
-      wallet_address: address.toLowerCase(),
-      encrypted_share_b: JSON.stringify(encryptedData),
-      share_c_hash: await hashShare(encodeShare(shareC)),
-      salt: toBase64(saltBytes),
-      derivation_path: "m/44'/60'/0'/0/0",
-      created_at: new Date().toISOString(),
-    })
-
-    if (insertError) {
+    try {
+      await prisma.embeddedWallet.create({
+        data: {
+          user_id: userId,
+          wallet_address: address.toLowerCase(),
+          address: address.toLowerCase(),
+          encrypted_share_b: JSON.stringify(encryptedData),
+          share_c_hash: await hashShare(encodeShare(shareC)),
+          salt: toBase64(saltBytes),
+          derivation_path: "m/44'/60'/0'/0/0",
+          chain_type: "EVM",
+          is_primary: true,
+        },
+      })
+    } catch (insertError) {
       console.error("[Setup PIN] Failed to store wallet:", insertError)
       return NextResponse.json({ success: false, error: "Failed to create wallet" }, { status: 500 })
     }
 
     // Step 8: Update auth_users table
-    await supabase
-      .from("auth_users")
-      .update({
+    await prisma.authUser.update({
+      where: { id: userId },
+      data: {
         wallet_address: address.toLowerCase(),
         onboarding_completed: true,
-      })
-      .eq("id", user.id)
+      },
+    })
 
     // Step 9: Return success with mnemonic, recovery code, and share A (for client storage)
     return NextResponse.json({

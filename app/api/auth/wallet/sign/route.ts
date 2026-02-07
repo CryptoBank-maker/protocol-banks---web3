@@ -8,7 +8,7 @@
  */
 
 import { type NextRequest, NextResponse } from "next/server"
-import { createClient } from "@/lib/supabase/server"
+import { prisma } from "@/lib/prisma"
 import { getSession } from "@/lib/auth/session"
 import { signTransaction, signMessage } from "@/lib/auth/embedded-wallet"
 
@@ -25,16 +25,17 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Missing required fields" }, { status: 400 })
     }
 
-    const supabase = await createClient()
-
     // Get server share
-    const { data: wallet, error } = await supabase
-      .from("embedded_wallets")
-      .select("server_share_encrypted, server_share_iv, salt")
-      .eq("user_id", session.userId)
-      .single()
+    const wallet = await prisma.embeddedWallet.findFirst({
+      where: { user_id: session.userId },
+      select: {
+        server_share_encrypted: true,
+        server_share_iv: true,
+        salt: true,
+      },
+    })
 
-    if (error || !wallet) {
+    if (!wallet) {
       return NextResponse.json({ error: "Wallet not found" }, { status: 404 })
     }
 

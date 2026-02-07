@@ -11,7 +11,7 @@
  * - MoonPay (widget-only)
  */
 
-import { createClient } from "./supabase"
+import { prisma } from "@/lib/prisma"
 
 // ============================================
 // Types
@@ -295,7 +295,6 @@ function getMockQuote(
  * Initiate off-ramp transaction via provider API
  */
 export async function initiateOffRamp(request: OffRampRequest): Promise<OffRampTransaction> {
-  const supabase = createClient()
   const transactionId = `offramp_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`
 
   // Try to execute via provider API
@@ -375,23 +374,24 @@ export async function initiateOffRamp(request: OffRampRequest): Promise<OffRampT
   }
 
   // Record in database
-  if (supabase) {
-    try {
-      await supabase.from("offramp_transactions").insert({
-        id: transactionId,
+  try {
+    await prisma.offrampTransaction.create({
+      data: {
+        reference_id: transactionId,
         wallet_address: request.walletAddress.toLowerCase(),
         provider: request.provider,
-        provider_order_id: providerOrderId,
-        input_amount: request.amount,
-        input_token: request.token,
-        output_amount: outputAmount,
-        output_currency: request.targetCurrency,
+        provider_tx_id: providerOrderId,
+        crypto_amount: parseFloat(request.amount),
+        token: request.token,
         chain_id: request.chainId,
+        fiat_amount: parseFloat(outputAmount),
+        fiat_currency: request.targetCurrency,
+        payout_method: request.bankAccount?.type || "bank_transfer",
         status: "pending",
-      })
-    } catch (error) {
-      console.warn("[OffRamp] DB recording failed:", error)
-    }
+      },
+    })
+  } catch (error) {
+    console.warn("[OffRamp] DB recording failed:", error)
   }
 
   return transaction
@@ -401,25 +401,27 @@ export async function initiateOffRamp(request: OffRampRequest): Promise<OffRampT
  * Get off-ramp transaction status
  */
 export async function getOffRampStatus(transactionId: string): Promise<OffRampTransaction | null> {
-  const supabase = createClient()
-  if (!supabase) return null
+  try {
+    const data = await prisma.offrampTransaction.findUnique({
+      where: { reference_id: transactionId },
+    })
 
-  const { data, error } = await supabase.from("offramp_transactions").select("*").eq("id", transactionId).single()
+    if (!data) return null
 
-  if (error || !data) return null
-
-  return {
-    id: data.id,
-    status: data.status,
-    provider: data.provider,
-    inputAmount: data.input_amount,
-    inputToken: data.input_token,
-    outputAmount: data.output_amount,
-    outputCurrency: data.output_currency,
-    txHash: data.tx_hash,
-    createdAt: data.created_at,
-    completedAt: data.completed_at,
-    bankReference: data.bank_reference,
+    return {
+      id: data.reference_id,
+      status: data.status as OffRampTransaction["status"],
+      provider: data.provider as OffRampProvider,
+      inputAmount: data.crypto_amount.toString(),
+      inputToken: data.token,
+      outputAmount: data.fiat_amount.toString(),
+      outputCurrency: data.fiat_currency,
+      txHash: data.tx_hash || undefined,
+      createdAt: data.created_at.toISOString(),
+      bankReference: data.bank_details || undefined,
+    }
+  } catch {
+    return null
   }
 }
 
@@ -427,31 +429,28 @@ export async function getOffRampStatus(transactionId: string): Promise<OffRampTr
  * Get user's off-ramp history
  */
 export async function getOffRampHistory(walletAddress: string): Promise<OffRampTransaction[]> {
-  const supabase = createClient()
-  if (!supabase) return []
+  try {
+    const data = await prisma.offrampTransaction.findMany({
+      where: { wallet_address: walletAddress.toLowerCase() },
+      orderBy: { created_at: "desc" },
+      take: 50,
+    })
 
-  const { data, error } = await supabase
-    .from("offramp_transactions")
-    .select("*")
-    .eq("wallet_address", walletAddress.toLowerCase())
-    .order("created_at", { ascending: false })
-    .limit(50)
-
-  if (error || !data) return []
-
-  return data.map((row: any) => ({
-    id: row.id,
-    status: row.status,
-    provider: row.provider,
-    inputAmount: row.input_amount,
-    inputToken: row.input_token,
-    outputAmount: row.output_amount,
-    outputCurrency: row.output_currency,
-    txHash: row.tx_hash,
-    createdAt: row.created_at,
-    completedAt: row.completed_at,
-    bankReference: row.bank_reference,
-  }))
+    return data.map((row) => ({
+      id: row.reference_id,
+      status: row.status as OffRampTransaction["status"],
+      provider: row.provider as OffRampProvider,
+      inputAmount: row.crypto_amount.toString(),
+      inputToken: row.token,
+      outputAmount: row.fiat_amount.toString(),
+      outputCurrency: row.fiat_currency,
+      txHash: row.tx_hash || undefined,
+      createdAt: row.created_at.toISOString(),
+      bankReference: row.bank_details || undefined,
+    }))
+  } catch {
+    return []
+  }
 }
 
 /**

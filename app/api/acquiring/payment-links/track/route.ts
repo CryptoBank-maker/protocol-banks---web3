@@ -6,28 +6,7 @@
  */
 
 import { type NextRequest, NextResponse } from "next/server"
-import { createServerClient } from "@supabase/ssr"
-import { cookies } from "next/headers"
-
-async function getServiceSupabase() {
-  const cookieStore = await cookies()
-  return createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-    {
-      cookies: {
-        getAll() {
-          return cookieStore.getAll()
-        },
-        setAll(cookiesToSet) {
-          cookiesToSet.forEach(({ name, value, options }) => {
-            cookieStore.set(name, value, options)
-          })
-        },
-      },
-    },
-  )
-}
+import { prisma } from "@/lib/prisma"
 
 export async function POST(request: NextRequest) {
   try {
@@ -38,85 +17,68 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "linkId and event required" }, { status: 400 })
     }
 
-    const supabase = await getServiceSupabase()
     const ipAddress = request.headers.get("x-forwarded-for") || request.headers.get("x-real-ip")
     const userAgent = request.headers.get("user-agent")
 
     if (event === "view" || event === "click") {
-      // Record view/click event and increment view count on the link
+      // Record view/click event
       try {
-        await supabase.from("payment_link_events").insert({
-          link_id: linkId,
-          event_type: event,
-          ip_address: ipAddress,
-          user_agent: userAgent,
+        await prisma.paymentLinkEvent.create({
+          data: {
+            link_id: linkId,
+            event_type: event,
+            ip_address: ipAddress,
+            user_agent: userAgent,
+          },
         })
       } catch {
         // Table might not exist yet
       }
 
-      // Increment view count on the payment link itself
+      // Increment view count
       try {
-        const { data: link } = await supabase
-          .from("payment_links")
-          .select("total_views")
-          .eq("link_id", linkId)
-          .single()
-
-        if (link) {
-          await supabase
-            .from("payment_links")
-            .update({
-              total_views: (link.total_views || 0) + 1,
-              updated_at: new Date().toISOString(),
-            })
-            .eq("link_id", linkId)
-        }
+        await prisma.paymentLink.update({
+          where: { link_id: linkId },
+          data: {
+            total_views: { increment: 1 },
+            updated_at: new Date(),
+          },
+        })
       } catch {
-        // Column might not exist yet
+        // Ignore if link doesn't exist
       }
     }
 
     if (event === "payment") {
       // Update payment link stats
-      const { error: updateError } = await supabase.rpc("increment_payment_link_stats", {
-        p_link_id: linkId,
-        p_amount: parseFloat(amount) || 0,
-      })
-
-      if (updateError) {
-        // Fallback: direct update if RPC doesn't exist
-        const { data: link } = await supabase
-          .from("payment_links")
-          .select("total_payments, total_amount")
-          .eq("link_id", linkId)
-          .single()
-
-        if (link) {
-          await supabase
-            .from("payment_links")
-            .update({
-              total_payments: (link.total_payments || 0) + 1,
-              total_amount: (link.total_amount || 0) + (parseFloat(amount) || 0),
-              updated_at: new Date().toISOString(),
-            })
-            .eq("link_id", linkId)
-        }
+      try {
+        await prisma.paymentLink.update({
+          where: { link_id: linkId },
+          data: {
+            total_payments: { increment: 1 },
+            total_amount: { increment: parseFloat(amount) || 0 },
+            updated_at: new Date(),
+          },
+        })
+      } catch {
+        console.log(`[PaymentLink] Payment: ${linkId} - ${amount} - ${txHash}`)
       }
 
       // Record the payment event
       try {
-        await supabase.from("payment_link_events").insert({
-          link_id: linkId,
-          event_type: "payment",
-          tx_hash: txHash,
-          amount: parseFloat(amount) || 0,
-          payer_address: payer,
-          ip_address: ipAddress,
-          user_agent: userAgent,
+        await prisma.paymentLinkEvent.create({
+          data: {
+            link_id: linkId,
+            event_type: "payment",
+            tx_hash: txHash,
+            amount: parseFloat(amount) || 0,
+            payer_address: payer,
+            ip_address: ipAddress,
+            user_agent: userAgent,
+          },
         })
       } catch {
-        console.log(`[PaymentLink] Payment: ${linkId} - ${amount} - ${txHash}`)
+        console.log(`[PaymentLink] Payment event: ${linkId} - ${amount} - ${txHash}`)
       }
     }
 
@@ -139,30 +101,37 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "linkId required" }, { status: 400 })
     }
 
-    const supabase = await getServiceSupabase()
-
     // Get link stats
-    const { data: link, error: linkError } = await supabase
-      .from("payment_links")
-      .select("link_id, total_payments, total_amount, total_views, created_at")
-      .eq("link_id", linkId)
-      .single()
+    const link = await prisma.paymentLink.findUnique({
+      where: { link_id: linkId },
+      select: {
+        link_id: true,
+        total_payments: true,
+        total_amount: true,
+        total_views: true,
+        created_at: true,
+      },
+    })
 
-    if (linkError || !link) {
+    if (!link) {
       return NextResponse.json({ error: "Payment link not found" }, { status: 404 })
     }
 
     // Get recent events
     let events: any[] = []
     try {
-      const { data } = await supabase
-        .from("payment_link_events")
-        .select("event_type, tx_hash, amount, payer_address, created_at")
-        .eq("link_id", linkId)
-        .order("created_at", { ascending: false })
-        .limit(50)
-
-      events = data || []
+      events = await prisma.paymentLinkEvent.findMany({
+        where: { link_id: linkId },
+        select: {
+          event_type: true,
+          tx_hash: true,
+          amount: true,
+          payer_address: true,
+          created_at: true,
+        },
+        orderBy: { created_at: "desc" },
+        take: 50,
+      })
     } catch {
       // Table might not exist
     }

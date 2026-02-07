@@ -3,7 +3,7 @@
 import { useState, useCallback, useEffect } from "react"
 import { useUnifiedWallet } from "@/hooks/use-unified-wallet"
 import { useToast } from "@/hooks/use-toast"
-import { getSupabase } from "@/lib/supabase"
+import { authHeaders } from "@/lib/authenticated-fetch"
 
 export interface PricingTier {
   id: string
@@ -117,14 +117,15 @@ export function useMonetizeConfig(): UseMonetizeConfigReturn {
     setError(null)
 
     try {
-      const supabase = getSupabase()
+      const res = await fetch("/api/monetize", {
+        headers: authHeaders(address),
+      })
 
-      // Fetch config
-      const { data: configData } = await supabase
-        .from("monetize_configs")
-        .select("*")
-        .eq("wallet_address", address.toLowerCase())
-        .single()
+      if (!res.ok) {
+        throw new Error("Failed to fetch monetize data")
+      }
+
+      const { config: configData, apiKeys: keysData } = await res.json()
 
       if (configData) {
         setConfig({
@@ -132,16 +133,9 @@ export function useMonetizeConfig(): UseMonetizeConfigReturn {
           tiers: configData.tiers || DEFAULT_TIERS,
           defaultTier: configData.default_tier || "free",
           webhookUrl: configData.webhook_url,
-          rateLimitEnabled: configData.rate_limit_enabled ?? true,
+          rateLimitEnabled: configData.require_auth ?? true,
         })
       }
-
-      // Fetch API keys
-      const { data: keysData } = await supabase
-        .from("api_keys")
-        .select("*")
-        .eq("wallet_address", address.toLowerCase())
-        .order("created_at", { ascending: false })
 
       setApiKeys(keysData || [])
 
@@ -174,20 +168,24 @@ export function useMonetizeConfig(): UseMonetizeConfigReturn {
       if (!address) return
 
       try {
-        const supabase = getSupabase()
         const newConfig = { ...config, ...updates }
 
-        const { error: upsertError } = await supabase.from("monetize_configs").upsert({
-          wallet_address: address.toLowerCase(),
-          enabled: newConfig.enabled,
-          tiers: newConfig.tiers,
-          default_tier: newConfig.defaultTier,
-          webhook_url: newConfig.webhookUrl,
-          rate_limit_enabled: newConfig.rateLimitEnabled,
-          updated_at: new Date().toISOString(),
+        const res = await fetch("/api/monetize", {
+          method: "PUT",
+          headers: { ...authHeaders(address), "Content-Type": "application/json" },
+          body: JSON.stringify({
+            enabled: newConfig.enabled,
+            tiers: newConfig.tiers,
+            defaultTier: newConfig.defaultTier,
+            webhookUrl: newConfig.webhookUrl,
+            rateLimitEnabled: newConfig.rateLimitEnabled,
+          }),
         })
 
-        if (upsertError) throw upsertError
+        if (!res.ok) {
+          const errBody = await res.json().catch(() => ({}))
+          throw new Error(errBody.error || "Failed to update config")
+        }
 
         setConfig(newConfig)
         toast({
@@ -211,25 +209,28 @@ export function useMonetizeConfig(): UseMonetizeConfigReturn {
       if (!address) return null
 
       try {
-        const supabase = getSupabase()
         const key = `pb_${crypto.randomUUID().replace(/-/g, "")}`
         const tierConfig = config.tiers.find((t) => t.id === tier)
 
-        const { data, error: insertError } = await supabase
-          .from("api_keys")
-          .insert({
-            wallet_address: address.toLowerCase(),
+        const res = await fetch("/api/monetize", {
+          method: "POST",
+          headers: { ...authHeaders(address), "Content-Type": "application/json" },
+          body: JSON.stringify({
             key,
             name,
             tier,
             status: "active",
             calls_used: 0,
             calls_limit: tier === "enterprise" ? -1 : tierConfig?.rateLimit ? tierConfig.rateLimit * 30 * 24 * 60 : 1000,
-          })
-          .select()
-          .single()
+          }),
+        })
 
-        if (insertError) throw insertError
+        if (!res.ok) {
+          const errBody = await res.json().catch(() => ({}))
+          throw new Error(errBody.error || "Failed to create API key")
+        }
+
+        const data = await res.json()
 
         setApiKeys((prev) => [data, ...prev])
         toast({
@@ -253,13 +254,16 @@ export function useMonetizeConfig(): UseMonetizeConfigReturn {
   const revokeAPIKey = useCallback(
     async (keyId: string) => {
       try {
-        const supabase = getSupabase()
-        const { error: updateError } = await supabase
-          .from("api_keys")
-          .update({ status: "revoked" })
-          .eq("id", keyId)
+        const res = await fetch("/api/monetize", {
+          method: "PATCH",
+          headers: { ...authHeaders(address), "Content-Type": "application/json" },
+          body: JSON.stringify({ keyId }),
+        })
 
-        if (updateError) throw updateError
+        if (!res.ok) {
+          const errBody = await res.json().catch(() => ({}))
+          throw new Error(errBody.error || "Failed to revoke API key")
+        }
 
         setApiKeys((prev) => prev.map((key) => (key.id === keyId ? { ...key, status: "revoked" } : key)))
         toast({
@@ -275,7 +279,7 @@ export function useMonetizeConfig(): UseMonetizeConfigReturn {
         })
       }
     },
-    [toast],
+    [address, toast],
   )
 
   const addTier = useCallback(

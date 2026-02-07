@@ -3,7 +3,7 @@
 import { useState, useCallback, useEffect } from "react"
 import { useUnifiedWallet } from "@/hooks/use-unified-wallet"
 import { useToast } from "@/hooks/use-toast"
-import { getSupabase } from "@/lib/supabase"
+import { authHeaders } from "@/lib/authenticated-fetch"
 
 export interface MCPProvider {
   id: string
@@ -127,18 +127,15 @@ export function useMCPSubscriptions(): UseMCPSubscriptionsReturn {
     setError(null)
 
     try {
-      const supabase = getSupabase()
-      const { data, error: fetchError } = await supabase
-        .from("mcp_subscriptions")
-        .select("*")
-        .eq("wallet_address", address.toLowerCase())
-        .order("created_at", { ascending: false })
+      const res = await fetch("/api/mcp-subscriptions", {
+        headers: authHeaders(address),
+      })
 
-      if (fetchError) {
-        // Table might not exist, return empty
-        console.warn("[MCP] Subscriptions table error:", fetchError)
+      if (!res.ok) {
+        console.warn("[MCP] Subscriptions fetch error:", res.status)
         setSubscriptions([])
       } else {
+        const data = await res.json()
         setSubscriptions(data || [])
       }
     } catch (err: any) {
@@ -176,14 +173,13 @@ export function useMCPSubscriptions(): UseMCPSubscriptionsReturn {
       }
 
       try {
-        const supabase = getSupabase()
         const now = new Date()
         const periodEnd = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000) // 30 days
 
-        const { data, error: insertError } = await supabase
-          .from("mcp_subscriptions")
-          .insert({
-            wallet_address: address.toLowerCase(),
+        const res = await fetch("/api/mcp-subscriptions", {
+          method: "POST",
+          headers: { ...authHeaders(address), "Content-Type": "application/json" },
+          body: JSON.stringify({
             provider_id: providerId,
             provider_name: provider.name,
             plan,
@@ -192,11 +188,15 @@ export function useMCPSubscriptions(): UseMCPSubscriptionsReturn {
             calls_limit: provider.pricing[plan].calls,
             current_period_start: now.toISOString(),
             current_period_end: periodEnd.toISOString(),
-          })
-          .select()
-          .single()
+          }),
+        })
 
-        if (insertError) throw insertError
+        if (!res.ok) {
+          const errBody = await res.json().catch(() => ({}))
+          throw new Error(errBody.error || "Failed to subscribe")
+        }
+
+        const data = await res.json()
 
         setSubscriptions((prev) => [data, ...prev])
 
@@ -219,13 +219,16 @@ export function useMCPSubscriptions(): UseMCPSubscriptionsReturn {
   const unsubscribe = useCallback(
     async (subscriptionId: string) => {
       try {
-        const supabase = getSupabase()
-        const { error: updateError } = await supabase
-          .from("mcp_subscriptions")
-          .update({ status: "cancelled" })
-          .eq("id", subscriptionId)
+        const res = await fetch("/api/mcp-subscriptions", {
+          method: "PATCH",
+          headers: { ...authHeaders(address), "Content-Type": "application/json" },
+          body: JSON.stringify({ id: subscriptionId, status: "cancelled" }),
+        })
 
-        if (updateError) throw updateError
+        if (!res.ok) {
+          const errBody = await res.json().catch(() => ({}))
+          throw new Error(errBody.error || "Failed to unsubscribe")
+        }
 
         setSubscriptions((prev) =>
           prev.map((sub) => (sub.id === subscriptionId ? { ...sub, status: "cancelled" } : sub)),
@@ -244,7 +247,7 @@ export function useMCPSubscriptions(): UseMCPSubscriptionsReturn {
         })
       }
     },
-    [toast],
+    [address, toast],
   )
 
   const changePlan = useCallback(
@@ -256,16 +259,20 @@ export function useMCPSubscriptions(): UseMCPSubscriptionsReturn {
         const provider = MCP_PROVIDERS.find((p) => p.id === subscription.provider_id)
         if (!provider) throw new Error("Provider not found")
 
-        const supabase = getSupabase()
-        const { error: updateError } = await supabase
-          .from("mcp_subscriptions")
-          .update({
+        const res = await fetch("/api/mcp-subscriptions", {
+          method: "PATCH",
+          headers: { ...authHeaders(address), "Content-Type": "application/json" },
+          body: JSON.stringify({
+            id: subscriptionId,
             plan: newPlan,
             calls_limit: provider.pricing[newPlan].calls,
-          })
-          .eq("id", subscriptionId)
+          }),
+        })
 
-        if (updateError) throw updateError
+        if (!res.ok) {
+          const errBody = await res.json().catch(() => ({}))
+          throw new Error(errBody.error || "Failed to change plan")
+        }
 
         setSubscriptions((prev) =>
           prev.map((sub) =>
@@ -288,7 +295,7 @@ export function useMCPSubscriptions(): UseMCPSubscriptionsReturn {
         })
       }
     },
-    [subscriptions, toast],
+    [address, subscriptions, toast],
   )
 
   // Get current active subscription

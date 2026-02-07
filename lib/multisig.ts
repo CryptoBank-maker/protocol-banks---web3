@@ -1,5 +1,5 @@
 // Multi-signature wallet service using Safe (Gnosis Safe) protocol
-import { createClient } from "@/lib/supabase/client"
+import { prisma } from "@/lib/prisma"
 import { ethers } from "ethers"
 
 // Safe contract addresses (mainnet)
@@ -73,22 +73,22 @@ export interface MultisigConfirmation {
 }
 
 export class MultisigService {
-  private supabase = createClient()
-
   // Get all multisig wallets for a user
   async getWallets(ownerAddress: string): Promise<MultisigWallet[]> {
-    const { data, error } = await this.supabase
-      .from("multisig_wallets")
-      .select(`
-        *,
-        multisig_signers (*)
-      `)
-      .or(`created_by.eq.${ownerAddress}`)
-      .eq("is_active", true)
-      .order("created_at", { ascending: false })
+    const wallets: any[] = await prisma.$queryRawUnsafe(
+      `SELECT mw.*, json_agg(ms.*) as signers
+       FROM multisig_wallets mw
+       LEFT JOIN multisig_signers ms ON ms.multisig_id = mw.id
+       WHERE mw.created_by = $1 AND mw.is_active = true
+       GROUP BY mw.id
+       ORDER BY mw.created_at DESC`,
+      ownerAddress,
+    )
 
-    if (error) throw error
-    return data || []
+    return wallets.map((w) => ({
+      ...w,
+      signers: w.signers?.[0] ? w.signers : [],
+    }))
   }
 
   // Create a new multisig wallet
@@ -110,30 +110,30 @@ export class MultisigService {
     const predictedAddress = await this.predictSafeAddress(signers, threshold, chainId, saltNonce)
 
     // Create wallet record
-    const { data: wallet, error: walletError } = await this.supabase
-      .from("multisig_wallets")
-      .insert({
-        name,
-        wallet_address: predictedAddress,
-        chain_id: chainId,
-        threshold,
-        created_by: createdBy,
-      })
-      .select()
-      .single()
+    const walletRows: any[] = await prisma.$queryRawUnsafe(
+      `INSERT INTO multisig_wallets (name, wallet_address, chain_id, threshold, created_by)
+       VALUES ($1, $2, $3, $4, $5)
+       RETURNING *`,
+      name,
+      predictedAddress,
+      chainId,
+      threshold,
+      createdBy,
+    )
 
-    if (walletError) throw walletError
+    const wallet = walletRows[0]
+    if (!wallet) throw new Error("Failed to create multisig wallet")
 
     // Add signers
-    const signerRecords = signers.map((address) => ({
-      multisig_id: wallet.id,
-      signer_address: address.toLowerCase(),
-      added_by: createdBy,
-    }))
-
-    const { error: signersError } = await this.supabase.from("multisig_signers").insert(signerRecords)
-
-    if (signersError) throw signersError
+    for (const address of signers) {
+      await prisma.$executeRawUnsafe(
+        `INSERT INTO multisig_signers (multisig_id, signer_address, added_by)
+         VALUES ($1, $2, $3)`,
+        wallet.id,
+        address.toLowerCase(),
+        createdBy,
+      )
+    }
 
     return wallet
   }
@@ -182,35 +182,34 @@ export class MultisigService {
     createdBy: string
   }): Promise<MultisigTransaction> {
     // Get current nonce
-    const { data: lastTx } = await this.supabase
-      .from("multisig_transactions")
-      .select("safe_nonce")
-      .eq("multisig_id", params.multisigId)
-      .order("safe_nonce", { ascending: false })
-      .limit(1)
-      .single()
+    const nonceRows: any[] = await prisma.$queryRawUnsafe(
+      `SELECT safe_nonce FROM multisig_transactions
+       WHERE multisig_id = $1
+       ORDER BY safe_nonce DESC
+       LIMIT 1`,
+      params.multisigId,
+    )
 
-    const nextNonce = (lastTx?.safe_nonce || -1) + 1
+    const nextNonce = (nonceRows[0]?.safe_nonce ?? -1) + 1
 
-    const { data, error } = await this.supabase
-      .from("multisig_transactions")
-      .insert({
-        multisig_id: params.multisigId,
-        to_address: params.toAddress,
-        value: params.value,
-        data: params.data || "0x",
-        safe_nonce: nextNonce,
-        status: "pending",
-        created_by: params.createdBy,
-        description: params.description,
-        token_symbol: params.tokenSymbol,
-        amount_usd: params.amountUsd,
-      })
-      .select()
-      .single()
+    const rows: any[] = await prisma.$queryRawUnsafe(
+      `INSERT INTO multisig_transactions (multisig_id, to_address, value, data, safe_nonce, status, created_by, description, token_symbol, amount_usd)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+       RETURNING *`,
+      params.multisigId,
+      params.toAddress,
+      params.value,
+      params.data || "0x",
+      nextNonce,
+      "pending",
+      params.createdBy,
+      params.description || null,
+      params.tokenSymbol || null,
+      params.amountUsd || null,
+    )
 
-    if (error) throw error
-    return data
+    if (!rows[0]) throw new Error("Failed to create multisig transaction")
+    return rows[0]
   }
 
   // Sign/confirm a transaction
@@ -219,73 +218,78 @@ export class MultisigService {
     signerAddress: string
     signature: string
   }): Promise<MultisigConfirmation> {
-    const { data, error } = await this.supabase
-      .from("multisig_confirmations")
-      .insert({
-        transaction_id: params.transactionId,
-        signer_address: params.signerAddress.toLowerCase(),
-        signature: params.signature,
-      })
-      .select()
-      .single()
+    const rows: any[] = await prisma.$queryRawUnsafe(
+      `INSERT INTO multisig_confirmations (transaction_id, signer_address, signature)
+       VALUES ($1, $2, $3)
+       RETURNING *`,
+      params.transactionId,
+      params.signerAddress.toLowerCase(),
+      params.signature,
+    )
 
-    if (error) throw error
+    if (!rows[0]) throw new Error("Failed to confirm transaction")
 
     // Check if threshold reached
     await this.checkAndUpdateStatus(params.transactionId)
 
-    return data
+    return rows[0]
   }
 
   // Check if transaction has enough confirmations
   private async checkAndUpdateStatus(transactionId: string): Promise<void> {
-    const { data: tx } = await this.supabase
-      .from("multisig_transactions")
-      .select(`
-        *,
-        multisig_wallets!inner (threshold)
-      `)
-      .eq("id", transactionId)
-      .single()
+    const txRows: any[] = await prisma.$queryRawUnsafe(
+      `SELECT mt.*, mw.threshold
+       FROM multisig_transactions mt
+       JOIN multisig_wallets mw ON mw.id = mt.multisig_id
+       WHERE mt.id = $1`,
+      transactionId,
+    )
 
-    if (!tx) return
+    if (!txRows[0]) return
 
-    const { count } = await this.supabase
-      .from("multisig_confirmations")
-      .select("*", { count: "exact", head: true })
-      .eq("transaction_id", transactionId)
+    const countRows: { count: bigint }[] = await prisma.$queryRawUnsafe(
+      `SELECT COUNT(*) as count FROM multisig_confirmations WHERE transaction_id = $1`,
+      transactionId,
+    )
 
-    if (count && count >= tx.multisig_wallets.threshold) {
-      await this.supabase.from("multisig_transactions").update({ status: "confirmed" }).eq("id", transactionId)
+    const count = Number(countRows[0]?.count || 0)
+
+    if (count >= txRows[0].threshold) {
+      await prisma.$executeRawUnsafe(
+        `UPDATE multisig_transactions SET status = $1 WHERE id = $2`,
+        "confirmed",
+        transactionId,
+      )
     }
   }
 
   // Get pending transactions for a wallet
   async getPendingTransactions(multisigId: string): Promise<MultisigTransaction[]> {
-    const { data, error } = await this.supabase
-      .from("multisig_transactions")
-      .select(`
-        *,
-        multisig_confirmations (*)
-      `)
-      .eq("multisig_id", multisigId)
-      .in("status", ["pending", "confirmed"])
-      .order("safe_nonce", { ascending: true })
+    const rows: any[] = await prisma.$queryRawUnsafe(
+      `SELECT mt.*, json_agg(mc.*) as confirmations
+       FROM multisig_transactions mt
+       LEFT JOIN multisig_confirmations mc ON mc.transaction_id = mt.id
+       WHERE mt.multisig_id = $1 AND mt.status IN ('pending', 'confirmed')
+       GROUP BY mt.id
+       ORDER BY mt.safe_nonce ASC`,
+      multisigId,
+    )
 
-    if (error) throw error
-    return data || []
+    return rows.map((r) => ({
+      ...r,
+      confirmations: r.confirmations?.[0] ? r.confirmations : [],
+    }))
   }
 
   // Execute a confirmed transaction
   async markExecuted(transactionId: string, txHash: string): Promise<void> {
-    await this.supabase
-      .from("multisig_transactions")
-      .update({
-        status: "executed",
-        executed_at: new Date().toISOString(),
-        execution_tx_hash: txHash,
-      })
-      .eq("id", transactionId)
+    await prisma.$executeRawUnsafe(
+      `UPDATE multisig_transactions SET status = $1, executed_at = $2, execution_tx_hash = $3 WHERE id = $4`,
+      "executed",
+      new Date().toISOString(),
+      txHash,
+      transactionId,
+    )
   }
 }
 

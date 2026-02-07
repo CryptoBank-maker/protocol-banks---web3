@@ -28,7 +28,7 @@ import {
   ArrowRightLeft,
   Users,
 } from "lucide-react"
-import { getSupabase } from "@/lib/supabase"
+import { authHeaders } from "@/lib/authenticated-fetch"
 import { SECURITY_CONFIG } from "@/lib/security/security"
 import { QuantumReadinessCard } from "@/components/quantum-readiness-card"
 
@@ -155,42 +155,21 @@ export default function SecurityPage() {
     setIsLoading(true)
 
     try {
-      const supabase = getSupabase()
-      if (!supabase) {
+      // Fetch audit logs from API
+      const logsRes = await fetch(`/api/audit-log?actor=${currentWallet}&limit=100`, {
+        headers: authHeaders(currentWallet),
+      })
+      if (logsRes.ok) {
+        const logsData = await logsRes.json()
+        setAuditLogs(logsData.logs || logsData || demoAuditLogs)
+      } else {
         setAuditLogs(demoAuditLogs)
-        setSecurityAlerts(demoSecurityAlerts)
-        setAddressChanges(demoAddressChanges)
-        return
       }
 
-      // Fetch audit logs
-      const { data: logs } = await supabase
-        .from("audit_logs")
-        .select("*")
-        .or(`actor.ilike.%${currentWallet}%,actor.eq.SYSTEM`)
-        .order("created_at", { ascending: false })
-        .limit(100)
-
-      if (logs) setAuditLogs(logs)
-
-      // Fetch security alerts
-      const { data: alerts } = await supabase
-        .from("security_alerts")
-        .select("*")
-        .ilike("actor", `%${currentWallet}%`)
-        .order("created_at", { ascending: false })
-        .limit(50)
-
-      if (alerts) setSecurityAlerts(alerts)
-
-      // Fetch address changes
-      const { data: changes } = await supabase
-        .from("address_change_log")
-        .select("*")
-        .order("created_at", { ascending: false })
-        .limit(50)
-
-      if (changes) setAddressChanges(changes)
+      // Security alerts and address changes don't have dedicated API routes yet
+      // Use demo/mock data
+      setSecurityAlerts(demoSecurityAlerts)
+      setAddressChanges(demoAddressChanges)
     } catch (error) {
       console.error("[Security] Failed to load data:", error)
       // Fall back to demo data

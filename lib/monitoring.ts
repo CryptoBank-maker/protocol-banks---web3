@@ -1,4 +1,4 @@
-import { getSupabase } from "./supabase"
+import { prisma } from "@/lib/prisma"
 
 export type AlertType = "error" | "warning" | "info" | "critical"
 export type ServiceType = "payment" | "auth" | "database" | "api" | "security" | "integration"
@@ -15,16 +15,15 @@ interface MonitoringEvent {
  */
 export async function logMonitoringAlert(event: MonitoringEvent): Promise<void> {
   try {
-    const supabase = getSupabase()
-    if (!supabase) return
-
-    await supabase.from("monitoring_alerts").insert({
-      alert_type: event.alertType,
-      service: event.service,
-      message: event.message,
-      details: event.details || {},
-      is_resolved: false,
-    })
+    await prisma.$executeRawUnsafe(
+      `INSERT INTO monitoring_alerts (alert_type, service, message, details, is_resolved)
+       VALUES ($1, $2, $3, $4, $5)`,
+      event.alertType,
+      event.service,
+      event.message,
+      JSON.stringify(event.details || {}),
+      false,
+    )
   } catch (error) {
     console.error("[Monitoring] Failed to log alert:", error)
   }
@@ -41,16 +40,14 @@ export async function logSecurityAlert(
   details?: Record<string, any>,
 ): Promise<void> {
   try {
-    const supabase = getSupabase()
-    if (!supabase) return
-
-    await supabase.from("security_alerts").insert({
-      alert_type: alertType,
-      severity,
-      actor,
-      description,
-      details: details || {},
-      resolved: false,
+    await prisma.securityAlert.create({
+      data: {
+        alert_type: alertType,
+        severity,
+        address: actor,
+        description,
+        details: details || {},
+      },
     })
   } catch (error) {
     console.error("[Monitoring] Failed to log security alert:", error)
@@ -77,7 +74,7 @@ export async function checkSystemHealth(): Promise<{
   }
 
   // Check required environment variables
-  const requiredEnvVars = ["NEXT_PUBLIC_SUPABASE_URL", "NEXT_PUBLIC_SUPABASE_ANON_KEY", "NEXT_PUBLIC_REOWN_PROJECT_ID"]
+  const requiredEnvVars = ["DATABASE_URL", "NEXT_PUBLIC_REOWN_PROJECT_ID"]
 
   for (const envVar of requiredEnvVars) {
     if (!process.env[envVar]) {
@@ -100,23 +97,17 @@ export async function getAlertCounts(): Promise<{
   total: number
 }> {
   try {
-    const supabase = getSupabase()
-    if (!supabase) return { security: 0, system: 0, total: 0 }
+    const securityCount = await prisma.securityAlert.count()
 
-    const { count: securityCount } = await supabase
-      .from("security_alerts")
-      .select("*", { count: "exact", head: true })
-      .eq("resolved", false)
-
-    const { count: systemCount } = await supabase
-      .from("monitoring_alerts")
-      .select("*", { count: "exact", head: true })
-      .eq("is_resolved", false)
+    const systemResult: { count: bigint }[] = await prisma.$queryRawUnsafe(
+      `SELECT COUNT(*) as count FROM monitoring_alerts WHERE is_resolved = false`,
+    )
+    const systemCount = Number(systemResult[0]?.count || 0)
 
     return {
-      security: securityCount || 0,
-      system: systemCount || 0,
-      total: (securityCount || 0) + (systemCount || 0),
+      security: securityCount,
+      system: systemCount,
+      total: securityCount + systemCount,
     }
   } catch (error) {
     return { security: 0, system: 0, total: 0 }

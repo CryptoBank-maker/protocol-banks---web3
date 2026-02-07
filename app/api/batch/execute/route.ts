@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
-import { createServerClient } from "@supabase/ssr"
-import { cookies } from "next/headers"
 import { prisma } from "@/lib/prisma"
+import { getAuthenticatedAddress } from "@/lib/api-auth"
 
 /**
  * POST /api/batch/execute
@@ -9,20 +8,8 @@ import { prisma } from "@/lib/prisma"
  */
 export async function POST(request: NextRequest) {
   try {
-    const cookieStore = await cookies()
-    const supabase = createServerClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-      {
-        cookies: {
-          getAll() { return cookieStore.getAll() },
-          setAll(cookiesToSet) {}
-        }
-      }
-    )
-
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
-    if (authError || !user) {
+    const walletAddress = await getAuthenticatedAddress(request)
+    if (!walletAddress) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
@@ -35,7 +22,7 @@ export async function POST(request: NextRequest) {
     const job = await prisma.batchJob.findFirst({
       where: {
         id: jobId,
-        user_id: user.id
+        user_id: walletAddress.toLowerCase()
       }
     })
 

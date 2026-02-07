@@ -2,63 +2,39 @@
  * Order Details API
  */
 
-import { type NextRequest, NextResponse } from "next/server";
-import { createServerClient } from "@supabase/ssr";
-import { cookies } from "next/headers";
-import { getAuthenticatedAddress } from "@/lib/api-auth";
+import { type NextRequest, NextResponse } from "next/server"
+import { prisma } from "@/lib/prisma"
+import { getAuthenticatedAddress } from "@/lib/api-auth"
 
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ orderNo: string }> },
 ) {
   try {
-    const { orderNo } = await params;
-
-    const cookieStore = await cookies();
-    const supabase = createServerClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!,
-      {
-        cookies: {
-          getAll() {
-            return cookieStore.getAll();
-          },
-          setAll(cookiesToSet) {
-            cookiesToSet.forEach(({ name, value, options }) => {
-              cookieStore.set(name, value, options);
-            });
-          },
-        },
-      },
-    );
+    const { orderNo } = await params
 
     // Get order information
-    const { data: order, error: orderError } = await supabase
-      .from("acquiring_orders")
-      .select("*")
-      .eq("order_no", orderNo)
-      .single();
+    const order = await prisma.acquiringOrder.findUnique({
+      where: { order_no: orderNo },
+    })
 
-    if (orderError || !order) {
-      return NextResponse.json({ error: "Order not found" }, { status: 404 });
+    if (!order) {
+      return NextResponse.json({ error: "Order not found" }, { status: 404 })
     }
 
     // Get merchant information
-    const { data: merchant } = await supabase
-      .from("merchants")
-      .select("name, logo_url, wallet_address")
-      .eq("id", order.merchant_id)
-      .single();
+    const merchant = await prisma.merchant.findUnique({
+      where: { id: order.merchant_id },
+      select: { name: true, logo_url: true, wallet_address: true },
+    })
 
     // Check if order is expired
-    const isExpired = new Date(order.expires_at) < new Date();
-    if (isExpired && order.status === "pending") {
-      // Automatically update to expired status
-      await supabase
-        .from("acquiring_orders")
-        .update({ status: "expired" })
-        .eq("id", order.id);
-      order.status = "expired";
+    if (new Date(order.expires_at) < new Date() && order.status === "pending") {
+      await prisma.acquiringOrder.update({
+        where: { id: order.id },
+        data: { status: "expired" },
+      })
+      order.status = "expired"
     }
 
     return NextResponse.json({
@@ -69,13 +45,10 @@ export async function GET(
         merchant_logo: merchant?.logo_url,
         merchant_wallet_address: merchant?.wallet_address,
       },
-    });
+    })
   } catch (error: any) {
-    console.error("[API] Order fetch error:", error);
-    return NextResponse.json(
-      { error: error.message || "Internal server error" },
-      { status: 500 },
-    );
+    console.error("[API] Order fetch error:", error)
+    return NextResponse.json({ error: error.message || "Internal server error" }, { status: 500 })
   }
 }
 
@@ -85,81 +58,52 @@ export async function PATCH(
   { params }: { params: Promise<{ orderNo: string }> },
 ) {
   try {
-    const callerAddress = await getAuthenticatedAddress(request);
+    const callerAddress = await getAuthenticatedAddress(request)
     if (!callerAddress) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
-    const { orderNo } = await params;
-    const body = await request.json();
-    const { status, payment_method, payer_address, tx_hash } = body;
-
-    const cookieStore = await cookies();
-    const supabase = createServerClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!,
-      {
-        cookies: {
-          getAll() {
-            return cookieStore.getAll();
-          },
-          setAll(cookiesToSet) {
-            cookiesToSet.forEach(({ name, value, options }) => {
-              cookieStore.set(name, value, options);
-            });
-          },
-        },
-      },
-    );
+    const { orderNo } = await params
+    const body = await request.json()
+    const { status, payment_method, payer_address, tx_hash } = body
 
     const updateData: any = {
       status,
-      updated_at: new Date().toISOString(),
-    };
-
-    if (payment_method) updateData.payment_method = payment_method;
-    if (payer_address) updateData.payer_address = payer_address;
-    if (tx_hash) updateData.tx_hash = tx_hash;
-    if (status === "paid") updateData.paid_at = new Date().toISOString();
-
-    const { data: order, error } = await supabase
-      .from("acquiring_orders")
-      .update(updateData)
-      .eq("order_no", orderNo)
-      .select()
-      .single();
-
-    if (error) {
-      console.error("[API] Order update error:", error);
-      return NextResponse.json(
-        { error: "Failed to update order" },
-        { status: 500 },
-      );
+      updated_at: new Date(),
     }
+
+    if (payment_method) updateData.payment_method = payment_method
+    if (payer_address) updateData.payer_address = payer_address
+    if (tx_hash) updateData.tx_hash = tx_hash
+    if (status === "paid") updateData.paid_at = new Date()
+
+    const order = await prisma.acquiringOrder.update({
+      where: { order_no: orderNo },
+      data: updateData,
+    })
 
     // If order is paid, update merchant balance
     if (status === "paid" && order) {
-      const { data: balance } = await supabase
-        .from("merchant_balances")
-        .select("*")
-        .eq("merchant_id", order.merchant_id)
-        .eq("token", order.token)
-        .single();
+      const existingBalance = await prisma.merchantBalance.findFirst({
+        where: { merchant_id: order.merchant_id, token: order.token },
+      })
 
-      if (balance) {
-        await supabase
-          .from("merchant_balances")
-          .update({
-            balance: parseFloat(balance.balance) + parseFloat(order.amount),
-            updated_at: new Date().toISOString(),
-          })
-          .eq("id", balance.id);
+      if (existingBalance) {
+        await prisma.merchantBalance.update({
+          where: { id: existingBalance.id },
+          data: {
+            balance: String(parseFloat(existingBalance.balance) + order.amount),
+            updated_at: new Date(),
+          },
+        })
       } else {
-        await supabase.from("merchant_balances").insert({
-          merchant_id: order.merchant_id,
-          token: order.token,
-          balance: order.amount,
-        });
+        await prisma.merchantBalance.create({
+          data: {
+            merchant_id: order.merchant_id,
+            token: order.token,
+            balance: String(order.amount),
+          },
+        })
       }
 
       // Send Webhook notification (if configured)
@@ -176,19 +120,16 @@ export async function PATCH(
               tx_hash: order.tx_hash,
               paid_at: order.paid_at,
             }),
-          });
+          })
         } catch (webhookError) {
-          console.error("[API] Webhook notification error:", webhookError);
+          console.error("[API] Webhook notification error:", webhookError)
         }
       }
     }
 
-    return NextResponse.json({ success: true, order });
+    return NextResponse.json({ success: true, order })
   } catch (error: any) {
-    console.error("[API] Order update error:", error);
-    return NextResponse.json(
-      { error: error.message || "Internal server error" },
-      { status: 500 },
-    );
+    console.error("[API] Order update error:", error)
+    return NextResponse.json({ error: error.message || "Internal server error" }, { status: 500 })
   }
 }

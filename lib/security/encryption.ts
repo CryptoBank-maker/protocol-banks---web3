@@ -56,9 +56,9 @@ export function generateIntegrityHash(
 // ============================================
 
 function getSessionKeyEncryptionKey(): Buffer {
-  const secret = process.env.SESSION_KEY_ENCRYPTION_SECRET || process.env.SUPABASE_SERVICE_ROLE_KEY
+  const secret = process.env.SESSION_KEY_ENCRYPTION_SECRET
   if (!secret) {
-    throw new Error("SESSION_KEY_ENCRYPTION_SECRET or SUPABASE_SERVICE_ROLE_KEY must be configured for session key encryption")
+    throw new Error("SESSION_KEY_ENCRYPTION_SECRET must be configured for session key encryption")
   }
   return createHash("sha256").update(secret).digest()
 }

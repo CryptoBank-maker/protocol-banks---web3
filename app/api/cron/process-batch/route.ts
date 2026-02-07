@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { createClient } from '@supabase/supabase-js';
+import { promises as fs } from 'fs';
 import { parseBatchFile } from '@/lib/services/file-parser.service';
 import { validateBatch } from '@/lib/services/batch-validator.service';
 
@@ -40,29 +40,15 @@ export async function GET(req: NextRequest) {
         data: { status: 'PARSING' }
     });
 
-    // Initialize Storage Client (Still needed for file retrieval)
-    const supabase = createClient(
-        process.env.NEXT_PUBLIC_SUPABASE_URL!,
-        process.env.SUPABASE_SERVICE_ROLE_KEY!
-    );
-
-    // 2. Download File
-    // Note: If using Prisma only for DB, we still likely use Supabase for Storage as per typical "Vercel+Supabase" stack
+    // 2. Download File from local filesystem
     if (!job.file_url) throw new Error("File URL missing");
 
-    const { data: fileBlob, error: downloadError } = await supabase
-        .storage
-        .from('batch-files')
-        .download(job.file_url);
-
-    if (downloadError || !fileBlob) {
-        throw new Error(`Download failed: ${downloadError?.message}`);
+    let nodeBuffer: Buffer;
+    try {
+      nodeBuffer = await fs.readFile(job.file_url);
+    } catch (readError: any) {
+      throw new Error(`File read failed: ${readError.message}`);
     }
-
-    // 3. Parse and Validate
-    const buffer = await fileBlob.arrayBuffer();
-    // In Edge/Serverless, Buffer might need polyfill or available in Node runtime
-    const nodeBuffer = Buffer.from(buffer);
     
     // Determine file type from extension or job metadata
     // We didn't save extension in DB strictly, but file_url usually has it

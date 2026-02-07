@@ -7,8 +7,7 @@
 
 import { type NextRequest, NextResponse } from "next/server"
 import { distributeAsset, checkAssetAvailability, type AssetDistributionConfig } from "@/lib/asset-distribution"
-import { createServerClient } from "@supabase/ssr"
-import { cookies } from "next/headers"
+import { prisma } from "@/lib/prisma"
 import { getAuthenticatedAddress } from "@/lib/api-auth"
 
 export async function POST(request: NextRequest) {
@@ -92,34 +91,22 @@ export async function POST(request: NextRequest) {
     const result = await distributeAsset(config, recipientAddress)
 
     // Record distribution in database
-    const cookieStore = await cookies()
-    const supabase = createServerClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, {
-      cookies: {
-        getAll() {
-          return cookieStore.getAll()
-        },
-        setAll(cookiesToSet) {
-          cookiesToSet.forEach(({ name, value, options }) => {
-            cookieStore.set(name, value, options)
-          })
-        },
-      },
-    })
-
     try {
-      await supabase.from("asset_distributions").insert({
-        payment_tx_hash: paymentTxHash,
-        distribution_tx_hash: result.txHash,
-        recipient_address: recipientAddress,
-        asset_type: assetType,
-        contract_address: contractAddress,
-        chain_id: chainId || 8453,
-        token_id: tokenId,
-        amount: amount,
-        status: result.success ? "completed" : "failed",
-        error: result.error,
-        link_id: linkId,
-        invoice_id: invoiceId,
+      await prisma.assetDistribution.create({
+        data: {
+          payment_tx_hash: paymentTxHash,
+          distribution_tx: result.txHash,
+          recipient_address: recipientAddress,
+          asset_type: assetType,
+          contract_address: contractAddress,
+          chain_id: chainId || 8453,
+          token_id: tokenId,
+          amount: amount,
+          status: result.success ? "completed" : "failed",
+          error_message: result.error,
+          payment_link_id: linkId,
+          invoice_id: invoiceId,
+        },
       })
     } catch (dbError) {
       console.warn("[Asset Distribution] DB recording failed:", dbError)

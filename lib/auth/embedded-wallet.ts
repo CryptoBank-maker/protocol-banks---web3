@@ -4,7 +4,7 @@
  * Creates HD wallets with Shamir Secret Sharing for secure key management.
  * Private keys are split into 3 shares:
  * - Share A: Device share (stored in IndexedDB)
- * - Share B: Server share (stored in Supabase, encrypted)
+ * - Share B: Server share (stored in PostgreSQL via Prisma, encrypted)
  * - Share C: Recovery share (given to user for backup)
  */
 

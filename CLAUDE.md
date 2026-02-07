@@ -10,7 +10,7 @@ Protocol Banks is an enterprise-grade crypto payment infrastructure providing no
 - **Frontend:** Next.js 15 (App Router), TypeScript 5, Tailwind CSS v4, shadcn/ui
 - **Backend Services:** Next.js API routes, Go microservices (gRPC, optional)
 - **Web3:** viem, ethers.js, Reown AppKit, Safe Protocol
-- **Database:** Prisma 7 (Serverless, pg adapter) → PostgreSQL (Supabase with RLS)
+- **Database:** Prisma 7 (Serverless, pg adapter) → PostgreSQL
 - **Infrastructure:** Vercel, Docker, Kubernetes, Redis, Prometheus + Grafana
 
 ## Common Commands
@@ -121,7 +121,7 @@ cd services/payout-engine && go test -v ./internal/processor
 **2. Custom Non-Custodial Auth (Enterprise, Advanced)**
 - Shamir Secret Sharing (2-of-3 threshold) for private key management
   - Share A: Device (IndexedDB, encrypted)
-  - Share B: Server (Supabase, PIN-encrypted)
+  - Share B: Server (PostgreSQL via Prisma, PIN-encrypted)
   - Share C: User recovery code
 - Magic link email authentication
 - Google/Apple OAuth support
@@ -172,7 +172,7 @@ ENABLE_GO_SERVICES=false  # Fallback to TypeScript implementations
 - Configurable threshold (2-of-3, 3-of-5, etc.)
 - Role-based signing workflows
 - Transaction proposals with mobile approval
-- Audit trail in Supabase
+- Audit trail in PostgreSQL (via Prisma)
 
 **Cross-Chain Operations:**
 - Swap: Rango Exchange integration (`lib/rango.ts`) - 50+ chains, 100+ DEXs
@@ -186,7 +186,7 @@ ENABLE_GO_SERVICES=false  # Fallback to TypeScript implementations
 - Rate limiting (per-user and global) via `lib/security-middleware.ts`
 - CSRF tokens, SQL injection prevention, XSS protection
 - Replay attack prevention, signature verification (HMAC-SHA256)
-- Row-Level Security (RLS) in Supabase for data isolation
+- Row-Level Security (RLS) in PostgreSQL for data isolation
 - Attack monitoring: `lib/security-monitor.ts`, `lib/advanced-attack-protection.ts`
 - Vendor address change: wallet signature verification + 24h cooldown + email/push notification
 - Vendor integrity hash: SHA-256 deterministic hash verified on every read
@@ -239,8 +239,7 @@ lib/                              # Core business logic
 ├── services/                     # TypeScript services (fallback for Go)
 ├── security/                     # Security middleware + utilities
 ├── grpc/                         # gRPC client bridges
-├── prisma.ts                     # Prisma client (serverless)
-└── supabase.ts                   # Supabase client (legacy)
+└── prisma.ts                     # Prisma client (serverless)
 
 prisma/                           # Prisma ORM
 └── schema.prisma                 # Database schema
@@ -266,12 +265,11 @@ docs/                             # Documentation
 - Features controlled via Reown dashboard (not code)
 - Console notice "local configuration was ignored" is expected behavior
 
-**Database (Prisma + Supabase):**
+**Database (Prisma):**
 
-- Primary ORM: Prisma 7 with `@prisma/adapter-pg` (serverless)
+- ORM: Prisma 7 with `@prisma/adapter-pg` (serverless)
 - Client: `lib/prisma.ts` (lazy initialization, server-only)
 - Schema: `prisma/schema.prisma`
-- Legacy Supabase client: `lib/supabase.ts` (still used for some features)
 - All tables use Row-Level Security (RLS)
 - Key tables: `Vendor`, `Transaction`, `AuditLog`, `PushSubscription`, `Invoice`
 

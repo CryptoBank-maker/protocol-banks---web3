@@ -6,8 +6,7 @@
  */
 
 import { type NextRequest, NextResponse } from "next/server"
-import { createServerClient } from "@supabase/ssr"
-import { cookies } from "next/headers"
+import { prisma } from "@/lib/prisma"
 import crypto from "crypto"
 import { getAuthenticatedAddress } from "@/lib/api-auth"
 
@@ -15,41 +14,17 @@ import { getAuthenticatedAddress } from "@/lib/api-auth"
 // Helpers
 // ============================================
 
-/**
- * Create Supabase client with service role key (bypasses RLS for merchant operations)
- */
-async function getServiceSupabase() {
-  const cookieStore = await cookies()
-  return createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-    {
-      cookies: {
-        getAll() {
-          return cookieStore.getAll()
-        },
-        setAll(cookiesToSet) {
-          cookiesToSet.forEach(({ name, value, options }) => {
-            cookieStore.set(name, value, options)
-          })
-        },
-      },
-    }
-  )
-}
-
 function generateLinkId(): string {
   return `PL-${Date.now().toString(36).toUpperCase()}-${crypto.randomBytes(4).toString("hex").toUpperCase()}`
 }
 
-// Singleton random fallback generated once per instance (never use a static default)
 let _fallbackSecret: string | null = null
 function getPaymentLinkSecret(): string {
   const configured = process.env.PAYMENT_LINK_SECRET
   if (configured) return configured
   if (!_fallbackSecret) {
     _fallbackSecret = crypto.randomBytes(32).toString("hex")
-    console.warn("[PaymentLinks] PAYMENT_LINK_SECRET not configured — using random per-instance secret. Links will NOT survive redeployments.")
+    console.warn("[PaymentLinks] PAYMENT_LINK_SECRET not configured — using random per-instance secret.")
   }
   return _fallbackSecret
 }
@@ -71,36 +46,19 @@ function buildPaymentUrl(linkId: string, recipientAddress: string, amount: strin
 
 export async function POST(request: NextRequest) {
   try {
-    const callerAddress = await getAuthenticatedAddress(request);
+    const callerAddress = await getAuthenticatedAddress(request)
     if (!callerAddress) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
     const body = await request.json()
     const {
-      merchantId,
-      title,
-      description,
-      amount,
-      currency,
-      token,
-      recipientAddress,
-      amountType,
-      minAmount,
-      maxAmount,
-      expiresAt,
-      redirectUrl,
-      metadata,
-      brandColor,
-      logoUrl,
-      distributeAsset,
-      assetType,
-      assetContractAddress,
-      assetTokenId,
-      assetAmount,
+      merchantId, title, description, amount, currency, token,
+      recipientAddress, amountType, minAmount, maxAmount, expiresAt,
+      redirectUrl, metadata, brandColor, logoUrl,
+      distributeAsset, assetType, assetContractAddress, assetTokenId, assetAmount,
     } = body
 
-    // Validate required fields
     if (!recipientAddress || !/^0x[a-fA-F0-9]{40}$/.test(recipientAddress)) {
       return NextResponse.json({ error: "Invalid recipient address" }, { status: 400 })
     }
@@ -109,60 +67,39 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Invalid amount for fixed payment link" }, { status: 400 })
     }
 
-    const supabase = await getServiceSupabase()
     const linkId = generateLinkId()
     const tokenValue = token || "USDC"
     const titleValue = title || "Payment"
     const signatureData = `${linkId}|${recipientAddress}|${amount || "dynamic"}|${tokenValue}`
     const signature = generateSignature(signatureData)
 
-    const insertData = {
-      link_id: linkId,
-      merchant_id: merchantId,
-      title: titleValue,
-      description,
-      amount: amount ? parseFloat(amount) : null,
-      currency: currency || "USD",
-      token: tokenValue,
-      recipient_address: recipientAddress,
-      amount_type: amountType || "fixed",
-      min_amount: minAmount ? parseFloat(minAmount) : null,
-      max_amount: maxAmount ? parseFloat(maxAmount) : null,
-      expires_at: expiresAt || null,
-      redirect_url: redirectUrl,
-      signature,
-      status: "active",
-      metadata: metadata || {},
-      brand_color: brandColor,
-      logo_url: logoUrl,
-      distribute_asset: distributeAsset || false,
-      asset_type: assetType,
-      asset_contract_address: assetContractAddress,
-      asset_token_id: assetTokenId,
-      asset_amount: assetAmount,
-    }
-
-    const { data: link, error: insertError } = await supabase
-      .from("payment_links")
-      .insert(insertData)
-      .select()
-      .single()
-
-    if (insertError) {
-      console.warn("[API] Payment links table may not exist:", insertError.message)
-
-      // Return mock response when table doesn't exist (pre-migration)
-      const mockLink = {
-        id: crypto.randomUUID(),
-        ...insertData,
-        created_at: new Date().toISOString(),
-        total_payments: 0,
-        total_amount: 0,
-      }
-
-      const urls = buildPaymentUrl(linkId, recipientAddress, amount, tokenValue, titleValue, signature)
-      return NextResponse.json({ success: true, link: mockLink, ...urls })
-    }
+    const link = await prisma.paymentLink.create({
+      data: {
+        link_id: linkId,
+        merchant_id: merchantId,
+        title: titleValue,
+        description,
+        amount: amount ? parseFloat(amount) : null,
+        currency: currency || "USD",
+        token: tokenValue,
+        recipient_address: recipientAddress,
+        amount_type: amountType || "fixed",
+        min_amount: minAmount ? parseFloat(minAmount) : null,
+        max_amount: maxAmount ? parseFloat(maxAmount) : null,
+        expires_at: expiresAt || null,
+        redirect_url: redirectUrl,
+        signature,
+        status: "active",
+        metadata: metadata || {},
+        brand_color: brandColor,
+        logo_url: logoUrl,
+        distribute_asset: distributeAsset || false,
+        asset_type: assetType,
+        asset_contract_address: assetContractAddress,
+        asset_token_id: assetTokenId,
+        asset_amount: assetAmount,
+      },
+    })
 
     const urls = buildPaymentUrl(linkId, recipientAddress, amount, tokenValue, titleValue, signature)
     return NextResponse.json({ success: true, link, ...urls })
@@ -185,17 +122,13 @@ export async function GET(request: NextRequest) {
     const limit = parseInt(searchParams.get("limit") || "50", 10)
     const offset = parseInt(searchParams.get("offset") || "0", 10)
 
-    const supabase = await getServiceSupabase()
-
     // Fetch single link by linkId
     if (linkId) {
-      const { data: link, error } = await supabase
-        .from("payment_links")
-        .select("*")
-        .eq("link_id", linkId)
-        .single()
+      const link = await prisma.paymentLink.findUnique({
+        where: { link_id: linkId },
+      })
 
-      if (error || !link) {
+      if (!link) {
         return NextResponse.json({ error: "Payment link not found" }, { status: 404 })
       }
 
@@ -203,28 +136,21 @@ export async function GET(request: NextRequest) {
     }
 
     // Fetch list with filters and pagination
-    let query = supabase
-      .from("payment_links")
-      .select("*", { count: "exact" })
-      .order("created_at", { ascending: false })
-      .range(offset, offset + limit - 1)
+    const where: any = {}
+    if (merchantId) where.merchant_id = merchantId
+    if (status) where.status = status
 
-    if (merchantId) {
-      query = query.eq("merchant_id", merchantId)
-    }
+    const [links, total] = await Promise.all([
+      prisma.paymentLink.findMany({
+        where,
+        orderBy: { created_at: "desc" },
+        skip: offset,
+        take: limit,
+      }),
+      prisma.paymentLink.count({ where }),
+    ])
 
-    if (status) {
-      query = query.eq("status", status)
-    }
-
-    const { data: links, error, count } = await query
-
-    if (error) {
-      console.warn("[API] Payment links fetch error:", error.message)
-      return NextResponse.json({ success: true, links: [], total: 0 })
-    }
-
-    return NextResponse.json({ success: true, links, total: count || 0 })
+    return NextResponse.json({ success: true, links, total })
   } catch (error: any) {
     console.error("[API] Payment links fetch error:", error)
     return NextResponse.json({ error: error.message || "Failed to fetch payment links" }, { status: 500 })
@@ -237,9 +163,9 @@ export async function GET(request: NextRequest) {
 
 export async function PATCH(request: NextRequest) {
   try {
-    const callerAddress = await getAuthenticatedAddress(request);
+    const callerAddress = await getAuthenticatedAddress(request)
     if (!callerAddress) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
     const body = await request.json()
@@ -249,25 +175,16 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json({ error: "Link ID required" }, { status: 400 })
     }
 
-    const supabase = await getServiceSupabase()
-
     const updateData: any = {
       ...updates,
-      updated_at: new Date().toISOString(),
+      updated_at: new Date(),
     }
-
     if (status) updateData.status = status
 
-    const { data: link, error } = await supabase
-      .from("payment_links")
-      .update(updateData)
-      .eq("link_id", linkId)
-      .select()
-      .single()
-
-    if (error) {
-      return NextResponse.json({ error: "Failed to update payment link" }, { status: 500 })
-    }
+    const link = await prisma.paymentLink.update({
+      where: { link_id: linkId },
+      data: updateData,
+    })
 
     return NextResponse.json({ success: true, link })
   } catch (error: any) {
@@ -282,9 +199,9 @@ export async function PATCH(request: NextRequest) {
 
 export async function DELETE(request: NextRequest) {
   try {
-    const callerAddress = await getAuthenticatedAddress(request);
+    const callerAddress = await getAuthenticatedAddress(request)
     if (!callerAddress) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
     const { searchParams } = new URL(request.url)
@@ -294,13 +211,9 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json({ error: "Link ID required" }, { status: 400 })
     }
 
-    const supabase = await getServiceSupabase()
-
-    const { error } = await supabase.from("payment_links").delete().eq("link_id", linkId)
-
-    if (error) {
-      return NextResponse.json({ error: "Failed to delete payment link" }, { status: 500 })
-    }
+    await prisma.paymentLink.delete({
+      where: { link_id: linkId },
+    })
 
     return NextResponse.json({ success: true })
   } catch (error: any) {

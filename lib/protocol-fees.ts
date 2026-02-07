@@ -3,7 +3,7 @@
  * Handles fee calculation, collection, and management
  */
 
-import { createClient } from "@/lib/supabase"
+import { prisma } from "@/lib/prisma"
 
 // Fee configuration types
 export interface FeeConfig {
@@ -71,28 +71,31 @@ const DEFAULT_TREASURY_ADDRESS = "0x0000000000000000000000000000000000000000"
  * Get fee configuration from database
  */
 export async function getFeeConfig(): Promise<FeeConfig> {
-  const supabase = createClient()
+  try {
+    const data = await prisma.feeConfig.findUnique({
+      where: { config_key: "base_fee_rate" },
+    })
 
-  const { data, error } = await supabase
-    .from("fee_config")
-    .select("config_value")
-    .eq("config_key", "base_fee_rate")
-    .single()
+    if (!data) {
+      return {
+        baseRate: 0.001, // 0.1%
+        minFeeUsd: 0.5,
+        maxFeeUsd: 500,
+      }
+    }
 
-  if (error || !data) {
-    // Return defaults if not configured
+    const config = data.value as Record<string, number>
     return {
-      baseRate: 0.001, // 0.1%
+      baseRate: config.rate || 0.001,
+      minFeeUsd: config.min_fee_usd || 0.5,
+      maxFeeUsd: config.max_fee_usd || 500,
+    }
+  } catch {
+    return {
+      baseRate: 0.001,
       minFeeUsd: 0.5,
       maxFeeUsd: 500,
     }
-  }
-
-  const config = data.config_value as Record<string, number>
-  return {
-    baseRate: config.rate || 0.001,
-    minFeeUsd: config.min_fee_usd || 0.5,
-    maxFeeUsd: config.max_fee_usd || 500,
   }
 }
 
@@ -100,23 +103,23 @@ export async function getFeeConfig(): Promise<FeeConfig> {
  * Get tier discounts from database
  */
 export async function getTierDiscounts(): Promise<TierDiscounts> {
-  const supabase = createClient()
+  try {
+    const data = await prisma.feeConfig.findUnique({
+      where: { config_key: "tier_discounts" },
+    })
 
-  const { data, error } = await supabase
-    .from("fee_config")
-    .select("config_value")
-    .eq("config_key", "tier_discounts")
-    .single()
+    if (!data) {
+      return { standard: 0, business: 0.15, enterprise: 0.3 }
+    }
 
-  if (error || !data) {
+    const discounts = data.value as Record<string, number>
+    return {
+      standard: discounts.standard || 0,
+      business: discounts.business || 0.15,
+      enterprise: discounts.enterprise || 0.3,
+    }
+  } catch {
     return { standard: 0, business: 0.15, enterprise: 0.3 }
-  }
-
-  const discounts = data.config_value as Record<string, number>
-  return {
-    standard: discounts.standard || 0,
-    business: discounts.business || 0.15,
-    enterprise: discounts.enterprise || 0.3,
   }
 }
 
@@ -124,43 +127,47 @@ export async function getTierDiscounts(): Promise<TierDiscounts> {
  * Get volume discounts from database
  */
 export async function getVolumeDiscounts(): Promise<VolumeDiscount[]> {
-  const supabase = createClient()
+  try {
+    const data = await prisma.feeConfig.findUnique({
+      where: { config_key: "volume_discounts" },
+    })
 
-  const { data, error } = await supabase
-    .from("fee_config")
-    .select("config_value")
-    .eq("config_key", "volume_discounts")
-    .single()
+    if (!data) {
+      return [
+        { minVolume: 100000, discount: 0.1 },
+        { minVolume: 500000, discount: 0.2 },
+        { minVolume: 1000000, discount: 0.3 },
+      ]
+    }
 
-  if (error || !data) {
+    return (data.value as VolumeDiscount[]) || []
+  } catch {
     return [
       { minVolume: 100000, discount: 0.1 },
       { minVolume: 500000, discount: 0.2 },
       { minVolume: 1000000, discount: 0.3 },
     ]
   }
-
-  return (data.config_value as VolumeDiscount[]) || []
 }
 
 /**
  * Get treasury address for a specific chain
  */
 export async function getTreasuryAddress(chainType: "evm" | "solana" | "bitcoin" = "evm"): Promise<string> {
-  const supabase = createClient()
+  try {
+    const data = await prisma.feeConfig.findUnique({
+      where: { config_key: "treasury_address" },
+    })
 
-  const { data, error } = await supabase
-    .from("fee_config")
-    .select("config_value")
-    .eq("config_key", "treasury_address")
-    .single()
+    if (!data) {
+      return DEFAULT_TREASURY_ADDRESS
+    }
 
-  if (error || !data) {
+    const addresses = data.value as Record<string, string>
+    return addresses[chainType] || DEFAULT_TREASURY_ADDRESS
+  } catch {
     return DEFAULT_TREASURY_ADDRESS
   }
-
-  const addresses = data.config_value as Record<string, string>
-  return addresses[chainType] || DEFAULT_TREASURY_ADDRESS
 }
 
 /**
@@ -171,21 +178,23 @@ export async function getMonthlyVolume(walletAddress: string): Promise<number> {
     return 0
   }
 
-  const supabase = createClient()
-  const monthYear = new Date().toISOString().slice(0, 7) // YYYY-MM
+  try {
+    const monthYear = new Date().toISOString().slice(0, 7) // YYYY-MM
 
-  const { data, error } = await supabase
-    .from("monthly_fee_summary")
-    .select("total_transaction_volume")
-    .eq("wallet_address", walletAddress.toLowerCase())
-    .eq("month_year", monthYear)
-    .single()
+    const data = await prisma.monthlyFeeSummary.findUnique({
+      where: {
+        wallet_address_month_year: {
+          wallet_address: walletAddress.toLowerCase(),
+          month_year: monthYear,
+        },
+      },
+      select: { total_transaction_volume: true },
+    })
 
-  if (error || !data) {
+    return data?.total_transaction_volume || 0
+  } catch {
     return 0
   }
-
-  return data.total_transaction_volume || 0
 }
 
 /**
@@ -266,27 +275,66 @@ export async function recordFee(params: {
   tier?: UserTier
   collectionMethod?: "immediate" | "deferred" | "batch"
 }): Promise<string | null> {
-  const supabase = createClient()
-  const treasuryAddress = await getTreasuryAddress("evm")
+  try {
+    const treasuryAddress = await getTreasuryAddress("evm")
+    const tier = params.tier || "standard"
 
-  const { data, error } = await supabase.rpc("record_protocol_fee", {
-    p_payment_id: params.paymentId || null,
-    p_batch_id: params.batchId || null,
-    p_amount: params.amount,
-    p_from_address: params.fromAddress,
-    p_treasury_address: treasuryAddress,
-    p_token_symbol: params.tokenSymbol,
-    p_chain_id: params.chainId,
-    p_tier: params.tier || "standard",
-    p_collection_method: params.collectionMethod || "deferred",
-  })
+    // Calculate fee
+    const feeCalc = await calculateFee(params.amount, params.fromAddress, tier)
 
-  if (error) {
+    // Record the protocol fee
+    const fee = await prisma.protocolFee.create({
+      data: {
+        payment_id: params.paymentId || null,
+        batch_id: params.batchId || null,
+        transaction_amount: params.amount,
+        fee_rate: feeCalc.feeRate,
+        base_fee: feeCalc.baseFee,
+        discount_amount: feeCalc.discountAmount,
+        final_fee: feeCalc.finalFee,
+        from_address: params.fromAddress.toLowerCase(),
+        treasury_address: treasuryAddress,
+        token_symbol: params.tokenSymbol,
+        chain_id: params.chainId,
+        status: "pending",
+        tier,
+      },
+    })
+
+    // Update monthly summary
+    const monthYear = new Date().toISOString().slice(0, 7)
+    await prisma.monthlyFeeSummary.upsert({
+      where: {
+        wallet_address_month_year: {
+          wallet_address: params.fromAddress.toLowerCase(),
+          month_year: monthYear,
+        },
+      },
+      update: {
+        total_transaction_volume: { increment: params.amount },
+        transaction_count: { increment: 1 },
+        total_fees_charged: { increment: feeCalc.baseFee },
+        total_discounts_given: { increment: feeCalc.discountAmount },
+        net_fees_collected: { increment: feeCalc.finalFee },
+        current_tier: tier,
+      },
+      create: {
+        wallet_address: params.fromAddress.toLowerCase(),
+        month_year: monthYear,
+        total_transaction_volume: params.amount,
+        transaction_count: 1,
+        total_fees_charged: feeCalc.baseFee,
+        total_discounts_given: feeCalc.discountAmount,
+        net_fees_collected: feeCalc.finalFee,
+        current_tier: tier,
+      },
+    })
+
+    return fee.id
+  } catch (error) {
     console.error("Error recording fee:", error)
     return null
   }
-
-  return data
 }
 
 /**
@@ -304,28 +352,56 @@ export async function getFeeStats(
   pendingFees: number
   collectedFees: number
 } | null> {
-  const supabase = createClient()
+  try {
+    const safeWalletAddress = walletAddress && typeof walletAddress === "string" ? walletAddress.toLowerCase() : undefined
+    const effectiveStartDate = startDate || new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)
+    const effectiveEndDate = endDate || new Date()
 
-  const safeWalletAddress = walletAddress && typeof walletAddress === "string" ? walletAddress.toLowerCase() : null
+    const where = {
+      ...(safeWalletAddress && { from_address: safeWalletAddress }),
+      created_at: {
+        gte: effectiveStartDate,
+        lte: effectiveEndDate,
+      },
+    }
 
-  const { data, error } = await supabase.rpc("get_protocol_fee_stats", {
-    p_wallet: safeWalletAddress,
-    p_start_date: startDate?.toISOString() || new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString(),
-    p_end_date: endDate?.toISOString() || new Date().toISOString(),
-  })
+    const [totals, pendingAgg, collectedAgg] = await Promise.all([
+      prisma.protocolFee.aggregate({
+        where,
+        _sum: {
+          final_fee: true,
+          transaction_amount: true,
+        },
+        _avg: {
+          fee_rate: true,
+        },
+        _count: true,
+      }),
+      prisma.protocolFee.aggregate({
+        where: { ...where, status: "pending" },
+        _sum: { final_fee: true },
+      }),
+      prisma.protocolFee.aggregate({
+        where: { ...where, status: "collected" },
+        _sum: { final_fee: true },
+      }),
+    ])
 
-  if (error || !data || data.length === 0) {
+    if (totals._count === 0) {
+      return null
+    }
+
+    return {
+      totalFeesCollected: totals._sum.final_fee || 0,
+      totalTransactionVolume: totals._sum.transaction_amount || 0,
+      transactionCount: totals._count,
+      averageFeeRate: totals._avg.fee_rate || 0,
+      pendingFees: pendingAgg._sum.final_fee || 0,
+      collectedFees: collectedAgg._sum.final_fee || 0,
+    }
+  } catch (error) {
+    console.error("Error getting fee stats:", error)
     return null
-  }
-
-  const stats = data[0]
-  return {
-    totalFeesCollected: Number(stats.total_fees_collected) || 0,
-    totalTransactionVolume: Number(stats.total_transaction_volume) || 0,
-    transactionCount: Number(stats.transaction_count) || 0,
-    averageFeeRate: Number(stats.average_fee_rate) || 0,
-    pendingFees: Number(stats.pending_fees) || 0,
-    collectedFees: Number(stats.collected_fees) || 0,
   }
 }
 
@@ -337,29 +413,34 @@ export async function getMonthlyFeeSummary(walletAddress: string): Promise<Month
     return null
   }
 
-  const supabase = createClient()
-  const monthYear = new Date().toISOString().slice(0, 7)
+  try {
+    const monthYear = new Date().toISOString().slice(0, 7)
 
-  const { data, error } = await supabase
-    .from("monthly_fee_summary")
-    .select("*")
-    .eq("wallet_address", walletAddress.toLowerCase())
-    .eq("month_year", monthYear)
-    .single()
+    const data = await prisma.monthlyFeeSummary.findUnique({
+      where: {
+        wallet_address_month_year: {
+          wallet_address: walletAddress.toLowerCase(),
+          month_year: monthYear,
+        },
+      },
+    })
 
-  if (error || !data) {
+    if (!data) {
+      return null
+    }
+
+    return {
+      walletAddress: data.wallet_address,
+      monthYear: data.month_year,
+      totalTransactionVolume: Number(data.total_transaction_volume),
+      transactionCount: data.transaction_count,
+      totalFeesCharged: Number(data.total_fees_charged),
+      totalDiscountsGiven: Number(data.total_discounts_given),
+      netFeesCollected: Number(data.net_fees_collected),
+      currentTier: data.current_tier,
+    }
+  } catch {
     return null
-  }
-
-  return {
-    walletAddress: data.wallet_address,
-    monthYear: data.month_year,
-    totalTransactionVolume: Number(data.total_transaction_volume),
-    transactionCount: data.transaction_count,
-    totalFeesCharged: Number(data.total_fees_charged),
-    totalDiscountsGiven: Number(data.total_discounts_given),
-    netFeesCollected: Number(data.net_fees_collected),
-    currentTier: data.current_tier,
   }
 }
 
@@ -371,37 +452,34 @@ export async function getRecentFees(walletAddress: string, limit = 10): Promise<
     return []
   }
 
-  const supabase = createClient()
+  try {
+    const data = await prisma.protocolFee.findMany({
+      where: { from_address: walletAddress.toLowerCase() },
+      orderBy: { created_at: "desc" },
+      take: limit,
+    })
 
-  const { data, error } = await supabase
-    .from("protocol_fees")
-    .select("*")
-    .eq("from_address", walletAddress.toLowerCase())
-    .order("created_at", { ascending: false })
-    .limit(limit)
-
-  if (error || !data) {
+    return data.map((fee) => ({
+      id: fee.id,
+      paymentId: fee.payment_id ?? undefined,
+      batchId: fee.batch_id ?? undefined,
+      transactionAmount: Number(fee.transaction_amount),
+      feeRate: Number(fee.fee_rate),
+      baseFee: Number(fee.base_fee),
+      discountAmount: Number(fee.discount_amount),
+      finalFee: Number(fee.final_fee),
+      fromAddress: fee.from_address,
+      treasuryAddress: fee.treasury_address,
+      tokenSymbol: fee.token_symbol,
+      chainId: fee.chain_id,
+      status: fee.status as ProtocolFee["status"],
+      collectionTxHash: fee.collection_tx_hash ?? undefined,
+      tier: fee.tier,
+      createdAt: fee.created_at.toISOString(),
+    }))
+  } catch {
     return []
   }
-
-  return data.map((fee: any) => ({
-    id: fee.id,
-    paymentId: fee.payment_id,
-    batchId: fee.batch_id,
-    transactionAmount: Number(fee.transaction_amount),
-    feeRate: Number(fee.fee_rate),
-    baseFee: Number(fee.base_fee),
-    discountAmount: Number(fee.discount_amount),
-    finalFee: Number(fee.final_fee),
-    fromAddress: fee.from_address,
-    treasuryAddress: fee.treasury_address,
-    tokenSymbol: fee.token_symbol,
-    chainId: fee.chain_id,
-    status: fee.status,
-    collectionTxHash: fee.collection_tx_hash,
-    tier: fee.tier,
-    createdAt: fee.created_at,
-  }))
 }
 
 /**

@@ -6,7 +6,8 @@
  */
 
 import { NextRequest, NextResponse } from "next/server"
-import { createClient } from "@/lib/supabase/server"
+import { prisma } from "@/lib/prisma"
+import { getAuthenticatedAddress } from "@/lib/api-auth"
 
 interface RouteParams {
   params: Promise<{ id: string }>
@@ -16,35 +17,21 @@ interface RouteParams {
 export async function GET(request: NextRequest, { params }: RouteParams) {
   try {
     const { id } = await params
-    const supabase = await createClient()
 
-    // Get user from session
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
-    if (authError || !user) {
+    const walletAddress = await getAuthenticatedAddress(request)
+    if (!walletAddress) {
       return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 })
     }
 
-    // Get owner_address
-    const { data: authUser } = await supabase
-      .from("auth_users")
-      .select("wallet_address")
-      .eq("id", user.id)
-      .single()
-
-    const ownerAddress = authUser?.wallet_address
-    if (!ownerAddress) {
-      return NextResponse.json({ success: false, error: "No wallet associated" }, { status: 400 })
-    }
-
     // Fetch session key
-    const { data: sessionKey, error } = await supabase
-      .from("session_keys")
-      .select("*")
-      .eq("id", id)
-      .eq("owner_address", ownerAddress.toLowerCase())
-      .single()
+    const sessionKey = await prisma.sessionKey.findFirst({
+      where: {
+        id,
+        owner_address: walletAddress.toLowerCase(),
+      },
+    })
 
-    if (error || !sessionKey) {
+    if (!sessionKey) {
       return NextResponse.json({ success: false, error: "Session key not found" }, { status: 404 })
     }
 
@@ -54,10 +41,10 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       sessionKey: {
         id: sessionKey.id,
         owner_address: sessionKey.owner_address,
-        session_key_address: sessionKey.session_key_address,
+        session_key_address: sessionKey.session_address,
         chain_id: sessionKey.chain_id,
         spending_limit: sessionKey.spending_limit,
-        spent_amount: sessionKey.spent_amount,
+        spent_amount: sessionKey.amount_spent,
         allowed_tokens: sessionKey.allowed_tokens,
         expires_at: sessionKey.expires_at,
         is_active: sessionKey.is_active,
@@ -78,24 +65,22 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
 export async function PATCH(request: NextRequest, { params }: RouteParams) {
   try {
     const { id } = await params
-    const supabase = await createClient()
 
-    // Get user from session
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
-    if (authError || !user) {
+    const walletAddress = await getAuthenticatedAddress(request)
+    if (!walletAddress) {
       return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 })
     }
 
-    // Get owner_address
-    const { data: authUser } = await supabase
-      .from("auth_users")
-      .select("wallet_address")
-      .eq("id", user.id)
-      .single()
+    // Verify ownership first
+    const existing = await prisma.sessionKey.findFirst({
+      where: {
+        id,
+        owner_address: walletAddress.toLowerCase(),
+      },
+    })
 
-    const ownerAddress = authUser?.wallet_address
-    if (!ownerAddress) {
-      return NextResponse.json({ success: false, error: "No wallet associated" }, { status: 400 })
+    if (!existing) {
+      return NextResponse.json({ success: false, error: "Session key not found or update failed" }, { status: 404 })
     }
 
     // Parse request body
@@ -117,27 +102,20 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
     }
 
     // Update session key
-    const { data: sessionKey, error } = await supabase
-      .from("session_keys")
-      .update(updateData)
-      .eq("id", id)
-      .eq("owner_address", ownerAddress.toLowerCase())
-      .select()
-      .single()
-
-    if (error || !sessionKey) {
-      return NextResponse.json({ success: false, error: "Session key not found or update failed" }, { status: 404 })
-    }
+    const sessionKey = await prisma.sessionKey.update({
+      where: { id },
+      data: updateData,
+    })
 
     return NextResponse.json({
       success: true,
       sessionKey: {
         id: sessionKey.id,
         owner_address: sessionKey.owner_address,
-        session_key_address: sessionKey.session_key_address,
+        session_key_address: sessionKey.session_address,
         chain_id: sessionKey.chain_id,
         spending_limit: sessionKey.spending_limit,
-        spent_amount: sessionKey.spent_amount,
+        spent_amount: sessionKey.amount_spent,
         allowed_tokens: sessionKey.allowed_tokens,
         expires_at: sessionKey.expires_at,
         is_active: sessionKey.is_active,
@@ -158,37 +136,28 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
 export async function DELETE(request: NextRequest, { params }: RouteParams) {
   try {
     const { id } = await params
-    const supabase = await createClient()
 
-    // Get user from session
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
-    if (authError || !user) {
+    const walletAddress = await getAuthenticatedAddress(request)
+    if (!walletAddress) {
       return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 })
     }
 
-    // Get owner_address
-    const { data: authUser } = await supabase
-      .from("auth_users")
-      .select("wallet_address")
-      .eq("id", user.id)
-      .single()
+    // Verify ownership first
+    const existing = await prisma.sessionKey.findFirst({
+      where: {
+        id,
+        owner_address: walletAddress.toLowerCase(),
+      },
+    })
 
-    const ownerAddress = authUser?.wallet_address
-    if (!ownerAddress) {
-      return NextResponse.json({ success: false, error: "No wallet associated" }, { status: 400 })
+    if (!existing) {
+      return NextResponse.json({ success: false, error: "Session key not found" }, { status: 404 })
     }
 
     // Delete session key
-    const { error } = await supabase
-      .from("session_keys")
-      .delete()
-      .eq("id", id)
-      .eq("owner_address", ownerAddress.toLowerCase())
-
-    if (error) {
-      console.error("[SessionKeys] Failed to delete:", error)
-      return NextResponse.json({ success: false, error: "Failed to delete session key" }, { status: 500 })
-    }
+    await prisma.sessionKey.delete({
+      where: { id },
+    })
 
     return NextResponse.json({ success: true })
   } catch (error) {

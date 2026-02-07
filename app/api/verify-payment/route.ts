@@ -6,8 +6,7 @@
  */
 
 import { type NextRequest, NextResponse } from "next/server"
-import { createServerClient } from "@supabase/ssr"
-import { cookies } from "next/headers"
+import { prisma } from "@/lib/prisma"
 import { validateAndChecksumAddress, validateAmount, verifyTransactionIntegrity, createAuditLog } from "@/lib/security/security"
 
 export async function POST(request: NextRequest) {
@@ -31,29 +30,12 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: `Invalid amount: ${amountValidation.error}` }, { status: 400 })
     }
 
-    // Create Supabase client
-    const cookieStore = await cookies()
-    const supabase = createServerClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, {
-      cookies: {
-        getAll() {
-          return cookieStore.getAll()
-        },
-        setAll(cookiesToSet) {
-          cookiesToSet.forEach(({ name, value, options }) => {
-            cookieStore.set(name, value, options)
-          })
-        },
-      },
+    // Fetch payment from database
+    const payment = await prisma.payment.findUnique({
+      where: { id: paymentId },
     })
 
-    // Fetch payment from database
-    const { data: payment, error: fetchError } = await supabase
-      .from("payments")
-      .select("*")
-      .eq("id", paymentId)
-      .single()
-
-    if (fetchError || !payment) {
+    if (!payment) {
       return NextResponse.json({ error: "Payment not found" }, { status: 404 })
     }
 
@@ -88,12 +70,14 @@ export async function POST(request: NextRequest) {
     })
 
     // Store verification result
-    await supabase.from("payment_integrity").insert({
-      payment_id: paymentId,
-      client_hash: integrityHash,
-      server_hash: integrityHash, // In production, compute server-side hash
-      match_status: discrepancies.length === 0 && integrityValid,
-      discrepancies: discrepancies,
+    await prisma.paymentIntegrity.create({
+      data: {
+        payment_id: paymentId,
+        client_hash: integrityHash,
+        server_hash: integrityHash, // In production, compute server-side hash
+        integrity_valid: discrepancies.length === 0 && integrityValid,
+        discrepancies: discrepancies,
+      },
     })
 
     // Log if there are discrepancies
@@ -110,12 +94,14 @@ export async function POST(request: NextRequest) {
       console.error("[Security Alert]", alertLog)
 
       // Store security alert
-      await supabase.from("security_alerts").insert({
-        alert_type: "TAMPERING",
-        severity: "high",
-        actor: payment.from_address,
-        description: `Payment parameters do not match between client and server`,
-        details: { discrepancies, payment_id: paymentId },
+      await prisma.securityAlert.create({
+        data: {
+          alert_type: "TAMPERING",
+          severity: "high",
+          address: payment.from_address,
+          description: `Payment parameters do not match between client and server`,
+          details: { discrepancies, payment_id: paymentId },
+        },
       })
     }
 

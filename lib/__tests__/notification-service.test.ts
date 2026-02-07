@@ -15,51 +15,33 @@ import {
 // Test Utilities
 // ============================================
 
-// Mock Supabase client
-jest.mock('@/lib/supabase-client', () => ({
-  createClient: jest.fn(() => ({
-    from: jest.fn(() => ({
-      select: jest.fn(() => ({
-        eq: jest.fn(() => ({
-          single: jest.fn().mockResolvedValue({ data: null, error: null }),
-          eq: jest.fn(() => ({
-            single: jest.fn().mockResolvedValue({ data: null, error: null }),
-          })),
-        })),
-      })),
-      insert: jest.fn(() => ({
-        select: jest.fn(() => ({
-          single: jest.fn().mockResolvedValue({
-            data: {
-              id: 'test-id',
-              user_address: '0xtest',
-              payment_received: true,
-              payment_sent: true,
-              subscription_reminder: true,
-              subscription_payment: true,
-              multisig_proposal: true,
-              multisig_executed: true,
-              created_at: new Date().toISOString(),
-              updated_at: new Date().toISOString(),
-            },
-            error: null,
-          }),
-        })),
-      })),
-      update: jest.fn(() => ({
-        eq: jest.fn(() => ({
-          select: jest.fn(() => ({
-            single: jest.fn().mockResolvedValue({ data: null, error: null }),
-          })),
-        })),
-      })),
-      delete: jest.fn(() => ({
-        eq: jest.fn(() => ({
-          eq: jest.fn().mockResolvedValue({ error: null }),
-        })),
-      })),
-    })),
-  })),
+// Mock Prisma client
+jest.mock('@/lib/prisma', () => ({
+  __esModule: true,
+  default: {
+    notificationPreference: {
+      findUnique: jest.fn().mockResolvedValue(null),
+      create: jest.fn().mockResolvedValue({
+        id: 'test-id',
+        user_address: '0xtest',
+        payment_received: true,
+        payment_sent: true,
+        subscription_reminder: true,
+        subscription_payment: true,
+        multisig_proposal: true,
+        multisig_executed: true,
+        created_at: new Date(),
+        updated_at: new Date(),
+      }),
+      update: jest.fn().mockResolvedValue(null),
+      delete: jest.fn().mockResolvedValue(null),
+    },
+    pushSubscription: {
+      findMany: jest.fn().mockResolvedValue([]),
+      create: jest.fn().mockResolvedValue(null),
+      deleteMany: jest.fn().mockResolvedValue({ count: 0 }),
+    },
+  },
 }));
 
 // Mock web-push - must be before importing the service

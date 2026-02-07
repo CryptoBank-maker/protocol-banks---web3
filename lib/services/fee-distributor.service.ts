@@ -3,6 +3,8 @@
  * Handles fee distribution and logging
  */
 
+import prisma from '@/lib/prisma'
+
 export interface FeeDistribution {
   totalFee: number
   protocolFee: number
@@ -41,36 +43,21 @@ export function calculateDistribution(
  * Log fee distribution to database
  */
 export async function logFeeDistribution(
-  distribution: FeeDistribution,
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  supabase?: any
+  distribution: FeeDistribution
 ): Promise<{ success: boolean; id?: string; error?: string }> {
-  if (!supabase) {
-    // Log to console in development
-    console.log('[FeeDistributor] Fee distribution:', distribution)
-    return { success: true, id: `local-${Date.now()}` }
-  }
-  
   try {
-    const { data, error } = await supabase
-      .from('fee_distributions')
-      .insert({
+    const record = await prisma.feeDistribution.create({
+      data: {
         total_fee: distribution.totalFee,
         protocol_fee: distribution.protocolFee,
         relayer_fee: distribution.relayerFee,
         network_fee: distribution.networkFee,
         transaction_hash: distribution.transactionHash,
-        created_at: new Date(distribution.timestamp).toISOString(),
-      })
-      .select('id')
-      .single()
+        created_at: new Date(distribution.timestamp),
+      },
+    })
     
-    if (error) {
-      console.error('[FeeDistributor] Failed to log distribution:', error)
-      return { success: false, error: error.message }
-    }
-    
-    return { success: true, id: data.id }
+    return { success: true, id: record.id }
   } catch (err) {
     console.error('[FeeDistributor] Error logging distribution:', err)
     return { success: false, error: String(err) }
@@ -82,9 +69,7 @@ export async function logFeeDistribution(
  */
 export async function getFeeStatistics(
   startDate: Date,
-  endDate: Date,
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  supabase: any
+  endDate: Date
 ): Promise<{
   totalFees: number
   protocolFees: number
@@ -93,21 +78,26 @@ export async function getFeeStatistics(
   transactionCount: number
 }> {
   try {
-    const { data, error } = await supabase
-      .from('fee_distributions')
-      .select('total_fee, protocol_fee, relayer_fee, network_fee')
-      .gte('created_at', startDate.toISOString())
-      .lte('created_at', endDate.toISOString())
-    
-    if (error) {
-      throw error
-    }
+    const data = await prisma.feeDistribution.findMany({
+      where: {
+        created_at: {
+          gte: startDate,
+          lte: endDate,
+        },
+      },
+      select: {
+        total_fee: true,
+        protocol_fee: true,
+        relayer_fee: true,
+        network_fee: true,
+      },
+    })
     
     return {
-      totalFees: data.reduce((sum: number, d: { total_fee: number }) => sum + d.total_fee, 0),
-      protocolFees: data.reduce((sum: number, d: { protocol_fee: number }) => sum + d.protocol_fee, 0),
-      relayerFees: data.reduce((sum: number, d: { relayer_fee: number }) => sum + d.relayer_fee, 0),
-      networkFees: data.reduce((sum: number, d: { network_fee: number }) => sum + d.network_fee, 0),
+      totalFees: data.reduce((sum, d) => sum + (d.total_fee ?? 0), 0),
+      protocolFees: data.reduce((sum, d) => sum + (d.protocol_fee ?? 0), 0),
+      relayerFees: data.reduce((sum, d) => sum + (d.relayer_fee ?? 0), 0),
+      networkFees: data.reduce((sum, d) => sum + (d.network_fee ?? 0), 0),
       transactionCount: data.length,
     }
   } catch (err) {

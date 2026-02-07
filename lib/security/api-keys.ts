@@ -1,5 +1,5 @@
 // API Key management service
-import { createClient } from "@/lib/supabase/client"
+import { prisma } from "@/lib/prisma"
 import { createHash, randomBytes } from "crypto"
 
 export interface ApiKey {
@@ -75,8 +75,6 @@ export const API_PERMISSIONS = [
 ] as const
 
 export class ApiKeyService {
-  private supabase = createClient()
-
   // Generate a new API key
   async createApiKey(params: {
     name: string
@@ -96,27 +94,26 @@ export class ApiKeyService {
       ? new Date(Date.now() + params.expiresInDays * 24 * 60 * 60 * 1000).toISOString()
       : null
 
-    const { data, error } = await this.supabase
-      .from("api_keys")
-      .insert({
-        name: params.name,
-        key_hash: keyHash,
-        key_prefix: keyPrefix,
-        owner_address: params.ownerAddress.toLowerCase(),
-        permissions: params.permissions || ["read"],
-        rate_limit_per_minute: params.rateLimitPerMinute || 60,
-        rate_limit_per_day: params.rateLimitPerDay || 10000,
-        allowed_ips: params.allowedIps || null,
-        allowed_origins: params.allowedOrigins || null,
-        expires_at: expiresAt,
-      })
-      .select()
-      .single()
+    const rows: any[] = await prisma.$queryRawUnsafe(
+      `INSERT INTO api_keys (name, key_hash, key_prefix, owner_address, permissions, rate_limit_per_minute, rate_limit_per_day, allowed_ips, allowed_origins, expires_at)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+       RETURNING *`,
+      params.name,
+      keyHash,
+      keyPrefix,
+      params.ownerAddress.toLowerCase(),
+      JSON.stringify(params.permissions || ["read"]),
+      params.rateLimitPerMinute || 60,
+      params.rateLimitPerDay || 10000,
+      params.allowedIps ? JSON.stringify(params.allowedIps) : null,
+      params.allowedOrigins ? JSON.stringify(params.allowedOrigins) : null,
+      expiresAt,
+    )
 
-    if (error) throw error
+    if (!rows[0]) throw new Error("Failed to create API key")
 
     return {
-      apiKey: data,
+      apiKey: rows[0],
       secretKey, // Only returned once
     }
   }
@@ -125,14 +122,14 @@ export class ApiKeyService {
   async validateApiKey(secretKey: string): Promise<ApiKey | null> {
     const keyHash = createHash("sha256").update(secretKey).digest("hex")
 
-    const { data, error } = await this.supabase
-      .from("api_keys")
-      .select("*")
-      .eq("key_hash", keyHash)
-      .eq("is_active", true)
-      .single()
+    const rows: any[] = await prisma.$queryRawUnsafe(
+      `SELECT * FROM api_keys WHERE key_hash = $1 AND is_active = true LIMIT 1`,
+      keyHash,
+    )
 
-    if (error || !data) return null
+    if (!rows[0]) return null
+
+    const data = rows[0]
 
     // Check expiration
     if (data.expires_at && new Date(data.expires_at) < new Date()) {
@@ -140,55 +137,56 @@ export class ApiKeyService {
     }
 
     // Update usage stats
-    await this.supabase
-      .from("api_keys")
-      .update({
-        last_used_at: new Date().toISOString(),
-        usage_count: data.usage_count + 1,
-      })
-      .eq("id", data.id)
+    await prisma.$executeRawUnsafe(
+      `UPDATE api_keys SET last_used_at = $1, usage_count = usage_count + 1 WHERE id = $2`,
+      new Date().toISOString(),
+      data.id,
+    )
 
     return data
   }
 
   // Check rate limit
   async checkRateLimit(apiKeyId: string): Promise<{ allowed: boolean; remaining: number }> {
-    const { data: key } = await this.supabase
-      .from("api_keys")
-      .select("rate_limit_per_minute, rate_limit_per_day")
-      .eq("id", apiKeyId)
-      .single()
+    const keyRows: any[] = await prisma.$queryRawUnsafe(
+      `SELECT rate_limit_per_minute, rate_limit_per_day FROM api_keys WHERE id = $1 LIMIT 1`,
+      apiKeyId,
+    )
 
-    if (!key) return { allowed: false, remaining: 0 }
+    if (!keyRows[0]) return { allowed: false, remaining: 0 }
+
+    const key = keyRows[0]
 
     // Get usage in last minute
     const minuteAgo = new Date(Date.now() - 60000).toISOString()
-    const { count: minuteCount } = await this.supabase
-      .from("api_key_usage_logs")
-      .select("*", { count: "exact", head: true })
-      .eq("api_key_id", apiKeyId)
-      .gte("created_at", minuteAgo)
+    const minuteResult: { count: bigint }[] = await prisma.$queryRawUnsafe(
+      `SELECT COUNT(*) as count FROM api_key_usage_logs WHERE api_key_id = $1 AND created_at >= $2`,
+      apiKeyId,
+      minuteAgo,
+    )
+    const minuteCount = Number(minuteResult[0]?.count || 0)
 
-    if ((minuteCount || 0) >= key.rate_limit_per_minute) {
+    if (minuteCount >= key.rate_limit_per_minute) {
       return { allowed: false, remaining: 0 }
     }
 
     // Get usage today
     const today = new Date()
     today.setHours(0, 0, 0, 0)
-    const { count: dayCount } = await this.supabase
-      .from("api_key_usage_logs")
-      .select("*", { count: "exact", head: true })
-      .eq("api_key_id", apiKeyId)
-      .gte("created_at", today.toISOString())
+    const dayResult: { count: bigint }[] = await prisma.$queryRawUnsafe(
+      `SELECT COUNT(*) as count FROM api_key_usage_logs WHERE api_key_id = $1 AND created_at >= $2`,
+      apiKeyId,
+      today.toISOString(),
+    )
+    const dayCount = Number(dayResult[0]?.count || 0)
 
-    if ((dayCount || 0) >= key.rate_limit_per_day) {
+    if (dayCount >= key.rate_limit_per_day) {
       return { allowed: false, remaining: 0 }
     }
 
     return {
       allowed: true,
-      remaining: key.rate_limit_per_minute - (minuteCount || 0),
+      remaining: key.rate_limit_per_minute - minuteCount,
     }
   }
 
@@ -202,47 +200,53 @@ export class ApiKeyService {
     ipAddress?: string
     userAgent?: string
   }): Promise<void> {
-    await this.supabase.from("api_key_usage_logs").insert(params)
+    await prisma.$executeRawUnsafe(
+      `INSERT INTO api_key_usage_logs (api_key_id, endpoint, method, status_code, response_time_ms, ip_address, user_agent)
+       VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+      params.apiKeyId,
+      params.endpoint,
+      params.method,
+      params.statusCode,
+      params.responseTimeMs,
+      params.ipAddress || null,
+      params.userAgent || null,
+    )
   }
 
   // Get all API keys for a user
   async getApiKeys(ownerAddress: string): Promise<ApiKey[]> {
-    const { data, error } = await this.supabase
-      .from("api_keys")
-      .select("*")
-      .eq("owner_address", ownerAddress.toLowerCase())
-      .order("created_at", { ascending: false })
+    const rows: any[] = await prisma.$queryRawUnsafe(
+      `SELECT * FROM api_keys WHERE owner_address = $1 ORDER BY created_at DESC`,
+      ownerAddress.toLowerCase(),
+    )
 
-    if (error) throw error
-    return data || []
+    return rows || []
   }
 
   // Revoke an API key
   async revokeApiKey(keyId: string, ownerAddress: string): Promise<void> {
-    const { error } = await this.supabase
-      .from("api_keys")
-      .update({ is_active: false })
-      .eq("id", keyId)
-      .eq("owner_address", ownerAddress.toLowerCase())
+    const result = await prisma.$executeRawUnsafe(
+      `UPDATE api_keys SET is_active = false WHERE id = $1 AND owner_address = $2`,
+      keyId,
+      ownerAddress.toLowerCase(),
+    )
 
-    if (error) throw error
+    if (result === 0) throw new Error("API key not found or not owned by user")
   }
 
   // Delete an API key
   async deleteApiKey(keyId: string, ownerAddress: string): Promise<void> {
-    const { error } = await this.supabase
-      .from("api_keys")
-      .delete()
-      .eq("id", keyId)
-      .eq("owner_address", ownerAddress.toLowerCase())
+    const result = await prisma.$executeRawUnsafe(
+      `DELETE FROM api_keys WHERE id = $1 AND owner_address = $2`,
+      keyId,
+      ownerAddress.toLowerCase(),
+    )
 
-    if (error) throw error
+    if (result === 0) throw new Error("API key not found or not owned by user")
   }
 }
 
 export class WebhookService {
-  private supabase = createClient()
-
   // Create a new webhook
   async createWebhook(params: {
     name: string
@@ -253,36 +257,33 @@ export class WebhookService {
     const secret = `whsec_${randomBytes(32).toString("hex")}`
     const secretHash = createHash("sha256").update(secret).digest("hex")
 
-    const { data, error } = await this.supabase
-      .from("webhooks")
-      .insert({
-        name: params.name,
-        url: params.url,
-        owner_address: params.ownerAddress.toLowerCase(),
-        events: params.events,
-        secret_hash: secretHash,
-      })
-      .select()
-      .single()
+    const rows: any[] = await prisma.$queryRawUnsafe(
+      `INSERT INTO webhooks (name, url, owner_address, events, secret_hash)
+       VALUES ($1, $2, $3, $4, $5)
+       RETURNING *`,
+      params.name,
+      params.url,
+      params.ownerAddress.toLowerCase(),
+      JSON.stringify(params.events),
+      secretHash,
+    )
 
-    if (error) throw error
+    if (!rows[0]) throw new Error("Failed to create webhook")
 
     return {
-      webhook: data,
+      webhook: rows[0],
       secret, // Only returned once
     }
   }
 
   // Get all webhooks for a user
   async getWebhooks(ownerAddress: string): Promise<Webhook[]> {
-    const { data, error } = await this.supabase
-      .from("webhooks")
-      .select("*")
-      .eq("owner_address", ownerAddress.toLowerCase())
-      .order("created_at", { ascending: false })
+    const rows: any[] = await prisma.$queryRawUnsafe(
+      `SELECT * FROM webhooks WHERE owner_address = $1 ORDER BY created_at DESC`,
+      ownerAddress.toLowerCase(),
+    )
 
-    if (error) throw error
-    return data || []
+    return rows || []
   }
 
   // Trigger a webhook event
@@ -292,23 +293,25 @@ export class WebhookService {
     payload: Record<string, unknown>
   }): Promise<void> {
     // Find all active webhooks for this event
-    const { data: webhooks } = await this.supabase
-      .from("webhooks")
-      .select("*")
-      .eq("owner_address", params.ownerAddress.toLowerCase())
-      .eq("is_active", true)
-      .contains("events", [params.eventType])
+    const webhooks: any[] = await prisma.$queryRawUnsafe(
+      `SELECT * FROM webhooks
+       WHERE owner_address = $1 AND is_active = true AND events @> $2`,
+      params.ownerAddress.toLowerCase(),
+      JSON.stringify([params.eventType]),
+    )
 
     if (!webhooks || webhooks.length === 0) return
 
     // Create delivery records
     for (const webhook of webhooks) {
-      await this.supabase.from("webhook_deliveries").insert({
-        webhook_id: webhook.id,
-        event_type: params.eventType,
-        payload: params.payload,
-        status: "pending",
-      })
+      await prisma.$executeRawUnsafe(
+        `INSERT INTO webhook_deliveries (webhook_id, event_type, payload, status)
+         VALUES ($1, $2, $3, $4)`,
+        webhook.id,
+        params.eventType,
+        JSON.stringify(params.payload),
+        "pending",
+      )
     }
 
     // In production, use a queue to process deliveries
@@ -338,44 +341,39 @@ export class WebhookService {
         signal: AbortSignal.timeout(webhook.timeout_ms),
       })
 
-      await this.supabase
-        .from("webhook_deliveries")
-        .update({
-          status: response.ok ? "delivered" : "failed",
-          response_status: response.status,
-          delivered_at: response.ok ? new Date().toISOString() : null,
-          attempts: 1,
-          last_attempt_at: new Date().toISOString(),
-        })
-        .eq("webhook_id", webhook.id)
-        .eq("event_type", eventType)
-        .eq("status", "pending")
+      await prisma.$executeRawUnsafe(
+        `UPDATE webhook_deliveries
+         SET status = $1, response_status = $2, delivered_at = $3, attempts = 1, last_attempt_at = $4
+         WHERE webhook_id = $5 AND event_type = $6 AND status = 'pending'`,
+        response.ok ? "delivered" : "failed",
+        response.status,
+        response.ok ? new Date().toISOString() : null,
+        new Date().toISOString(),
+        webhook.id,
+        eventType,
+      )
     } catch (error) {
-      await this.supabase
-        .from("webhook_deliveries")
-        .update({
-          status: "failed",
-          error_message: error instanceof Error ? error.message : "Unknown error",
-          attempts: 1,
-          last_attempt_at: new Date().toISOString(),
-        })
-        .eq("webhook_id", webhook.id)
-        .eq("event_type", eventType)
-        .eq("status", "pending")
+      await prisma.$executeRawUnsafe(
+        `UPDATE webhook_deliveries
+         SET status = $1, error_message = $2, attempts = 1, last_attempt_at = $3
+         WHERE webhook_id = $4 AND event_type = $5 AND status = 'pending'`,
+        "failed",
+        error instanceof Error ? error.message : "Unknown error",
+        new Date().toISOString(),
+        webhook.id,
+        eventType,
+      )
     }
   }
 
   // Get webhook deliveries
   async getDeliveries(webhookId: string): Promise<WebhookDelivery[]> {
-    const { data, error } = await this.supabase
-      .from("webhook_deliveries")
-      .select("*")
-      .eq("webhook_id", webhookId)
-      .order("created_at", { ascending: false })
-      .limit(100)
+    const rows: any[] = await prisma.$queryRawUnsafe(
+      `SELECT * FROM webhook_deliveries WHERE webhook_id = $1 ORDER BY created_at DESC LIMIT 100`,
+      webhookId,
+    )
 
-    if (error) throw error
-    return data || []
+    return rows || []
   }
 
   // Update webhook
@@ -384,24 +382,49 @@ export class WebhookService {
     ownerAddress: string
     updates: Partial<Pick<Webhook, "name" | "url" | "events" | "is_active">>
   }): Promise<void> {
-    const { error } = await this.supabase
-      .from("webhooks")
-      .update(params.updates)
-      .eq("id", params.webhookId)
-      .eq("owner_address", params.ownerAddress.toLowerCase())
+    const setClauses: string[] = []
+    const values: any[] = []
+    let paramIndex = 1
 
-    if (error) throw error
+    if (params.updates.name !== undefined) {
+      setClauses.push(`name = $${paramIndex++}`)
+      values.push(params.updates.name)
+    }
+    if (params.updates.url !== undefined) {
+      setClauses.push(`url = $${paramIndex++}`)
+      values.push(params.updates.url)
+    }
+    if (params.updates.events !== undefined) {
+      setClauses.push(`events = $${paramIndex++}`)
+      values.push(JSON.stringify(params.updates.events))
+    }
+    if (params.updates.is_active !== undefined) {
+      setClauses.push(`is_active = $${paramIndex++}`)
+      values.push(params.updates.is_active)
+    }
+
+    if (setClauses.length === 0) return
+
+    values.push(params.webhookId)
+    values.push(params.ownerAddress.toLowerCase())
+
+    const result = await prisma.$executeRawUnsafe(
+      `UPDATE webhooks SET ${setClauses.join(", ")} WHERE id = $${paramIndex++} AND owner_address = $${paramIndex}`,
+      ...values,
+    )
+
+    if (result === 0) throw new Error("Webhook not found or not owned by user")
   }
 
   // Delete webhook
   async deleteWebhook(webhookId: string, ownerAddress: string): Promise<void> {
-    const { error } = await this.supabase
-      .from("webhooks")
-      .delete()
-      .eq("id", webhookId)
-      .eq("owner_address", ownerAddress.toLowerCase())
+    const result = await prisma.$executeRawUnsafe(
+      `DELETE FROM webhooks WHERE id = $1 AND owner_address = $2`,
+      webhookId,
+      ownerAddress.toLowerCase(),
+    )
 
-    if (error) throw error
+    if (result === 0) throw new Error("Webhook not found or not owned by user")
   }
 }
 

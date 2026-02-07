@@ -1,5 +1,5 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { createServerClient } from "@/lib/supabase/server"
+import { prisma } from "@/lib/prisma"
 import { createSession } from "@/lib/auth/session"
 import * as jose from "jose"
 
@@ -22,7 +22,6 @@ export async function POST(request: NextRequest) {
     }
 
     // Decode the ID token to get user info
-    // Note: In production, you should verify the token signature
     const decoded = jose.decodeJwt(idToken)
 
     const appleUserId = decoded.sub as string
@@ -45,11 +44,10 @@ export async function POST(request: NextRequest) {
       return NextResponse.redirect(new URL("/auth/error?error=invalid_token", request.url))
     }
 
-    // Create or get user
-    const supabase = await createServerClient()
-
-    // Check if user exists
-    const { data: existingUser } = await supabase.from("auth_users").select("*").eq("apple_id", appleUserId).single()
+    // Check if user exists by apple_id
+    let existingUser = await prisma.authUser.findUnique({
+      where: { apple_id: appleUserId },
+    })
 
     let userId: string
 
@@ -57,25 +55,26 @@ export async function POST(request: NextRequest) {
       userId = existingUser.id
       // Update email if we have it and it's not set
       if (email && !existingUser.email) {
-        await supabase.from("auth_users").update({ email }).eq("id", existingUser.id)
+        await prisma.authUser.update({
+          where: { id: existingUser.id },
+          data: { email },
+        })
       }
     } else {
       // Create new user
-      const { data: newUser, error: createError } = await supabase
-        .from("auth_users")
-        .insert({
-          email: email || null,
-          apple_id: appleUserId,
+      try {
+        const newUser = await prisma.authUser.create({
+          data: {
+            email: email || null,
+            apple_id: appleUserId,
+            email_verified: true,
+          },
         })
-        .select()
-        .single()
-
-      if (createError || !newUser) {
+        userId = newUser.id
+      } catch (createError) {
         console.error("[OAuth] User creation failed:", createError)
         return NextResponse.redirect(new URL("/auth/error?error=user_creation_failed", request.url))
       }
-
-      userId = newUser.id
     }
 
     // Create session

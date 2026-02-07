@@ -8,7 +8,7 @@
  */
 
 import { type NextRequest, NextResponse } from "next/server"
-import { createClient } from "@/lib/supabase/server"
+import { prisma } from "@/lib/prisma"
 import { getSession } from "@/lib/auth/session"
 import { createEmbeddedWallet, validatePIN } from "@/lib/auth/embedded-wallet"
 
@@ -28,14 +28,11 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: pinValidation.error }, { status: 400 })
     }
 
-    const supabase = await createClient()
-
     // Check if user already has a wallet
-    const { data: existingWallet } = await supabase
-      .from("embedded_wallets")
-      .select("id")
-      .eq("user_id", session.userId)
-      .single()
+    const existingWallet = await prisma.embeddedWallet.findFirst({
+      where: { user_id: session.userId },
+      select: { id: true },
+    })
 
     if (existingWallet) {
       return NextResponse.json({ error: "Wallet already exists" }, { status: 400 })
@@ -45,19 +42,21 @@ export async function POST(request: NextRequest) {
     const walletResult = await createEmbeddedWallet(pin)
 
     // Store wallet in database (server share only)
-    const { error: insertError } = await supabase.from("embedded_wallets").insert({
-      user_id: session.userId,
-      address: walletResult.address,
-      server_share_encrypted: walletResult.shares.serverShare.encrypted,
-      server_share_iv: walletResult.shares.serverShare.iv,
-      recovery_share_encrypted: walletResult.shares.recoveryShare.encrypted,
-      recovery_share_iv: walletResult.shares.recoveryShare.iv,
-      salt: walletResult.shares.salt,
-      chain_type: "EVM",
-      is_primary: true,
-    })
-
-    if (insertError) {
+    try {
+      await prisma.embeddedWallet.create({
+        data: {
+          user_id: session.userId,
+          address: walletResult.address,
+          server_share_encrypted: walletResult.shares.serverShare.encrypted,
+          server_share_iv: walletResult.shares.serverShare.iv,
+          recovery_share: walletResult.shares.recoveryShare.encrypted,
+          recovery_iv: walletResult.shares.recoveryShare.iv,
+          salt: walletResult.shares.salt,
+          chain_type: "EVM",
+          is_primary: true,
+        },
+      })
+    } catch (insertError) {
       console.error("[Auth] Failed to store wallet:", insertError)
       return NextResponse.json({ error: "Failed to create wallet" }, { status: 500 })
     }

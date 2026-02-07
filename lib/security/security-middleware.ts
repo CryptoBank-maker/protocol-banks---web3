@@ -10,6 +10,7 @@
  */
 
 import { type NextRequest, NextResponse } from "next/server"
+import prisma from '@/lib/prisma'
 // Uses global crypto (Web Crypto API)
 
 // Synchronous hash for immediate use
@@ -450,7 +451,6 @@ export function sanitizeForMixedAttack(input: string): {
 export async function verifyVendorAddressIntegrity(
   vendorId: string,
   currentAddress: string,
-  supabase: any,
 ): Promise<{
   valid: boolean
   error?: string
@@ -458,13 +458,12 @@ export async function verifyVendorAddressIntegrity(
 }> {
   try {
     // Fetch stored vendor data
-    const { data: vendor, error } = await supabase
-      .from("vendors")
-      .select("wallet_address, address_hash, last_verified_at")
-      .eq("id", vendorId)
-      .single()
+    const vendor = await prisma.vendor.findFirst({
+      where: { id: vendorId },
+      select: { wallet_address: true, address_hash: true, last_verified_at: true },
+    })
 
-    if (error || !vendor) {
+    if (!vendor) {
       return { valid: false, error: "Vendor not found", changed: false }
     }
 
@@ -474,15 +473,17 @@ export async function verifyVendorAddressIntegrity(
     // Check if address matches
     if (storedAddress !== providedAddress) {
       // Log the discrepancy
-      await supabase.from("security_alerts").insert({
-        alert_type: "ADDRESS_MISMATCH",
-        severity: "critical",
-        actor: vendorId,
-        description: `Vendor address mismatch detected`,
-        details: {
-          stored: storedAddress,
-          provided: providedAddress,
-          vendor_id: vendorId,
+      await prisma.securityAlert.create({
+        data: {
+          alert_type: "ADDRESS_MISMATCH",
+          severity: "critical",
+          actor: vendorId,
+          description: `Vendor address mismatch detected`,
+          details: {
+            stored: storedAddress,
+            provided: providedAddress,
+            vendor_id: vendorId,
+          },
         },
       })
 
@@ -494,7 +495,10 @@ export async function verifyVendorAddressIntegrity(
     }
 
     // Update last verified timestamp
-    await supabase.from("vendors").update({ last_verified_at: new Date().toISOString() }).eq("id", vendorId)
+    await prisma.vendor.update({
+      where: { id: vendorId },
+      data: { last_verified_at: new Date() },
+    })
 
     return { valid: true, changed: false }
   } catch (error: any) {
