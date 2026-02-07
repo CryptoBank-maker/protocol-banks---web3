@@ -16,6 +16,19 @@ import { agentX402Service, setUseDatabaseStorage as setX402Db } from '../service
 import { agentWebhookService, setUseDatabaseStorage as setWebhookDb } from '../services/agent-webhook-service';
 import { agentActivityService, setUseDatabaseStorage as setActivityDb } from '../services/agent-activity-service';
 
+// Mock Prisma to prevent DB calls from notification-service
+jest.mock('@/lib/prisma', () => ({
+  prisma: {
+    notificationPreference: {
+      findUnique: jest.fn().mockResolvedValue(null),
+      create: jest.fn().mockResolvedValue({}),
+    },
+    pushSubscription: {
+      findMany: jest.fn().mockResolvedValue([]),
+    },
+  },
+}));
+
 // ============================================
 // Test Setup
 // ============================================

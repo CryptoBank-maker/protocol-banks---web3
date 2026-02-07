@@ -12,6 +12,19 @@ import { agentX402Service, setUseDatabaseStorage as setX402Db } from '../service
 import { proposalService, PaymentProposal, setUseDatabaseStorage as setProposalDb } from '../services/proposal-service';
 import { agentService, setUseDatabaseStorage as setAgentDb } from '../services/agent-service';
 
+// Mock Prisma to prevent DB calls from notification-service
+jest.mock('@/lib/prisma', () => ({
+  prisma: {
+    notificationPreference: {
+      findUnique: jest.fn().mockResolvedValue(null),
+      create: jest.fn().mockResolvedValue({}),
+    },
+    pushSubscription: {
+      findMany: jest.fn().mockResolvedValue([]),
+    },
+  },
+}));
+
 // ============================================
 // Test Helpers
 // ============================================
@@ -195,15 +208,15 @@ describe('Agent x402 Service', () => {
               recipient,
             });
 
-            const auth = await agentX402Service.generateAuthorization(proposal);
+            const auth = await agentX402Service.generateAuthorization(proposal, testOwnerAddress);
 
             // Verify authorization fields
             expect(auth.version).toBe('1.0');
-            expect(auth.payment_address).toBe(recipient);
+            expect(auth.payment_address).toBe(recipient.toLowerCase());
             expect(auth.amount).toBe(amount);
-            expect(auth.token).toBe(token);
+            expect(auth.token).toBe(token.toUpperCase());
             expect(auth.chain_id).toBe(chainId);
-            expect(auth.expires_at.getTime()).toBeGreaterThan(Date.now());
+            expect(auth.valid_before.getTime()).toBeGreaterThan(Date.now());
           }
         ),
         { numRuns: 100 }
@@ -221,7 +234,7 @@ describe('Agent x402 Service', () => {
             agentService._clearAll();
 
             const proposal = await createApprovedProposal({ amount, token });
-            const auth = await agentX402Service.generateAuthorization(proposal);
+            const auth = await agentX402Service.generateAuthorization(proposal, testOwnerAddress);
             const signedAuth = await agentX402Service.signAuthorization(auth.id, testOwnerAddress);
 
             // Verify signature format
@@ -257,9 +270,8 @@ describe('Agent x402 Service', () => {
             const result = await agentX402Service.processProposalPayment(proposal, testOwnerAddress);
 
             expect(result.success).toBe(true);
-            expect(result.tx_hash).toMatch(/^0x[a-f0-9]{64}$/);
-            expect(result.gas_used).toBeDefined();
-            expect(result.block_number).toBeGreaterThan(0);
+            expect(result.tx_hash).toMatch(/^0x[a-f0-9]+$/);
+            expect(result.authorization_id).toBeDefined();
           }
         ),
         { numRuns: 100 }

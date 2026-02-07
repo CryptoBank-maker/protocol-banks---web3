@@ -15,6 +15,19 @@ import {
 } from '../services/proposal-service';
 import { agentService, setUseDatabaseStorage as setAgentDb } from '../services/agent-service';
 
+// Mock Prisma to prevent DB calls from notification-service
+jest.mock('@/lib/prisma', () => ({
+  prisma: {
+    notificationPreference: {
+      findUnique: jest.fn().mockResolvedValue(null),
+      create: jest.fn().mockResolvedValue({}),
+    },
+    pushSubscription: {
+      findMany: jest.fn().mockResolvedValue([]),
+    },
+  },
+}));
+
 // ============================================
 // Test Helpers
 // ============================================
