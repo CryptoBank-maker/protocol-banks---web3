@@ -3,7 +3,7 @@
  * Handles retry logic for failed transactions
  */
 
-import prisma from '@/lib/prisma'
+import { prisma } from '@/lib/prisma'
 
 export interface FailedItem {
   id: string

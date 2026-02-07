@@ -3,7 +3,7 @@
  * Handles fee distribution and logging
  */
 
-import prisma from '@/lib/prisma'
+import { prisma } from '@/lib/prisma'
 
 export interface FeeDistribution {
   totalFee: number

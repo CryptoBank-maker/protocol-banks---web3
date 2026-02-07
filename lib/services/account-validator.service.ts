@@ -5,7 +5,7 @@
 
 import { ethers } from 'ethers'
 import { isEvmAddressFormat, safeGetChecksumAddress } from '@/lib/address-utils'
-import prisma from '@/lib/prisma'
+import { prisma } from '@/lib/prisma'
 
 /**
  * Validate Ethereum address format
