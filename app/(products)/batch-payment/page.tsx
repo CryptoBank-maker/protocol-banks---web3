@@ -150,13 +150,6 @@ export default function BatchPaymentPage() {
   const supportsBatchTransfers = selectedPaymentChain === "EVM"
   const manualChainOverrideRef = useRef(false)
 
-  useEffect(() => {
-    if (!supportsMultisig && useMultisig) {
-      setUseMultisig(false)
-      setSelectedMultisig(null)
-    }
-  }, [supportsMultisig, useMultisig])
-
   const handlePaymentChainChange = useCallback(
     async (value: string, options?: { source?: "user" | "auto" }) => {
       if (options?.source === "user") {
@@ -218,6 +211,13 @@ export default function BatchPaymentPage() {
   const [multisigWallets, setMultisigWallets] = useState<MultisigWallet[]>([])
   const [selectedMultisig, setSelectedMultisig] = useState<string | null>(null)
   const [useMultisig, setUseMultisig] = useState(false)
+
+  useEffect(() => {
+    if (!supportsMultisig && useMultisig) {
+      setUseMultisig(false)
+      setSelectedMultisig(null)
+    }
+  }, [supportsMultisig, useMultisig])
 
   useEffect(() => {
     if (hasTronRecipients && useMultisig) {
