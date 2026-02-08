@@ -7,7 +7,7 @@ export const TRON_CONTRACTS = {
     yieldAggregator: process.env.NEXT_PUBLIC_TRON_YIELD_AGGREGATOR_MAINNET || "",
   },
   nile: {
-    paymentVault: process.env.NEXT_PUBLIC_TRON_PAYMENT_VAULT_NILE || "TSrRLNoyJ9mVNZMg6jA8hUzABxHA1ZBFGM",
+    paymentVault: process.env.NEXT_PUBLIC_TRON_PAYMENT_VAULT_NILE || "TC6bpE1t1EderDzXZq1nuRDf8QRhQHgkgy",
     paymentSplitter: process.env.NEXT_PUBLIC_TRON_PAYMENT_SPLITTER_NILE || "TDJwns4C2Frp4wVnrqyz4Ud6SYoxc9nk7Z",
     yieldAggregator: process.env.NEXT_PUBLIC_TRON_YIELD_AGGREGATOR_NILE || "TC6bpE1t1EderDzXZq1nuRDf8QRhQHgkgy",
   },

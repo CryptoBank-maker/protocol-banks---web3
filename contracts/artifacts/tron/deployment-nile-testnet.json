@@ -1,9 +1,9 @@
 {
   "network": "TRON Nile Testnet",
   "fullNode": "https://nile.trongrid.io",
-  "contractAddress": "4133e3d31e5b4c52994792b9b4f6fd241fc9309ac4",
+  "contractAddress": "4108b4af8532e19e0c4bee5a2616e75548bd7c6430",
   "deployer": "TMdaXsTVMZQYW5tAvAhapRDVcsKHhoHXjt",
-  "timestamp": "2026-02-08T20:32:25.682Z",
+  "timestamp": "2026-02-08T20:49:57.209Z",
   "parameters": {
     "initialSigners": [
       "TMdaXsTVMZQYW5tAvAhapRDVcsKHhoHXjt"
