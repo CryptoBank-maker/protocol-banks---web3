@@ -17,6 +17,7 @@ import { createRedisConnection } from '@/lib/redis'
 import { prisma } from '@/lib/prisma'
 import { getConfirmationInfo, getTronTransaction } from '@/lib/services/tron-payment'
 import { webhookTriggerService } from '@/lib/services/webhook-trigger-service'
+import { unifiedYieldService } from '@/lib/services/yield/unified-yield.service'
 import { logger } from '@/lib/logger/structured-logger'
 import { paymentTaskSchema, formatZodError } from '@/lib/validations/yield'
 
@@ -219,20 +220,33 @@ export class PaymentQueueService {
             }
           })
 
-          // 7. 触发 Webhook
+          // 7. 触发 Webhook (resolve chain_id from network)
+          const chainIdMap: Record<string, number> = {
+            ethereum: 1, base: 8453, arbitrum: 42161, tron: 728126428,
+          }
           await webhookTriggerService.triggerPaymentCompleted(merchantId, {
             payment_id: paymentId,
             from_address: onChainTx.from_address,
             to_address: onChainTx.to_address,
             amount,
             token_symbol: onChainTx.token_symbol,
-            chain_id: 1,
+            chain_id: chainIdMap[network] ?? 1,
             tx_hash: txHash,
             status: 'completed',
             created_at: new Date().toISOString()
           })
 
-          // 8. 更新任务状态
+          // 8. 自动存入收益协议 (非阻塞)
+          try {
+            await unifiedYieldService.autoDepositHook(orderId, merchantId, amount, network)
+          } catch (autoDepositError) {
+            jobLogger.warn('Auto-deposit hook failed (non-blocking)', {
+              action: 'auto_deposit_failed',
+              metadata: { error: String(autoDepositError) }
+            })
+          }
+
+          // 9. 更新任务状态
           await this.saveJobRecord(job.id!, job.data, 'completed')
 
           jobLogger.logPayment('completed', txHash, amount, {

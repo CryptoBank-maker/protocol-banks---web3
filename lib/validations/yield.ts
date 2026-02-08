@@ -50,6 +50,29 @@ export const yieldStatsQuerySchema = z.object({
 export type YieldStatsQuery = z.infer<typeof yieldStatsQuerySchema>
 
 // ============================================================
+// Deposit / Withdraw API Schemas
+// ============================================================
+
+export const yieldDepositSchema = z.object({
+  merchant: merchantAddressSchema,
+  network: yieldNetworkSchema,
+  amount: z.string().regex(/^\d+(\.\d{1,6})?$/, 'Invalid amount: must be a positive number with up to 6 decimal places'),
+}).refine(
+  (data) => parseFloat(data.amount) >= 1,
+  { message: 'Minimum deposit amount is 1 USDT' }
+)
+
+export type YieldDepositInput = z.infer<typeof yieldDepositSchema>
+
+export const yieldWithdrawSchema = z.object({
+  merchant: merchantAddressSchema,
+  network: yieldNetworkSchema,
+  amount: z.string().regex(/^\d+(\.\d{1,6})?$/, 'Invalid amount: must be a positive number with up to 6 decimal places'),
+})
+
+export type YieldWithdrawInput = z.infer<typeof yieldWithdrawSchema>
+
+// ============================================================
 // Common Schemas (reusable across APIs)
 // ============================================================
 

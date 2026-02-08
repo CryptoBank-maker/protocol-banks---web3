@@ -55,20 +55,22 @@ type ChainWatcher struct {
 	mu        sync.RWMutex
 }
 
-// MultiChainWatcher 多链监听器
+// MultiChainWatcher 多链监听器 (EVM + TRON)
 type MultiChainWatcher struct {
-	watchers map[uint64]*ChainWatcher
-	handlers []EventHandler
+	watchers     map[uint64]*ChainWatcher
+	tronWatchers map[uint64]*TronWatcher
+	handlers     []EventHandler
 }
 
-// NewMultiChainWatcher 创建多链监听器
+// NewMultiChainWatcher 创建多链监听器 (EVM + TRON)
 func NewMultiChainWatcher(ctx context.Context, cfg *config.Config) (*MultiChainWatcher, error) {
 	mcw := &MultiChainWatcher{
-		watchers: make(map[uint64]*ChainWatcher),
-		handlers: []EventHandler{},
+		watchers:     make(map[uint64]*ChainWatcher),
+		tronWatchers: make(map[uint64]*TronWatcher),
+		handlers:     []EventHandler{},
 	}
 
-	// 解析 ERC20 ABI
+	// 解析 ERC20 ABI (for EVM chains)
 	parsedABI, err := abi.JSON(strings.NewReader(erc20ABI))
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse ERC20 ABI: %w", err)
@@ -76,19 +78,36 @@ func NewMultiChainWatcher(ctx context.Context, cfg *config.Config) (*MultiChainW
 
 	// 为每条链创建监听器
 	for chainID, chainCfg := range cfg.Chains {
-		watcher, err := newChainWatcher(ctx, chainCfg, parsedABI)
-		if err != nil {
-			log.Warn().Err(err).Uint64("chain_id", chainID).Msg("Failed to create watcher, skipping")
-			continue
+		if isTronChain(chainCfg) {
+			// TRON chain → TronWatcher
+			tw, err := NewTronWatcher(ctx, chainCfg)
+			if err != nil {
+				log.Warn().Err(err).Uint64("chain_id", chainID).Msg("Failed to create TRON watcher, skipping")
+				continue
+			}
+			// Add watched TRON addresses (Base58 format, starts with 'T')
+			for _, addr := range cfg.WatchedAddresses {
+				if len(addr) == 34 && addr[0] == 'T' {
+					tw.AddTronAddress(addr)
+				}
+			}
+			mcw.tronWatchers[chainID] = tw
+			log.Info().Uint64("chain_id", chainID).Str("name", chainCfg.Name).Msg("TRON watcher created")
+		} else {
+			// EVM chain → ChainWatcher
+			watcher, err := newChainWatcher(ctx, chainCfg, parsedABI)
+			if err != nil {
+				log.Warn().Err(err).Uint64("chain_id", chainID).Msg("Failed to create EVM watcher, skipping")
+				continue
+			}
+			for _, addr := range cfg.WatchedAddresses {
+				if len(addr) == 42 && addr[:2] == "0x" {
+					watcher.AddAddress(common.HexToAddress(addr))
+				}
+			}
+			mcw.watchers[chainID] = watcher
+			log.Info().Uint64("chain_id", chainID).Str("name", chainCfg.Name).Msg("EVM watcher created")
 		}
-
-		// 添加监听地址
-		for _, addr := range cfg.WatchedAddresses {
-			watcher.AddAddress(common.HexToAddress(addr))
-		}
-
-		mcw.watchers[chainID] = watcher
-		log.Info().Uint64("chain_id", chainID).Str("name", chainCfg.Name).Msg("Chain watcher created")
 	}
 
 	return mcw, nil
@@ -138,10 +157,11 @@ func (w *ChainWatcher) RemoveAddress(addr common.Address) {
 	delete(w.addresses, addr)
 }
 
-// Start 启动多链监听
+// Start 启动多链监听 (EVM + TRON)
 func (mcw *MultiChainWatcher) Start(ctx context.Context) {
 	var wg sync.WaitGroup
 
+	// Start EVM watchers
 	for chainID, watcher := range mcw.watchers {
 		wg.Add(1)
 		go func(cID uint64, w *ChainWatcher) {
@@ -150,14 +170,26 @@ func (mcw *MultiChainWatcher) Start(ctx context.Context) {
 		}(chainID, watcher)
 	}
 
+	// Start TRON watchers
+	for chainID, tw := range mcw.tronWatchers {
+		wg.Add(1)
+		go func(cID uint64, w *TronWatcher) {
+			defer wg.Done()
+			w.Start(ctx)
+		}(chainID, tw)
+	}
+
 	wg.Wait()
 }
 
-// AddHandler 添加事件处理器
+// AddHandler 添加事件处理器 (applies to both EVM and TRON watchers)
 func (mcw *MultiChainWatcher) AddHandler(handler EventHandler) {
 	mcw.handlers = append(mcw.handlers, handler)
 	for _, watcher := range mcw.watchers {
 		watcher.handlers = append(watcher.handlers, handler)
+	}
+	for _, tw := range mcw.tronWatchers {
+		tw.handlers = append(tw.handlers, handler)
 	}
 }
 

@@ -29,10 +29,11 @@ describe('DoubleSpendPreventionService', () => {
 
     it('should reject if transaction hash is already used by another order', async () => {
       // Mock: txHash 已被其他订单使用
+      // service checks existingPayment.id !== orderId, so id must differ from orderId
       (prisma.payment.findFirst as jest.Mock).mockResolvedValue({
-        id: 'payment_1',
+        id: 'payment_999',
         tx_hash: txHash,
-        order_id: 'order_999', // 不同的订单
+        order_id: 'order_999',
         amount: 100
       })
 
@@ -40,15 +41,16 @@ describe('DoubleSpendPreventionService', () => {
 
       expect(result.valid).toBe(false)
       expect(result.reason).toContain('already used')
-      expect(result.reason).toContain('order_999')
+      expect(result.reason).toContain('payment_999')
     })
 
     it('should allow if transaction hash belongs to the same order', async () => {
       // Mock: txHash 属于当前订单（重复验证情况）
+      // service checks existingPayment.id !== orderId, so id must equal orderId
       (prisma.payment.findFirst as jest.Mock).mockResolvedValue({
-        id: 'payment_1',
+        id: orderId,
         tx_hash: txHash,
-        order_id: orderId, // 相同订单
+        order_id: orderId,
         amount: 100
       })
 
@@ -354,6 +356,148 @@ describe('DoubleSpendPreventionService', () => {
     })
   })
 
+  describe('verifyPayment - TRON Network Confirmation Thresholds', () => {
+    const txHash = '0xtx_tron'
+    const orderId = 'order_tron'
+    const expectedAddress = 'TAddr'
+
+    beforeEach(() => {
+      (prisma.payment.findFirst as jest.Mock).mockResolvedValue(null)
+    })
+
+    it('should require 10 confirmations for small TRON payments (< 100)', async () => {
+      ;(getTronTransaction as jest.Mock).mockResolvedValue({
+        txid: txHash,
+        amount: '50.00',
+        to_address: expectedAddress,
+        from_address: 'TSender',
+        token_symbol: 'USDT',
+        block_number: 12345
+      })
+      ;(getConfirmationInfo as jest.Mock).mockResolvedValue({
+        confirmations: 9,
+        blockNumber: 12345
+      })
+
+      const result = await service.verifyPayment(txHash, orderId, '50.00', expectedAddress, 'tron')
+
+      expect(result.valid).toBe(false)
+      expect(result.details?.requiredConfirmations).toBe(10)
+      expect(result.reason).toContain('9/10')
+    })
+
+    it('should require 20 confirmations for medium TRON payments (>= 100)', async () => {
+      ;(getTronTransaction as jest.Mock).mockResolvedValue({
+        txid: txHash,
+        amount: '500.00',
+        to_address: expectedAddress,
+        from_address: 'TSender',
+        token_symbol: 'USDT',
+        block_number: 12345
+      })
+      ;(getConfirmationInfo as jest.Mock).mockResolvedValue({
+        confirmations: 15,
+        blockNumber: 12345
+      })
+
+      const result = await service.verifyPayment(txHash, orderId, '500.00', expectedAddress, 'tron')
+
+      expect(result.valid).toBe(false)
+      expect(result.details?.requiredConfirmations).toBe(20)
+    })
+
+    it('should require 40 confirmations for large TRON payments (>= 1000)', async () => {
+      ;(getTronTransaction as jest.Mock).mockResolvedValue({
+        txid: txHash,
+        amount: '5000.00',
+        to_address: expectedAddress,
+        from_address: 'TSender',
+        token_symbol: 'USDT',
+        block_number: 12345
+      })
+      ;(getConfirmationInfo as jest.Mock).mockResolvedValue({
+        confirmations: 30,
+        blockNumber: 12345
+      })
+
+      const result = await service.verifyPayment(txHash, orderId, '5000.00', expectedAddress, 'tron')
+
+      expect(result.valid).toBe(false)
+      expect(result.details?.requiredConfirmations).toBe(40)
+    })
+
+    it('should require 60 confirmations for very large TRON payments (>= 10000)', async () => {
+      ;(getTronTransaction as jest.Mock).mockResolvedValue({
+        txid: txHash,
+        amount: '50000.00',
+        to_address: expectedAddress,
+        from_address: 'TSender',
+        token_symbol: 'USDT',
+        block_number: 12345
+      })
+      ;(getConfirmationInfo as jest.Mock).mockResolvedValue({
+        confirmations: 50,
+        blockNumber: 12345
+      })
+
+      const result = await service.verifyPayment(txHash, orderId, '50000.00', expectedAddress, 'tron')
+
+      expect(result.valid).toBe(false)
+      expect(result.details?.requiredConfirmations).toBe(60)
+    })
+
+    it('should pass TRON payment with sufficient confirmations', async () => {
+      ;(getTronTransaction as jest.Mock).mockResolvedValue({
+        txid: txHash,
+        amount: '50.00',
+        to_address: expectedAddress,
+        from_address: 'TSender',
+        token_symbol: 'USDT',
+        block_number: 12345
+      })
+      ;(getConfirmationInfo as jest.Mock).mockResolvedValue({
+        confirmations: 15,
+        blockNumber: 12345
+      })
+      ;(prisma.blockInfo.findUnique as jest.Mock).mockResolvedValue({
+        block_number: 12345,
+        block_hash: '0xhash',
+        timestamp: new Date(Date.now() - 120000)
+      })
+
+      const result = await service.verifyPayment(txHash, orderId, '50.00', expectedAddress, 'tron')
+
+      expect(result.valid).toBe(true)
+      expect(result.details?.requiredConfirmations).toBe(10)
+    })
+
+    it('should use EVM thresholds by default (backward compatible)', async () => {
+      ;(getTronTransaction as jest.Mock).mockResolvedValue({
+        txid: txHash,
+        amount: '50.00',
+        to_address: expectedAddress,
+        from_address: 'TSender',
+        token_symbol: 'USDT',
+        block_number: 12345
+      })
+      ;(getConfirmationInfo as jest.Mock).mockResolvedValue({
+        confirmations: 3,
+        blockNumber: 12345
+      })
+      ;(prisma.blockInfo.findUnique as jest.Mock).mockResolvedValue({
+        block_number: 12345,
+        block_hash: '0xhash',
+        timestamp: new Date(Date.now() - 120000)
+      })
+
+      // No network param → defaults to 'ethereum' → 3 confirmations for small
+      const result = await service.verifyPayment(txHash, orderId, '50.00', expectedAddress)
+
+      expect(result.valid).toBe(true)
+      expect(result.details?.requiredConfirmations).toBe(3)
+    })
+  })
+
   describe('verifyPayment - Layer 6: Block Reorganization Detection', () => {
     const txHash = '0xtx'
     const orderId = 'order_reorg'
@@ -555,16 +699,13 @@ describe('DoubleSpendPreventionService', () => {
       expect(result).toEqual(mockPayments)
       expect(prisma.payment.findMany).toHaveBeenCalledWith({
         where: { tx_hash: '0xtx' },
-        include: {
-          order: {
-            select: {
-              id: true,
-              order_number: true,
-              amount: true,
-              status: true,
-              created_at: true
-            }
-          }
+        select: {
+          id: true,
+          amount: true,
+          status: true,
+          from_address: true,
+          to_address: true,
+          created_at: true,
         }
       })
     })

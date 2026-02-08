@@ -47,13 +47,15 @@ export class DoubleSpendPreventionService {
    * @param orderId - 订单 ID
    * @param expectedAmount - 预期金额
    * @param expectedAddress - 预期接收地址
+   * @param network - 网络类型 (用于确认数阈值计算)
    * @returns 验证结果
    */
   async verifyPayment(
     txHash: string,
     orderId: string,
     expectedAmount: string,
-    expectedAddress: string
+    expectedAddress: string,
+    network: 'tron' | 'ethereum' | 'base' | 'arbitrum' | 'polygon' | 'optimism' = 'ethereum'
   ): Promise<VerificationResult> {
     try {
       // Layer 1: 检查交易哈希是否已被使用
@@ -127,9 +129,9 @@ export class DoubleSpendPreventionService {
         }
       }
 
-      // Layer 4: 验证确认数
+      // Layer 4: 验证确认数 (网络感知阈值)
       const confirmationInfo = await getConfirmationInfo(txHash)
-      const requiredConfirmations = this.getRequiredConfirmations(parseFloat(expectedAmount))
+      const requiredConfirmations = this.getRequiredConfirmations(parseFloat(expectedAmount), network)
 
       if (confirmationInfo.confirmations < requiredConfirmations) {
         return {
@@ -205,6 +207,7 @@ export class DoubleSpendPreventionService {
       orderId: string
       amount: string
       address: string
+      network?: 'tron' | 'ethereum' | 'base' | 'arbitrum' | 'polygon' | 'optimism'
     }>
   ): Promise<Array<VerificationResult & { txHash: string }>> {
     const results = await Promise.all(
@@ -213,7 +216,8 @@ export class DoubleSpendPreventionService {
           payment.txHash,
           payment.orderId,
           payment.amount,
-          payment.address
+          payment.address,
+          payment.network
         )
         return { ...result, txHash: payment.txHash }
       })
@@ -308,18 +312,33 @@ export class DoubleSpendPreventionService {
   }
 
   /**
-   * 根据金额获取所需确认数
+   * 根据金额和网络获取所需确认数
    *
-   * 大额交易需要更多确认
+   * TRON: ~3s 出块 (DPoS), 需要更多区块确认来达到等效安全时间
+   * EVM:  ~12s 出块 (Ethereum), 其他 L2 更快但有 L1 安全性保障
    *
    * @param amount - 金额
+   * @param network - 网络类型
    * @returns 所需确认数
    */
-  private getRequiredConfirmations(amount: number): number {
-    if (amount >= 10000) return 19    // 超大额: 19 确认
-    if (amount >= 1000) return 10     // 大额: 10 确认
-    if (amount >= 100) return 5       // 中额: 5 确认
-    return 3                          // 小额: 3 确认
+  private getRequiredConfirmations(
+    amount: number,
+    network: 'tron' | 'ethereum' | 'base' | 'arbitrum' | 'polygon' | 'optimism' = 'ethereum'
+  ): number {
+    if (network === 'tron') {
+      // TRON DPoS: ~3s/block, 27 个超级代表
+      // 等效安全时间: 小额~30s, 中额~60s, 大额~120s, 超大额~180s
+      if (amount >= 10000) return 60     // 超大额: 60 确认 (~180s)
+      if (amount >= 1000) return 40      // 大额: 40 确认 (~120s)
+      if (amount >= 100) return 20       // 中额: 20 确认 (~60s)
+      return 10                          // 小额: 10 确认 (~30s)
+    }
+
+    // EVM 链: ~12s/block (Ethereum mainnet)
+    if (amount >= 10000) return 19    // 超大额: 19 确认 (~228s)
+    if (amount >= 1000) return 10     // 大额: 10 确认 (~120s)
+    if (amount >= 100) return 5       // 中额: 5 确认 (~60s)
+    return 3                          // 小额: 3 确认 (~36s)
   }
 
   /**

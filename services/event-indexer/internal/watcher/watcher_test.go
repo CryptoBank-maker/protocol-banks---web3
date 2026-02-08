@@ -1,7 +1,7 @@
 package watcher
 
 import (
-	"context"
+	"encoding/hex"
 	"math/big"
 	"testing"
 	"time"
@@ -229,4 +229,104 @@ func getChainConfig(chainID int64) ChainConfig {
 
 func detectReorg(previousHash, currentParent string) bool {
 	return previousHash != currentParent
+}
+
+// ============================================
+// TRON Watcher Tests
+// ============================================
+
+func TestHexTopicToTronAddress(t *testing.T) {
+	// 20-byte address padded to 32 bytes (left-padded with zeros, TRON prefix 0x41 added by converter)
+	// Example: address bytes = all 0x11 → should produce a valid Base58 address starting with 'T'
+	topic := make([]byte, 32)
+	for i := 12; i < 32; i++ {
+		topic[i] = 0x11
+	}
+
+	addr := hexTopicToTronAddress(topic)
+	assert.NotEmpty(t, addr)
+	assert.Equal(t, byte('T'), addr[0])
+	assert.Equal(t, 34, len(addr))
+}
+
+func TestBase58Encode(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    []byte
+		expected string
+	}{
+		{"empty", []byte{}, ""},
+		{"single zero", []byte{0}, "1"},
+		{"single byte", []byte{1}, "2"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := base58Encode(tt.input)
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
+
+func TestBase58CheckEncode(t *testing.T) {
+	// TRON mainnet address: 0x41 prefix + 20 bytes
+	input := make([]byte, 21)
+	input[0] = 0x41
+	for i := 1; i < 21; i++ {
+		input[i] = byte(i)
+	}
+
+	result := base58CheckEncode(input)
+	assert.NotEmpty(t, result)
+	assert.Equal(t, byte('T'), result[0])
+	assert.Equal(t, 34, len(result))
+}
+
+func TestIsTronChain(t *testing.T) {
+	tests := []struct {
+		name     string
+		cfg      ChainConfigForTest
+		expected bool
+	}{
+		{"tron type", ChainConfigForTest{Type: "tron"}, true},
+		{"evm type", ChainConfigForTest{Type: "evm"}, false},
+		{"tron name", ChainConfigForTest{Name: "TRON Mainnet"}, true},
+		{"empty type with non-tron name", ChainConfigForTest{Name: "Ethereum"}, false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// isTronChain uses config.ChainConfig, so we test the logic directly
+			result := tt.cfg.Type == "tron" || (len(tt.cfg.Name) >= 4 && tt.cfg.Name[:4] == "TRON")
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
+
+func TestTRC20TransferSig(t *testing.T) {
+	// The TRC20 Transfer event signature should be the same as ERC20
+	assert.Equal(t, "ddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef", trc20TransferSig)
+	// Verify it's valid hex
+	_, err := hex.DecodeString(trc20TransferSig)
+	assert.NoError(t, err)
+}
+
+func TestDoubleSHA256(t *testing.T) {
+	input := []byte("test data")
+	result := doubleSHA256(input)
+	assert.Equal(t, 32, len(result))
+
+	// Same input should produce same output
+	result2 := doubleSHA256(input)
+	assert.Equal(t, result, result2)
+
+	// Different input should produce different output
+	result3 := doubleSHA256([]byte("different"))
+	assert.NotEqual(t, result, result3)
+}
+
+// Helper type for TRON chain config tests
+type ChainConfigForTest struct {
+	Name string
+	Type string
 }

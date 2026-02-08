@@ -7,6 +7,156 @@ import { getTokenAddress, getSupportedTokens } from "@/lib/networks"
 import type { PaymentResult, Recipient } from "@/types"
 import { logger } from "@/lib/logger/structured-logger"
 
+/**
+ * TRON Error Classification
+ *
+ * Maps raw TRON/TronLink error messages to user-friendly errors with action hints.
+ */
+export class TronError extends Error {
+  code: string
+  recoverable: boolean
+  action: string
+
+  constructor(code: string, message: string, recoverable: boolean, action: string) {
+    super(message)
+    this.name = 'TronError'
+    this.code = code
+    this.recoverable = recoverable
+    this.action = action
+  }
+}
+
+const TRON_ERROR_MAP: Array<{
+  pattern: RegExp | string
+  code: string
+  message: string
+  recoverable: boolean
+  action: string
+}> = [
+  {
+    pattern: /Confirmation declined by user/i,
+    code: 'USER_REJECTED',
+    message: 'Transaction was rejected by user',
+    recoverable: true,
+    action: 'Please approve the transaction in TronLink'
+  },
+  {
+    pattern: /Insufficient energy/i,
+    code: 'INSUFFICIENT_ENERGY',
+    message: 'Insufficient energy for this transaction',
+    recoverable: true,
+    action: 'Freeze TRX for energy or wait for energy to regenerate'
+  },
+  {
+    pattern: /Insufficient bandwidth/i,
+    code: 'INSUFFICIENT_BANDWIDTH',
+    message: 'Insufficient bandwidth for this transaction',
+    recoverable: true,
+    action: 'Freeze TRX for bandwidth or use TRX to pay for fees'
+  },
+  {
+    pattern: /OUT_OF_ENERGY/i,
+    code: 'OUT_OF_ENERGY',
+    message: 'Contract execution ran out of energy',
+    recoverable: true,
+    action: 'Increase fee limit or freeze more TRX for energy'
+  },
+  {
+    pattern: /REVERT/i,
+    code: 'CONTRACT_REVERT',
+    message: 'Smart contract execution reverted',
+    recoverable: false,
+    action: 'Check contract parameters and allowance'
+  },
+  {
+    pattern: /Account not found|account.*does not exist|Account not activated/i,
+    code: 'ACCOUNT_NOT_FOUND',
+    message: 'Target account is not activated on TRON network',
+    recoverable: false,
+    action: 'The recipient must have at least 0.1 TRX to activate their account'
+  },
+  {
+    pattern: /balance is not sufficient|Insufficient balance/i,
+    code: 'INSUFFICIENT_BALANCE',
+    message: 'Insufficient token balance for this transfer',
+    recoverable: false,
+    action: 'Check your token balance and ensure you have enough funds'
+  },
+  {
+    pattern: /TAPOS_ERROR|tapos/i,
+    code: 'TAPOS_ERROR',
+    message: 'Transaction reference block is invalid or expired',
+    recoverable: true,
+    action: 'Retry the transaction'
+  },
+  {
+    pattern: /TOO_BIG_TRANSACTION_ERROR/i,
+    code: 'TX_TOO_BIG',
+    message: 'Transaction data exceeds maximum size',
+    recoverable: false,
+    action: 'Reduce the number of operations in this transaction'
+  },
+  {
+    pattern: /DUPLICATE_TRANSACTION/i,
+    code: 'DUPLICATE_TX',
+    message: 'This transaction has already been submitted',
+    recoverable: false,
+    action: 'Wait for the original transaction to confirm'
+  },
+  {
+    pattern: /CONTRACT_VALIDATE_ERROR|validate error/i,
+    code: 'CONTRACT_VALIDATE_ERROR',
+    message: 'Contract validation failed',
+    recoverable: false,
+    action: 'Check contract address and parameters'
+  },
+  {
+    pattern: /Signature.*invalid|signature/i,
+    code: 'INVALID_SIGNATURE',
+    message: 'Transaction signature is invalid',
+    recoverable: true,
+    action: 'Reconnect TronLink and try again'
+  },
+  {
+    pattern: /fee.*limit.*low|feeLimit/i,
+    code: 'FEE_LIMIT_TOO_LOW',
+    message: 'Transaction fee limit is too low',
+    recoverable: true,
+    action: 'Increase the fee limit for this transaction'
+  },
+  {
+    pattern: /timeout|ETIMEDOUT|ECONNREFUSED/i,
+    code: 'NETWORK_ERROR',
+    message: 'Network connection error',
+    recoverable: true,
+    action: 'Check your internet connection and try again'
+  },
+]
+
+/**
+ * Parse raw TRON error into a structured TronError
+ */
+export function parseTronError(error: unknown): TronError {
+  const message = error instanceof Error ? error.message : String(error)
+
+  for (const mapping of TRON_ERROR_MAP) {
+    const matches = typeof mapping.pattern === 'string'
+      ? message.includes(mapping.pattern)
+      : mapping.pattern.test(message)
+
+    if (matches) {
+      return new TronError(mapping.code, mapping.message, mapping.recoverable, mapping.action)
+    }
+  }
+
+  return new TronError(
+    'UNKNOWN_ERROR',
+    `TRON transaction failed: ${message}`,
+    false,
+    'Please try again or contact support'
+  )
+}
+
 // TRC20 ABI for transfer function
 const TRC20_ABI = [
   {
@@ -188,27 +338,21 @@ export async function sendTRC20(
 
     return tx
   } catch (error: any) {
-    logger.error("TRC20 transfer failed", error instanceof Error ? error : new Error(String(error)), {
+    const tronError = parseTronError(error)
+
+    logger.error("TRC20 transfer failed", tronError, {
       network: "tron",
       component: "tron-payment",
       action: "send_trc20",
-      metadata: { amount, toAddress, tokenAddress }
+      metadata: {
+        amount, toAddress, tokenAddress,
+        errorCode: tronError.code,
+        recoverable: tronError.recoverable,
+        action: tronError.action
+      }
     })
 
-    // Parse TronLink error messages
-    if (error.message?.includes("Confirmation declined by user")) {
-      throw new Error("Transaction was rejected by user")
-    }
-
-    if (error.message?.includes("Insufficient energy")) {
-      throw new Error("Insufficient energy. Please freeze TRX for energy or wait for energy to regenerate.")
-    }
-
-    if (error.message?.includes("Insufficient bandwidth")) {
-      throw new Error("Insufficient bandwidth. Transaction requires bandwidth or TRX for fees.")
-    }
-
-    throw new Error(`Transfer failed: ${error.message || "Unknown error"}`)
+    throw tronError
   }
 }
 
@@ -243,18 +387,20 @@ export async function sendTRX(toAddress: string, amount: string): Promise<string
 
     return txHash
   } catch (error: any) {
-    logger.error("TRX transfer failed", error instanceof Error ? error : new Error(String(error)), {
+    const tronError = parseTronError(error)
+
+    logger.error("TRX transfer failed", tronError, {
       network: "tron",
       component: "tron-payment",
       action: "send_trx",
-      metadata: { amount, toAddress }
+      metadata: {
+        amount, toAddress,
+        errorCode: tronError.code,
+        recoverable: tronError.recoverable
+      }
     })
 
-    if (error.message?.includes("Confirmation declined by user")) {
-      throw new Error("Transaction was rejected by user")
-    }
-
-    throw new Error(`TRX transfer failed: ${error.message || "Unknown error"}`)
+    throw tronError
   }
 }
 

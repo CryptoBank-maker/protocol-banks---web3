@@ -469,16 +469,51 @@ export class YieldAggregatorService {
       return
     }
 
-    logger.info('Auto-deposit triggered', {
+    logger.info('EVM auto-deposit triggered', {
       component: 'yield-aggregator',
       action: 'auto_deposit',
       orderId,
-      metadata: { merchantId, amount, network }
+      network,
+      metadata: { merchantId, amount }
     })
 
-    // NOTE: Auto-deposit requires merchant-signed approval (ERC-3009 transferWithAuthorization).
-    // The actual on-chain call is triggered by the payout-engine service when the merchant
-    // has an active session key. This service only records intent; execution is deferred.
+    try {
+      // 记录自动存款意图到数据库
+      await prisma.yieldDeposit.create({
+        data: {
+          merchant_id: merchantId,
+          amount: parseFloat(amount),
+          token: 'USDT',
+          principal: parseFloat(amount),
+          interest: 0,
+          apy: 0,
+          status: 'active',
+          tx_hash: `auto:${orderId}`,
+          deposited_at: new Date()
+        }
+      })
+
+      logger.info('EVM auto-deposit intent recorded', {
+        component: 'yield-aggregator',
+        action: 'auto_deposit_recorded',
+        orderId,
+        network,
+        metadata: { merchantId, amount }
+      })
+
+      // NOTE: Actual on-chain call requires merchant-signed ERC-3009 transferWithAuthorization.
+      // The payout-engine gRPC service handles execution when the merchant has an active
+      // session key. This service records intent; on-chain execution is deferred.
+    } catch (error) {
+      logger.error('EVM auto-deposit hook failed', error instanceof Error ? error : new Error(String(error)), {
+        component: 'yield-aggregator',
+        action: 'auto_deposit',
+        orderId,
+        network,
+        metadata: { merchantId, amount }
+      })
+      // Don't throw - auto-deposit failure should not block payment confirmation
+    }
   }
 }
 

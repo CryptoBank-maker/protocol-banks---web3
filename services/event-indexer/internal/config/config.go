@@ -38,10 +38,11 @@ type ChainConfig struct {
 	ChainID       uint64
 	Name          string
 	RPCURL        string
-	WSURL         string // WebSocket URL for subscriptions
+	WSURL         string // WebSocket URL for subscriptions (EVM only)
 	ExplorerURL   string
 	StartBlock    uint64
 	Confirmations uint64
+	Type          string // "evm" or "tron"
 }
 
 func Load() (*Config, error) {
@@ -68,6 +69,7 @@ func Load() (*Config, error) {
 		},
 		WatchedAddresses: watchedAddrs,
 		Chains: map[uint64]ChainConfig{
+			// ——— EVM Chains ———
 			1: {
 				ChainID:       1,
 				Name:          "Ethereum",
@@ -76,6 +78,7 @@ func Load() (*Config, error) {
 				ExplorerURL:   "https://etherscan.io",
 				StartBlock:    0, // 0 = latest
 				Confirmations: 12,
+				Type:          "evm",
 			},
 			137: {
 				ChainID:       137,
@@ -85,6 +88,7 @@ func Load() (*Config, error) {
 				ExplorerURL:   "https://polygonscan.com",
 				StartBlock:    0,
 				Confirmations: 128,
+				Type:          "evm",
 			},
 			8453: {
 				ChainID:       8453,
@@ -94,6 +98,7 @@ func Load() (*Config, error) {
 				ExplorerURL:   "https://basescan.org",
 				StartBlock:    0,
 				Confirmations: 12,
+				Type:          "evm",
 			},
 			42161: {
 				ChainID:       42161,
@@ -103,6 +108,26 @@ func Load() (*Config, error) {
 				ExplorerURL:   "https://arbiscan.io",
 				StartBlock:    0,
 				Confirmations: 12,
+				Type:          "evm",
+			},
+			// ——— TRON Chains ———
+			728126428: {
+				ChainID:       728126428,
+				Name:          "TRON Mainnet",
+				RPCURL:        getEnv("TRON_RPC_URL", "grpc.trongrid.io:50051"),
+				ExplorerURL:   "https://tronscan.org",
+				StartBlock:    0,
+				Confirmations: 19, // ~57 seconds (3s blocks)
+				Type:          "tron",
+			},
+			3448148188: {
+				ChainID:       3448148188,
+				Name:          "TRON Nile Testnet",
+				RPCURL:        getEnv("TRON_TESTNET_RPC_URL", "grpc.nile.trongrid.io:50051"),
+				ExplorerURL:   "https://nile.tronscan.org",
+				StartBlock:    0,
+				Confirmations: 19,
+				Type:          "tron",
 			},
 		},
 	}

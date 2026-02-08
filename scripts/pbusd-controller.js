@@ -29,7 +29,7 @@ if (!CONFIG.pk) {
 
 // ABIs
 const TREASURY_ABI = [
-  "event DepositedToHashKey(address indexed depositor, uint256 amount, address indexed hashKeyRecipient, uint256 timestamp)",
+  "event DepositForMint(address indexed depositor, uint256 amount, address indexed hashKeyRecipient, uint256 timestamp)",
   "function releaseFromBurn(address recipient, uint256 amount, bytes32 burnTxHash) external"
 ];
 
@@ -96,7 +96,7 @@ async function main() {
   console.log(`👤 Relayer: ${relayerWallet.address}`);
 
   // 1. Base -> HashKey (Deposit -> Mint)
-  treasury.on("DepositedToHashKey", async (depositor, amount, hashKeyRecipient, timestamp, event) => {
+  treasury.on("DepositForMint", async (depositor, amount, hashKeyRecipient, timestamp, event) => {
     const txHash = event.log.transactionHash;
     const logIndex = event.log.index;
     const uniqueId = `${txHash}-${logIndex}`;

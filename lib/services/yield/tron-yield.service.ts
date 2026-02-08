@@ -541,7 +541,13 @@ export class TronYieldService {
   }
 
   /**
-   * 自动存款钩子
+   * 自动存款钩子 (订单确认后调用)
+   *
+   * 流程:
+   * 1. 检查是否启用自动生息
+   * 2. 检查金额是否达到最小阈值
+   * 3. 记录存款意图到数据库
+   * 4. 实际链上执行由 payout-engine 轮询处理
    *
    * @param orderId - 订单 ID
    * @param merchantId - 商户 ID
@@ -559,6 +565,13 @@ export class TronYieldService {
 
     const minAmount = parseFloat(process.env.AUTO_YIELD_MIN_AMOUNT || '100')
     if (parseFloat(amount) < minAmount) {
+      logger.debug('Amount below threshold, skipping TRON auto-deposit', {
+        component: 'tron-yield',
+        network: this.network,
+        action: 'auto_deposit',
+        orderId,
+        metadata: { merchantId, amount, minAmount }
+      })
       return
     }
 
@@ -570,9 +583,43 @@ export class TronYieldService {
       metadata: { merchantId, amount }
     })
 
-    // NOTE: TRON auto-deposit requires merchant custody approval.
-    // Execution is delegated to the payout-engine service via gRPC when the
-    // merchant has an active session key or pre-signed TRC20 approval.
+    try {
+      // 记录自动存款意图到数据库
+      await prisma.yieldDeposit.create({
+        data: {
+          merchant_id: merchantId,
+          amount: parseFloat(amount),
+          token: 'USDT',
+          principal: parseFloat(amount),
+          interest: 0,
+          apy: 0,
+          status: 'active',
+          tx_hash: `auto:${orderId}`,
+          deposited_at: new Date()
+        }
+      })
+
+      logger.info('TRON auto-deposit intent recorded', {
+        component: 'tron-yield',
+        network: this.network,
+        action: 'auto_deposit_recorded',
+        orderId,
+        metadata: { merchantId, amount }
+      })
+
+      // NOTE: Actual on-chain execution requires merchant's TRC20 pre-approval.
+      // The payout-engine gRPC service handles execution when the merchant has
+      // an active session key or pre-signed TRC20 approval.
+    } catch (error) {
+      logger.error('TRON auto-deposit hook failed', error instanceof Error ? error : new Error(String(error)), {
+        component: 'tron-yield',
+        network: this.network,
+        action: 'auto_deposit',
+        orderId,
+        metadata: { merchantId, amount }
+      })
+      // Don't throw - auto-deposit failure should not block payment confirmation
+    }
   }
 }
 
