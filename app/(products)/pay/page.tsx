@@ -24,7 +24,10 @@ import { authHeaders } from "@/lib/authenticated-fetch"
 import { useVendors } from "@/hooks/use-vendors"
 import { usePaymentHistory } from "@/hooks/use-payment-history"
 import { getTokenAddress, signERC3009Authorization, executeERC3009Transfer, sendToken, getTokenBalance } from "@/lib/web3"
-import { getChainInfo } from "@/lib/tokens"
+import { getChainInfo, SUPPORTED_CHAINS } from "@/lib/tokens"
+import { detectAddressType, validateAddress, isValidTronAddress } from "@/lib/address-utils"
+import { getTokenAddress as getTronTokenAddress } from "@/lib/networks"
+import { sendTRC20 } from "@/lib/services/tron-payment"
 import { FeePreview } from "@/components/fee-preview"
 import { SettlementMethodBadge } from "@/components/settlement-method-badge"
 import { PaymentActivity } from "@/components/payment-activity"
@@ -53,7 +56,8 @@ interface PaymentVerification {
 }
 
 function isValidAddress(address: string): boolean {
-  return /^0x[a-fA-F0-9]{40}$/.test(address)
+  const type = detectAddressType(address)
+  return type === "EVM" || type === "TRON"
 }
 
 function isValidAmount(amount: string): boolean {
@@ -79,7 +83,7 @@ async function verifyPaymentLink(params: Record<string, string | null>): Promise
   }
 
   const to = params.to
-  if (to && !/^0x[a-fA-F0-9]{40}$/.test(to)) {
+  if (to && !isValidAddress(to)) {
     result.paramsValid = false
     result.tamperedFields.push("to (invalid format)")
   }
@@ -180,17 +184,22 @@ function PaymentContent() {
   const [tokenBalance, setTokenBalance] = useState<string | null>(null)
   const [balanceLoading, setBalanceLoading] = useState(false)
 
-  // Payment history for form mode
+  // Detect recipient address network type
+  const recipientAddressType = formTo ? detectAddressType(formTo) : null
+  const isTronPayment = recipientAddressType === "TRON" || activeChain === "TRON"
+
+  // Payment history for form mode (use active wallet address)
+  const activeWalletAddress = wallets[activeChain] || wallets.EVM || undefined
   const { payments: historyPayments, loading: historyLoading, refresh: refreshHistory } = usePaymentHistory({
     isDemoMode,
-    walletAddress: wallets.EVM || undefined,
+    walletAddress: activeWalletAddress,
     type: "sent",
   })
 
   // Contacts for form mode
   const { vendors, loading: vendorsLoading } = useVendors({
     isDemoMode,
-    walletAddress: wallets.EVM || undefined,
+    walletAddress: activeWalletAddress,
   })
 
   // URL params (link mode)
@@ -210,14 +219,16 @@ function PaymentContent() {
   const token = hasPaymentLinkParams ? linkToken : formToken
 
   const isValid = to && amount && token
+  // Detect if target address is TRON (for link mode)
+  const resolvedIsTron = to ? detectAddressType(to) === "TRON" : isTronPayment
   const isUSDC = token === "USDC"
-  const isGasless = isUSDC && activeChain === "EVM"
+  const isGasless = isUSDC && activeChain === "EVM" && !resolvedIsTron
 
   // Form validation
   useEffect(() => {
     if (hasPaymentLinkParams) return
     if (formTo && !isValidAddress(formTo)) {
-      setAddressError("Invalid Ethereum address format")
+      setAddressError("Invalid address format (supports EVM 0x... and TRON T...)")
     } else {
       setAddressError("")
     }
@@ -235,7 +246,13 @@ function PaymentContent() {
   // Balance fetch for form mode
   useEffect(() => {
     async function fetchBalance() {
-      if (hasPaymentLinkParams || !wallets.EVM || !chainId) return
+      if (hasPaymentLinkParams) return
+      // Skip balance fetch for TRON (handled by TronLink wallet)
+      if (isTronPayment) {
+        setTokenBalance(null)
+        return
+      }
+      if (!wallets.EVM || !chainId) return
       setBalanceLoading(true)
       try {
         const tokenAddr = getTokenAddress(chainId, formToken)
@@ -252,7 +269,7 @@ function PaymentContent() {
       }
     }
     fetchBalance()
-  }, [formToken, chainId, wallets.EVM, hasPaymentLinkParams])
+  }, [formToken, chainId, wallets.EVM, hasPaymentLinkParams, isTronPayment])
 
   // Invoice fetch (link mode only)
   useEffect(() => {
@@ -296,20 +313,22 @@ function PaymentContent() {
     verifyLink()
   }, [linkTo, linkAmount, linkToken, networkParam, sig, exp, hasPaymentLinkParams])
 
-  // Fee estimation
+  // Fee estimation (EVM only, skip for TRON)
   useEffect(() => {
     async function estimateFee() {
-      if (amount && wallets.EVM) {
+      if (amount && wallets.EVM && !resolvedIsTron) {
         try {
           const fee = await calculateFee(Number(amount), wallets.EVM, "standard")
           setFeeEstimate(fee)
         } catch {
           // Fee estimation non-critical
         }
+      } else {
+        setFeeEstimate(null)
       }
     }
     estimateFee()
-  }, [amount, wallets.EVM])
+  }, [amount, wallets.EVM, resolvedIsTron])
 
   const createLock = useCallback(() => {
     if (!to || !amount || !token) return null
@@ -371,25 +390,14 @@ function PaymentContent() {
     try {
       if (!verifyLock(lock)) { setProcessing(false); return }
 
-      const tokenAddress = getTokenAddress(chainId, token || "USDC")
-      if (!tokenAddress) throw new Error("Token not supported on this network")
+      // Determine if this is a TRON payment based on recipient address
+      const paymentIsTron = to ? detectAddressType(to) === "TRON" : false
+      const senderAddress = paymentIsTron ? wallets.TRON : wallets.EVM
 
-      // Balance check
-      try {
-        const balance = await getTokenBalance(wallets.EVM!, tokenAddress)
-        if (parseFloat(balance) < parseFloat(amount!)) {
-          toast({
-            title: "Insufficient Balance",
-            description: `You need ${amount} ${token} but only have ${parseFloat(balance).toFixed(6)} ${token}`,
-            variant: "destructive",
-          })
-          setProcessing(false)
-          return
-        }
-      } catch {
-        toast({ title: "Balance Check Failed", description: "Unable to verify balance.", variant: "destructive" })
-        setProcessing(false)
-        return
+      if (!senderAddress) {
+        throw new Error(paymentIsTron
+          ? "Please connect your TronLink wallet to send TRON payments"
+          : "Please connect your EVM wallet to send payments")
       }
 
       // URL param tampering check (link mode only)
@@ -402,44 +410,86 @@ function PaymentContent() {
       }
 
       let hash = ""
+      let tokenAddress = ""
 
-      if (isGasless) {
-        toast({ title: "Signing Authorization", description: "Please sign the x402 payment authorization." })
-        const auth = await signERC3009Authorization(tokenAddress, wallets.EVM!, to!, amount!, chainId)
+      if (paymentIsTron) {
+        // === TRON Payment Flow ===
+        const tronTokenAddr = getTronTokenAddress("tron", token || "USDT")
+        if (!tronTokenAddr) throw new Error(`Token ${token} not supported on TRON network`)
+        tokenAddress = tronTokenAddr
+
+        toast({ title: "Confirm in TronLink", description: "Please confirm the transaction in your TronLink wallet." })
 
         if (!verifyLock(lock)) { setProcessing(false); return }
 
-        toast({ title: "Processing Payment", description: "Submitting your secure payment..." })
-
         try {
-          hash = await executeERC3009Transfer(tokenAddress, wallets.EVM!, to!, amount!, auth)
-        } catch (erc3009Error: any) {
-          throw new Error(`ERC-3009 transfer failed: ${erc3009Error.message}`)
-        }
-
-        // x402 settlement (non-blocking)
-        try {
-          await fetch("/api/x402/settle", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              authorizationId: auth.nonce || `auth_${Date.now()}`,
-              transactionHash: hash, chainId, amount: amount!, token: token || "USDC",
-              from: wallets.EVM, to: to!,
-            }),
-          })
-        } catch {
-          // Non-blocking
+          hash = await sendTRC20(tronTokenAddr, to!, amount!)
+        } catch (tronError: any) {
+          throw new Error(tronError.action
+            ? `${tronError.message}. ${tronError.action}`
+            : `TRON transfer failed: ${tronError.message}`)
         }
       } else {
-        toast({ title: "Confirm Transaction", description: "Please confirm the transaction in your wallet." })
+        // === EVM Payment Flow ===
+        tokenAddress = getTokenAddress(chainId, token || "USDC") || ""
+        if (!tokenAddress) throw new Error("Token not supported on this network")
 
-        if (!verifyLock(lock)) { setProcessing(false); return }
-
+        // Balance check (EVM only)
         try {
-          hash = await sendToken(tokenAddress, to!, amount!)
-        } catch (sendError: any) {
-          throw new Error(`Transaction failed: ${sendError.message}`)
+          const balance = await getTokenBalance(wallets.EVM!, tokenAddress)
+          if (parseFloat(balance) < parseFloat(amount!)) {
+            toast({
+              title: "Insufficient Balance",
+              description: `You need ${amount} ${token} but only have ${parseFloat(balance).toFixed(6)} ${token}`,
+              variant: "destructive",
+            })
+            setProcessing(false)
+            return
+          }
+        } catch {
+          toast({ title: "Balance Check Failed", description: "Unable to verify balance.", variant: "destructive" })
+          setProcessing(false)
+          return
+        }
+
+        if (isGasless) {
+          toast({ title: "Signing Authorization", description: "Please sign the x402 payment authorization." })
+          const auth = await signERC3009Authorization(tokenAddress, wallets.EVM!, to!, amount!, chainId)
+
+          if (!verifyLock(lock)) { setProcessing(false); return }
+
+          toast({ title: "Processing Payment", description: "Submitting your secure payment..." })
+
+          try {
+            hash = await executeERC3009Transfer(tokenAddress, wallets.EVM!, to!, amount!, auth)
+          } catch (erc3009Error: any) {
+            throw new Error(`ERC-3009 transfer failed: ${erc3009Error.message}`)
+          }
+
+          // x402 settlement (non-blocking)
+          try {
+            await fetch("/api/x402/settle", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                authorizationId: auth.nonce || `auth_${Date.now()}`,
+                transactionHash: hash, chainId, amount: amount!, token: token || "USDC",
+                from: wallets.EVM, to: to!,
+              }),
+            })
+          } catch {
+            // Non-blocking
+          }
+        } else {
+          toast({ title: "Confirm Transaction", description: "Please confirm the transaction in your wallet." })
+
+          if (!verifyLock(lock)) { setProcessing(false); return }
+
+          try {
+            hash = await sendToken(tokenAddress, to!, amount!)
+          } catch (sendError: any) {
+            throw new Error(`Transaction failed: ${sendError.message}`)
+          }
         }
       }
 
@@ -447,13 +497,14 @@ function PaymentContent() {
       try {
         const payload: Record<string, unknown> = {
           tx_hash: hash,
-          from_address: wallets.EVM,
+          from_address: senderAddress,
           to_address: to,
           token_symbol: token,
           token: tokenAddress,
           amount: amount,
           amount_usd: Number(amount),
-          chain: chainId.toString(),
+          chain: paymentIsTron ? "tron" : chainId.toString(),
+          network_type: paymentIsTron ? "TRON" : "EVM",
           type: "sent",
           status: "completed",
           ...(formMemo && { memo: formMemo }),
@@ -463,7 +514,7 @@ function PaymentContent() {
 
         const response = await fetch('/api/payments', {
           method: 'POST',
-          headers: authHeaders(wallets.EVM, { 'Content-Type': 'application/json' }),
+          headers: authHeaders(senderAddress, { 'Content-Type': 'application/json' }),
           body: JSON.stringify(payload)
         })
 
@@ -473,9 +524,9 @@ function PaymentContent() {
             await recordFee({
               paymentId: paymentData.id,
               amount: Number(amount),
-              fromAddress: wallets.EVM!,
+              fromAddress: senderAddress!,
               tokenSymbol: token!,
-              chainId: chainId,
+              chainId: paymentIsTron ? 728126428 : chainId,
               tier: "standard",
               collectionMethod: "deferred",
             })
@@ -486,11 +537,11 @@ function PaymentContent() {
         try {
           await fetch('/api/payment/retry-queue', {
             method: 'POST',
-            headers: authHeaders(wallets.EVM, { 'Content-Type': 'application/json' }),
+            headers: authHeaders(senderAddress, { 'Content-Type': 'application/json' }),
             body: JSON.stringify({
               txHash: hash,
               paymentData: {
-                tx_hash: hash, from_address: wallets.EVM, to_address: to,
+                tx_hash: hash, from_address: senderAddress, to_address: to,
                 token_symbol: token, token_address: tokenAddress,
                 amount: amount, amount_usd: Number(amount), status: "completed",
               }
@@ -531,13 +582,15 @@ function PaymentContent() {
     refreshHistory()
   }
 
+  // Play success sound when completed
+  useEffect(() => {
+    if (completed) {
+      sonicBranding.play("personal-success")
+    }
+  }, [completed])
+
   // === SUCCESS SCREEN (shared) ===
   if (completed) {
-    // Play success sound
-    useEffect(() => {
-      sonicBranding.play("personal-success")
-    }, [])
-    
     return (
       <div className="container max-w-md mx-auto py-20 px-4">
         <GlassCard className="border-green-500/20 bg-green-500/5">
@@ -746,6 +799,8 @@ function PaymentContent() {
   // === FORM MODE: History-first with payment dialog ===
   const formIsValid = formTo && isValidAddress(formTo) && formAmount && isValidAmount(formAmount) && formToken && !addressError && !amountError
   const chainInfo = getChainInfo(chainId)
+  // Network display name: auto-detect from recipient address or show connected chain
+  const networkDisplayName = isTronPayment ? "TRON" : (chainInfo?.name || `Chain ${chainId}`)
 
   // Map history payments for PaymentActivity component
   const activityPayments = historyPayments.map((p) => ({
@@ -795,7 +850,7 @@ function PaymentContent() {
       {/* Payment History */}
       <PaymentActivity
         payments={activityPayments}
-        walletAddress={wallets.EVM}
+        walletAddress={activeWalletAddress}
         loading={historyLoading}
         showAll
         title="Payment History"
@@ -816,7 +871,7 @@ function PaymentContent() {
             {/* Current Network */}
             <div className="flex items-center justify-between text-sm py-2 px-3 bg-muted/50 rounded-md">
               <span className="text-muted-foreground">Network</span>
-              <Badge variant="secondary">{chainInfo?.name || `Chain ${chainId}`}</Badge>
+              <Badge variant="secondary">{networkDisplayName}</Badge>
             </div>
 
             {/* Recipient Address */}
@@ -832,11 +887,16 @@ function PaymentContent() {
               </div>
               <Input
                 id="recipient"
-                placeholder="0x..."
+                placeholder="0x... (EVM) or T... (TRON)"
                 value={formTo}
                 onChange={(e) => setFormTo(e.target.value.trim())}
                 className={`font-mono ${addressError ? "border-destructive" : ""}`}
               />
+              {formTo && !addressError && recipientAddressType && (
+                <p className="text-xs text-muted-foreground">
+                  Detected: <span className="font-medium text-foreground">{recipientAddressType === "TRON" ? "TRON Network" : networkDisplayName}</span>
+                </p>
+              )}
               {addressError && <p className="text-sm text-destructive">{addressError}</p>}
 
               {/* Contact Picker */}
@@ -850,18 +910,24 @@ function PaymentContent() {
                     vendors
                       .filter(v => v.wallet_address && isValidAddress(v.wallet_address))
                       .slice(0, 10)
-                      .map((vendor) => (
-                        <button
-                          key={vendor.id}
-                          className="w-full text-left px-3 py-2 hover:bg-muted/50 text-sm flex justify-between items-center border-b last:border-b-0"
-                          onClick={() => { setFormTo(vendor.wallet_address); setShowContacts(false) }}
-                        >
-                          <span className="font-medium">{getVendorDisplayName(vendor)}</span>
-                          <span className="font-mono text-xs text-muted-foreground truncate max-w-[140px]">
-                            {vendor.wallet_address.slice(0, 6)}...{vendor.wallet_address.slice(-4)}
-                          </span>
-                        </button>
-                      ))
+                      .map((vendor) => {
+                        const addrType = detectAddressType(vendor.wallet_address)
+                        return (
+                          <button
+                            key={vendor.id}
+                            className="w-full text-left px-3 py-2 hover:bg-muted/50 text-sm flex justify-between items-center border-b last:border-b-0"
+                            onClick={() => { setFormTo(vendor.wallet_address); setShowContacts(false) }}
+                          >
+                            <div className="flex items-center gap-1.5">
+                              <span className="font-medium">{getVendorDisplayName(vendor)}</span>
+                              <span className="text-[10px] px-1 py-0.5 rounded bg-muted text-muted-foreground">{addrType}</span>
+                            </div>
+                            <span className="font-mono text-xs text-muted-foreground truncate max-w-[140px]">
+                              {vendor.wallet_address.slice(0, 6)}...{vendor.wallet_address.slice(-4)}
+                            </span>
+                          </button>
+                        )
+                      })
                   )}
                 </div>
               )}
@@ -876,11 +942,19 @@ function PaymentContent() {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="USDC">USDC</SelectItem>
-                    <SelectItem value="USDT">USDT</SelectItem>
-                    <SelectItem value="DAI">DAI</SelectItem>
-                    {/* Add HSK option if on HashKey chain */}
-                    {chainId === 177 && <SelectItem value="HSK">HSK</SelectItem>}
+                    {isTronPayment ? (
+                      <>
+                        <SelectItem value="USDT">USDT</SelectItem>
+                        <SelectItem value="USDC">USDC</SelectItem>
+                      </>
+                    ) : (
+                      <>
+                        <SelectItem value="USDC">USDC</SelectItem>
+                        <SelectItem value="USDT">USDT</SelectItem>
+                        <SelectItem value="DAI">DAI</SelectItem>
+                        {chainId === 177 && <SelectItem value="HSK">HSK</SelectItem>}
+                      </>
+                    )}
                   </SelectContent>
                 </Select>
               </div>
@@ -945,14 +1019,26 @@ function PaymentContent() {
               </div>
             )}
 
+            {/* TRON energy notice */}
+            {isTronPayment && (
+              <div className="flex items-center gap-2 py-2">
+                <Badge variant="secondary" className="bg-red-500/10 text-red-500 border-red-500/20">TRON TRC20</Badge>
+                <span className="text-xs text-muted-foreground">Requires energy/bandwidth (TronLink)</span>
+              </div>
+            )}
+
             {/* Settlement Method */}
             <div className="flex items-center justify-between text-sm py-2 px-3 bg-muted/50 rounded-md">
               <span className="text-muted-foreground">Settlement</span>
-              <SettlementMethodBadge method={chainId === 8453 ? "cdp" : "relayer"} chainId={chainId} />
+              {isTronPayment ? (
+                <Badge variant="secondary">TRON Direct</Badge>
+              ) : (
+                <SettlementMethodBadge method={chainId === 8453 ? "cdp" : "relayer"} chainId={chainId} />
+              )}
             </div>
 
-            {/* Fee Preview */}
-            {formAmount && Number(formAmount) > 0 && wallets.EVM && (
+            {/* Fee Preview (EVM only) */}
+            {!isTronPayment && formAmount && Number(formAmount) > 0 && wallets.EVM && (
               <FeePreview amount={Number(formAmount)} walletAddress={wallets.EVM} tokenSymbol={formToken} compact={true} />
             )}
 
@@ -960,7 +1046,21 @@ function PaymentContent() {
             {!isConnected && !isDemoMode && (
               <Alert className="bg-primary/5 border-primary/20">
                 <AlertTitle>Connect Wallet</AlertTitle>
-                <AlertDescription>Connect your wallet to send payments.</AlertDescription>
+                <AlertDescription>
+                  {isTronPayment
+                    ? "Connect your TronLink wallet to send TRON payments."
+                    : "Connect your wallet to send payments."}
+                </AlertDescription>
+              </Alert>
+            )}
+
+            {/* TRON wallet not connected warning */}
+            {isTronPayment && isConnected && !wallets.TRON && (
+              <Alert className="bg-yellow-500/5 border-yellow-500/20">
+                <AlertCircle className="h-4 w-4 text-yellow-500" />
+                <AlertDescription className="text-sm text-yellow-600">
+                  TronLink wallet not detected. Please install TronLink and connect to send TRON payments.
+                </AlertDescription>
               </Alert>
             )}
 
@@ -969,7 +1069,7 @@ function PaymentContent() {
               size="lg"
               className="w-full"
               onClick={handlePayment}
-              disabled={(!isConnected && !isDemoMode) || processing || !formIsValid}
+              disabled={(!isConnected && !isDemoMode) || processing || !formIsValid || (isTronPayment && !wallets.TRON && !isDemoMode)}
             >
               {processing ? (
                 <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Processing...</>
@@ -977,6 +1077,7 @@ function PaymentContent() {
                 <>
                   <Send className="mr-2 h-4 w-4" />
                   Send {formAmount ? `${formAmount} ${formToken}` : "Payment"}
+                  {isTronPayment && <span className="text-xs ml-1 opacity-70">(TRON)</span>}
                 </>
               )}
             </Button>

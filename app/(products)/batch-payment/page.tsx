@@ -224,6 +224,19 @@ export default function BatchPaymentPage() {
   const [selectedMultisig, setSelectedMultisig] = useState<string | null>(null)
   const [useMultisig, setUseMultisig] = useState(false)
 
+  // Auto payment states
+  const [autoPayments, setAutoPayments] = useState<AutoPayment[]>([])
+
+  // Payment history states
+  const [paymentHistory, setPaymentHistory] = useState<any[]>([])
+  const [historyLoading, setHistoryLoading] = useState(false)
+
+  // Batch payment states
+  const [recipients, setRecipients] = useState<PaymentRecipient[]>([
+    { id: "1", address: "", amount: "", vendorName: "", vendorId: "", token: "USDT", chain: selectedPaymentChain },
+  ])
+  const hasTronRecipients = recipients.some((recipient) => (recipient.chain || selectedPaymentChain) === "TRON")
+
   useEffect(() => {
     if (!supportsMultisig && useMultisig) {
       setUseMultisig(false)
@@ -237,19 +250,6 @@ export default function BatchPaymentPage() {
       setSelectedMultisig(null)
     }
   }, [hasTronRecipients, useMultisig])
-
-  // Auto payment states
-  const [autoPayments, setAutoPayments] = useState<AutoPayment[]>([])
-
-  // Payment history states
-  const [paymentHistory, setPaymentHistory] = useState<any[]>([])
-  const [historyLoading, setHistoryLoading] = useState(false)
-
-  // Batch payment states
-  const [recipients, setRecipients] = useState<PaymentRecipient[]>([
-    { id: "1", address: "", amount: "", vendorName: "", vendorId: "", token: "USDT", chain: selectedPaymentChain },
-  ])
-  const hasTronRecipients = recipients.some((recipient) => (recipient.chain || selectedPaymentChain) === "TRON")
 
   // Demo data
   const demoVendors: Vendor[] = [
