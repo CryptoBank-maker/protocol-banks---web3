@@ -8,15 +8,13 @@ import { getAuthenticatedAddress } from "@/lib/api-auth"
  */
 export async function GET(request: NextRequest) {
   try {
-    const { searchParams } = new URL(request.url)
-    const owner = searchParams.get("owner")
-
-    if (!owner) {
-      return NextResponse.json({ error: "Missing owner address" }, { status: 400 })
+    const callerAddress = await getAuthenticatedAddress(request)
+    if (!callerAddress) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
     const groups = await prisma.paymentGroup.findMany({
-      where: { owner_address: owner },
+      where: { owner_address: { equals: callerAddress, mode: "insensitive" } },
       orderBy: { created_at: "desc" },
       include: {
         _count: { select: { payments: true } },
@@ -52,18 +50,24 @@ export async function POST(request: NextRequest) {
     const body = await request.json()
     const { name, description, owner_address, purpose, tags } = body
 
-    if (!name || !owner_address) {
+    if (!name) {
       return NextResponse.json(
-        { error: "Missing required fields: name, owner_address" },
+        { error: "Missing required field: name" },
         { status: 400 },
       )
+    }
+
+    // Enforce owner is the authenticated caller
+    const resolvedOwner = owner_address || callerAddress
+    if (resolvedOwner.toLowerCase() !== callerAddress.toLowerCase()) {
+      return NextResponse.json({ error: "Forbidden: Cannot create group for another user" }, { status: 403 })
     }
 
     const group = await prisma.paymentGroup.create({
       data: {
         name,
         description,
-        owner_address,
+        owner_address: callerAddress,
         purpose,
         tags: tags || [],
       },

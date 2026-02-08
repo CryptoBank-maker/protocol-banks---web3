@@ -11,7 +11,7 @@
  */
 
 import { ethers } from "ethers"
-import { safeGetChecksumAddress } from "@/lib/address-utils"
+import { safeGetChecksumAddress, isValidTronAddress } from "@/lib/address-utils"
 
 // Web Crypto API compatible hash function
 async function sha256(data: string): Promise<string> {
@@ -62,15 +62,15 @@ export function secureCompare(a: string, b: string): boolean {
 // ============================================
 
 /**
- * Validates and checksums an EVM address
- * Prevents address tampering by enforcing EIP-55 checksum
+ * Validates and checksums an address (EVM or TRON)
+ * EVM: Enforces EIP-55 checksum
+ * TRON: Validates Base58 format (T + 33 chars)
  */
 export function validateAndChecksumAddress(address: string): {
   valid: boolean
   checksummed: string | null
   error?: string
 } {
-  // Remove whitespace and check for basic format
   const cleaned = address?.trim()
 
   if (!cleaned) {
@@ -82,13 +82,20 @@ export function validateAndChecksumAddress(address: string): {
     return { valid: false, checksummed: null, error: "Address contains invalid characters (possible homograph attack)" }
   }
 
-  // Validate basic hex format
+  // TRON address: starts with T, 34 chars, Base58
+  if (cleaned.startsWith("T") && cleaned.length === 34) {
+    if (isValidTronAddress(cleaned)) {
+      return { valid: true, checksummed: cleaned }
+    }
+    return { valid: false, checksummed: null, error: "Invalid TRON address format" }
+  }
+
+  // EVM address: 0x + 40 hex chars
   if (!/^0x[a-fA-F0-9]{40}$/.test(cleaned)) {
-    return { valid: false, checksummed: null, error: "Invalid address format" }
+    return { valid: false, checksummed: null, error: "Invalid address format (expected EVM 0x... or TRON T...)" }
   }
 
   try {
-    // safeGetChecksumAddress normalizes to lowercase first to avoid ethers v6 checksum rejection
     const checksummed = safeGetChecksumAddress(cleaned)
     return { valid: true, checksummed }
   } catch {
