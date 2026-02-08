@@ -5,6 +5,7 @@ import {
   performPreTransactionCheck,
   type PreTransactionCheckResult,
 } from "@/lib/security/web3-security"
+import { getInjectedEthereum } from "@/lib/web3"
 import { useUnifiedWallet } from "@/hooks/use-unified-wallet"
 
 export interface TransactionDetails {
@@ -38,7 +39,8 @@ export function useSecurityCheck(): UseSecurityCheckReturn {
 
   const performCheck = useCallback(
     async (details: TransactionDetails): Promise<PreTransactionCheckResult | null> => {
-      if (!isConnected || typeof window === 'undefined' || !window.ethereum) {
+      const ethereum = getInjectedEthereum()
+      if (!isConnected || !ethereum) {
         console.warn("[v0] No provider available for security check")
         return null
       }
@@ -49,7 +51,7 @@ export function useSecurityCheck(): UseSecurityCheckReturn {
       try {
         // Import ethers dynamically
         const { ethers } = await import("ethers")
-        const provider = new ethers.BrowserProvider(window.ethereum)
+        const provider = new ethers.BrowserProvider(ethereum)
         
         // Convert amount to bigint (assuming 6 decimals for stablecoins)
         const decimals = details.token === "USDC" || details.token === "USDT" ? 6 : 18

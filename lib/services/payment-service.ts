@@ -1,6 +1,6 @@
 import { isEvmAddressFormat, detectAddressType, validateAddress } from "@/lib/address-utils"
 import type { Payment, Recipient, PaymentResult } from "@/types"
-import { sendToken, signERC3009Authorization, executeERC3009Transfer } from "@/lib/web3"
+import { sendToken, signERC3009Authorization, executeERC3009Transfer, getInjectedEthereum } from "@/lib/web3"
 import {
   validateBatch,
   calculateBatchTotals,
@@ -120,8 +120,9 @@ export async function processSinglePayment(
 
       // Get the correct token address for the current chain
       const chainId = await (async () => {
-        if (typeof window !== "undefined" && window.ethereum) {
-          const provider = new (await import("ethers")).ethers.BrowserProvider(window.ethereum)
+        const ethereum = getInjectedEthereum()
+        if (ethereum) {
+          const provider = new (await import("ethers")).ethers.BrowserProvider(ethereum)
           const network = await provider.getNetwork()
           return Number(network.chainId)
         }

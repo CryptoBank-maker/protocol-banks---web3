@@ -12,6 +12,7 @@ import {
   isMetaMaskAvailable,
   switchNetwork as switchWeb3Network,
   signERC3009Authorization as signERC3009AuthorizationWeb3,
+  getInjectedEthereum,
   CHAIN_IDS,
   type ChainType,
 } from "@/lib/web3"
@@ -279,14 +280,17 @@ export function Web3Provider({ children }: { children: ReactNode }) {
         setActiveChain(type)
 
         // Create and store signer for EVM wallet
-        if (type === "EVM" && typeof window !== "undefined" && window.ethereum) {
-          try {
-            const { ethers } = await import("ethers")
-            const provider = new ethers.BrowserProvider(window.ethereum)
-            const signer = await provider.getSigner()
-            setEvmSigner(signer)
-          } catch (e) {
-            console.warn("[v0] Failed to create signer:", e)
+        if (type === "EVM") {
+          const ethereum = getInjectedEthereum()
+          if (ethereum) {
+            try {
+              const { ethers } = await import("ethers")
+              const provider = new ethers.BrowserProvider(ethereum)
+              const signer = await provider.getSigner()
+              setEvmSigner(signer)
+            } catch (e) {
+              console.warn("[v0] Failed to create signer:", e)
+            }
           }
         }
 
@@ -436,12 +440,17 @@ export function Web3Provider({ children }: { children: ReactNode }) {
         })
       }
 
-      window.ethereum.on("accountsChanged", handleAccountsChanged)
-      window.ethereum.on("chainChanged", handleChainChanged)
+      const ethereum = getInjectedEthereum() as any
+      if (!ethereum?.on || !ethereum?.removeListener) {
+        return
+      }
+
+      ethereum.on("accountsChanged", handleAccountsChanged)
+      ethereum.on("chainChanged", handleChainChanged)
 
       return () => {
-        window.ethereum.removeListener("accountsChanged", handleAccountsChanged)
-        window.ethereum.removeListener("chainChanged", handleChainChanged)
+        ethereum.removeListener("accountsChanged", handleAccountsChanged)
+        ethereum.removeListener("chainChanged", handleChainChanged)
       }
     }
   }, [sessionId])
@@ -456,11 +465,12 @@ export function Web3Provider({ children }: { children: ReactNode }) {
 
   // Stub functions for compatibility
   const signMessage = useCallback(async (message: string): Promise<string> => {
-    if (!wallets.EVM || typeof window === 'undefined' || !window.ethereum) {
-      throw new Error('Wallet not connected')
+    const ethereum = getInjectedEthereum() as any
+    if (!wallets.EVM || !ethereum?.request) {
+      throw new Error("Wallet not connected")
     }
-    const signature = await window.ethereum.request({
-      method: 'personal_sign',
+    const signature = await ethereum.request({
+      method: "personal_sign",
       params: [message, wallets.EVM],
     })
     return signature as string
@@ -502,8 +512,9 @@ export function Web3Provider({ children }: { children: ReactNode }) {
       throw new Error('EVM Wallet not connected')
     }
 
-    if (typeof window === 'undefined' || !window.ethereum) {
-      throw new Error('MetaMask not installed')
+    const ethereum = getInjectedEthereum() as any
+    if (!ethereum) {
+      throw new Error("MetaMask not installed")
     }
 
     try {
@@ -513,7 +524,7 @@ export function Web3Provider({ children }: { children: ReactNode }) {
       const { ethers } = await import('ethers')
 
       // 创建 provider 和 signer
-      const provider = new ethers.BrowserProvider(window.ethereum)
+      const provider = new ethers.BrowserProvider(ethereum)
       const signer = await provider.getSigner()
 
       // 获取代币地址

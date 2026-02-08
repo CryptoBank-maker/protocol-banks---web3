@@ -58,6 +58,7 @@ import type { Vendor, PaymentRecipient, AutoPayment, VendorCategory } from "@/ty
 import { validatePaymentData, processBatchPayment as executeBatchPayment } from "@/lib/services/payment-service"
 import { validateVendorData } from "@/lib/services/vendor-service"
 import { parsePaymentFile, generateSampleCSV, generateSampleExcel, type ParseResult } from "@/lib/excel-parser"
+import { getInjectedEthereum } from "@/lib/web3"
 import { multisigService, type MultisigWallet } from "@/lib/multisig"
 import { publicBatchTransferService } from "@/lib/services/public-batch-transfer-service"
 import { createWalletClient, createPublicClient, http, custom } from "viem"
@@ -877,7 +878,8 @@ export default function BatchPaymentPage() {
       })
 
       // 检查 ethereum provider
-      if (typeof window === 'undefined' || !window.ethereum) {
+      const ethereum = getInjectedEthereum() as any
+      if (!ethereum) {
         throw new Error('请安装 MetaMask 或其他 Web3 钱包')
       }
 
@@ -889,7 +891,7 @@ export default function BatchPaymentPage() {
 
       const walletClient = createWalletClient({
         chain: arbitrum,
-        transport: custom(window.ethereum)
+        transport: custom(ethereum)
       })
 
       // 准备批量转账数据

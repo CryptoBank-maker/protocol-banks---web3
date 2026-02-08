@@ -2,13 +2,17 @@ import { ethers } from "ethers"
 import TronWeb from "tronweb"
 import { isEvmAddressFormat, safeGetChecksumAddress } from "@/lib/address-utils"
 
+// Helper to retrieve the injected ethereum provider if it exists
+export function getInjectedEthereum<T = any>(): T | undefined {
+  if (typeof window === "undefined") return undefined
+  return (window as any).ethereum as T | undefined
+}
+
 // Chain type definition
 export type ChainType = "EVM" | "SOLANA" | "BITCOIN" | "TRON"
 
 declare global {
   interface Window {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    ethereum?: any
     tronWeb: any
     tokenpocket?: any
     solana?: {
@@ -132,7 +136,7 @@ export const CCTP_ABI = [
 
 export function isMetaMaskAvailable(): boolean {
   if (typeof window === "undefined") return false
-  const eth = window.ethereum as any
+  const eth = getInjectedEthereum() as any
   if (!eth) return false
 
   if (eth.providers) {
@@ -144,7 +148,7 @@ export function isMetaMaskAvailable(): boolean {
 
 export function isTokenPocketAvailable(): boolean {
   if (typeof window === "undefined") return false
-  const eth = window.ethereum as any
+  const eth = getInjectedEthereum() as any
   if (!eth) return false
 
   // TokenPocket sets isTokenPocket flag
@@ -163,7 +167,7 @@ export function getAvailableWallets(): string[] {
   const wallets: string[] = []
   if (isMetaMaskAvailable()) wallets.push("MetaMask")
   if (isTokenPocketAvailable()) wallets.push("TokenPocket")
-  if (window.ethereum) wallets.push("Injected")
+  if (getInjectedEthereum()) wallets.push("Injected")
   return wallets
 }
 
@@ -184,8 +188,9 @@ export function getMetaMaskDeepLink(path = ""): string {
 }
 
 export async function getChainId(): Promise<number> {
-  if (typeof window === "undefined") return CHAIN_IDS.MAINNET
-  const provider = new ethers.BrowserProvider(window.ethereum)
+  const ethereum = getInjectedEthereum()
+  if (!ethereum) return CHAIN_IDS.MAINNET
+  const provider = new ethers.BrowserProvider(ethereum)
   const network = await provider.getNetwork()
   return Number(network.chainId)
 }
@@ -197,11 +202,13 @@ export async function connectWallet(type: ChainType, preferredWallet?: "MetaMask
 
   // If mobile and no ethereum provider, we can't connect directly
   // The UI should handle redirecting to wallet app
-  if (isMobileDevice() && !window.ethereum) {
+  const injectedEthereum = getInjectedEthereum()
+
+  if (isMobileDevice() && !injectedEthereum) {
     return null
   }
 
-  if (!window.ethereum) {
+  if (!injectedEthereum) {
     throw new Error("Please install a Web3 wallet (MetaMask, TokenPocket, etc.)")
   }
 
@@ -209,7 +216,7 @@ export async function connectWallet(type: ChainType, preferredWallet?: "MetaMask
     let address = ""
 
     if (type === "EVM") {
-      let provider = window.ethereum as any
+      let provider = injectedEthereum
 
       // Handle multiple wallet providers
       if (provider.providers && provider.providers.length > 0) {
@@ -302,12 +309,13 @@ export const NETWORK_CONFIGS: Record<number, {
 }
 
 export async function switchNetwork(chainId: number) {
-  if (typeof window === "undefined" || !window.ethereum) return
+  const ethereum = getInjectedEthereum()
+  if (!ethereum) return
 
   const hexChainId = "0x" + chainId.toString(16)
 
   try {
-    await window.ethereum.request({
+    await ethereum.request({
       method: "wallet_switchEthereumChain",
       params: [{ chainId: hexChainId }],
     })
@@ -320,7 +328,7 @@ export async function switchNetwork(chainId: number) {
       const networkConfig = NETWORK_CONFIGS[chainId]
       if (networkConfig) {
         try {
-          await window.ethereum.request({
+          await ethereum.request({
             method: "wallet_addEthereumChain",
             params: [networkConfig],
           })
@@ -345,7 +353,8 @@ const CONTRACT_CACHE_TTL_MS = 5 * 60 * 1000 // 5 minutes
 const contractExistsCache: Record<string, { exists: boolean; timestamp: number }> = {}
 
 export async function getTokenBalance(walletAddress: string, tokenAddress: string): Promise<string> {
-  if (typeof window === "undefined" || !window.ethereum) {
+  const ethereum = getInjectedEthereum()
+  if (!ethereum) {
     return "0"
   }
 
@@ -355,7 +364,7 @@ export async function getTokenBalance(walletAddress: string, tokenAddress: strin
   }
 
   try {
-    const provider = new ethers.BrowserProvider(window.ethereum)
+    const provider = new ethers.BrowserProvider(ethereum)
     const network = await provider.getNetwork()
     const chainId = Number(network.chainId)
 
@@ -428,7 +437,8 @@ export async function sendToken(tokenAddress: string, toAddress: string, amount:
     throw new Error("Bitcoin transfers are not yet supported. Please use an EVM chain.")
   }
 
-  if (typeof window === "undefined" || !window.ethereum) {
+  const ethereum = getInjectedEthereum()
+  if (!ethereum) {
     throw new Error("Wallet is not available")
   }
 
@@ -442,7 +452,7 @@ export async function sendToken(tokenAddress: string, toAddress: string, amount:
     throw new Error("Invalid token contract address")
   }
 
-  const provider = new ethers.BrowserProvider(window.ethereum)
+  const provider = new ethers.BrowserProvider(ethereum)
   const signer = await provider.getSigner()
   const network = await provider.getNetwork()
 
@@ -604,11 +614,12 @@ export async function signERC3009Authorization(
   amount: string,
   chainId: number,
 ): Promise<{ v: number; r: string; s: string; nonce: string; validAfter: number; validBefore: number }> {
-  if (typeof window === "undefined" || !window.ethereum) {
+  const ethereum = getInjectedEthereum()
+  if (!ethereum) {
     throw new Error("MetaMask is not available")
   }
 
-  const provider = new ethers.BrowserProvider(window.ethereum)
+  const provider = new ethers.BrowserProvider(ethereum)
   const signer = await provider.getSigner()
 
   const contract = new ethers.Contract(tokenAddress, ERC20_ABI, provider)
@@ -664,11 +675,12 @@ export async function executeERC3009Transfer(
   amount: string,
   auth: { v: number; r: string; s: string; nonce: string; validAfter: number; validBefore: number },
 ): Promise<string> {
-  if (typeof window === "undefined" || !window.ethereum) {
+  const ethereum = getInjectedEthereum()
+  if (!ethereum) {
     throw new Error("MetaMask is not available")
   }
 
-  const provider = new ethers.BrowserProvider(window.ethereum)
+  const provider = new ethers.BrowserProvider(ethereum)
   const signer = await provider.getSigner()
 
   const contract = new ethers.Contract(tokenAddress, ERC20_ABI, signer)
