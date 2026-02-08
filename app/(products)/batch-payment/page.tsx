@@ -219,6 +219,13 @@ export default function BatchPaymentPage() {
   const [selectedMultisig, setSelectedMultisig] = useState<string | null>(null)
   const [useMultisig, setUseMultisig] = useState(false)
 
+  useEffect(() => {
+    if (hasTronRecipients && useMultisig) {
+      setUseMultisig(false)
+      setSelectedMultisig(null)
+    }
+  }, [hasTronRecipients, useMultisig])
+
   // Auto payment states
   const [autoPayments, setAutoPayments] = useState<AutoPayment[]>([])
 
@@ -228,8 +235,9 @@ export default function BatchPaymentPage() {
 
   // Batch payment states
   const [recipients, setRecipients] = useState<PaymentRecipient[]>([
-    { id: "1", address: "", amount: "", vendorName: "", vendorId: "", token: "USDT" },
+    { id: "1", address: "", amount: "", vendorName: "", vendorId: "", token: "USDT", chain: selectedPaymentChain },
   ])
+  const hasTronRecipients = recipients.some((recipient) => (recipient.chain || selectedPaymentChain) === "TRON")
 
   // Demo data
   const demoVendors: Vendor[] = [
@@ -523,16 +531,28 @@ export default function BatchPaymentPage() {
   }, [wallets.EVM, wallets.TRON])
 
   useEffect(() => {
-    if (manualChainOverrideRef.current || isChainSwitching || isConnecting) {
+    if (isChainSwitching || isConnecting) {
       return
     }
 
-    const hasTron = Boolean(wallets.TRON)
-    const hasEvm = Boolean(wallets.EVM)
+    const tronAvailable = Boolean(wallets.TRON)
+    const evmAvailable = Boolean(wallets.EVM)
 
-    if (hasTron && !hasEvm && selectedPaymentChain !== "TRON") {
+    if (manualChainOverrideRef.current) {
+      const overrideStillValid =
+        (selectedPaymentChain === "TRON" && tronAvailable) ||
+        (selectedPaymentChain === "EVM" && evmAvailable)
+
+      if (overrideStillValid) {
+        return
+      }
+
+      manualChainOverrideRef.current = false
+    }
+
+    if (tronAvailable && selectedPaymentChain !== "TRON") {
       handlePaymentChainChange("TRON", { source: "auto" })
-    } else if (hasEvm && !hasTron && selectedPaymentChain !== "EVM") {
+    } else if (!tronAvailable && evmAvailable && selectedPaymentChain !== "EVM") {
       handlePaymentChainChange("EVM", { source: "auto" })
     }
   }, [handlePaymentChainChange, isChainSwitching, isConnecting, selectedPaymentChain, wallets.EVM, wallets.TRON])
@@ -746,12 +766,33 @@ export default function BatchPaymentPage() {
   }
 
   // Select vendor and auto-fill address
+  const normalizeVendorChain = (chainLabel?: string | null): "EVM" | "TRON" => {
+    if (!chainLabel) return "EVM"
+    const normalized = chainLabel.toLowerCase()
+    if (normalized.includes("tron")) {
+      return "TRON"
+    }
+    return "EVM"
+  }
+
   const selectVendorForRecipient = (recipientId: string, vendorId: string) => {
     const vendor = displayVendors.find((v) => v.id === vendorId)
     if (vendor) {
-      updateRecipient(recipientId, "vendorId", vendor.id)
-      updateRecipient(recipientId, "vendorName", getVendorDisplayName(vendor))
-      updateRecipient(recipientId, "address", vendor.wallet_address)
+      const vendorChain = normalizeVendorChain(vendor.chain)
+      setRecipients((prev) =>
+        prev.map((recipient) => {
+          if (recipient.id !== recipientId) return recipient
+          const nextToken = vendorChain === "TRON" ? "USDT" : recipient.token || "USDT"
+          return {
+            ...recipient,
+            vendorId: vendor.id,
+            vendorName: getVendorDisplayName(vendor),
+            address: vendor.wallet_address,
+            chain: vendorChain,
+            token: nextToken,
+          }
+        }),
+      )
     }
   }
 
@@ -759,7 +800,15 @@ export default function BatchPaymentPage() {
   const addRecipient = () => {
     setRecipients([
       ...recipients,
-      { id: Date.now().toString(), address: "", amount: "", vendorName: "", vendorId: "", token: "USDT" },
+      {
+        id: Date.now().toString(),
+        address: "",
+        amount: "",
+        vendorName: "",
+        vendorId: "",
+        token: "USDT",
+        chain: selectedPaymentChain,
+      },
     ])
   }
 
@@ -771,6 +820,20 @@ export default function BatchPaymentPage() {
 
   const updateRecipient = (id: string, field: keyof PaymentRecipient, value: any) => {
     setRecipients(recipients.map((r) => (r.id === id ? { ...r, [field]: value } : r)))
+  }
+
+  const handleRecipientChainChange = (id: string, chain: "EVM" | "TRON") => {
+    setRecipients((prev) =>
+      prev.map((recipient) => {
+        if (recipient.id !== id) return recipient
+        const nextToken = chain === "TRON" ? "USDT" : recipient.token || "USDT"
+        return {
+          ...recipient,
+          chain,
+          token: chain === "TRON" ? "USDT" : nextToken,
+        }
+      }),
+    )
   }
 
   const getTotalAmounts = () => {
@@ -794,10 +857,10 @@ export default function BatchPaymentPage() {
 
   // Legacy single-transfer fallback flow
   const processIndividualPayments = async () => {
-    if (!currentWallet) {
+    if (!wallets.EVM && !wallets.TRON) {
       toast({
         title: "Error",
-        description: "Please connect your wallet first.",
+        description: "Please connect an EVM or Tron wallet first.",
         variant: "destructive",
       })
       return
@@ -813,23 +876,67 @@ export default function BatchPaymentPage() {
       return
     }
 
-    if (selectedPaymentChain === "TRON") {
-      const unsupportedToken = validRecipients.find((r) => (r.token || "USDT").toUpperCase() !== "USDT")
-      if (unsupportedToken) {
-        toast({
-          title: "Tron only supports USDT",
-          description: "Switch all recipients to USDT before sending on Tron, or change the settlement network.",
-          variant: "destructive",
-        })
-        return
+    const tronRecipients = validRecipients.filter((r) => (r.chain || selectedPaymentChain) === "TRON")
+    const evmRecipients = validRecipients.filter((r) => (r.chain || selectedPaymentChain) !== "TRON")
+
+    const tronTokenMismatch = tronRecipients.find((r) => (r.token || "USDT").toUpperCase() !== "USDT")
+    if (tronTokenMismatch) {
+      toast({
+        title: "Tron only supports USDT",
+        description: "Switch all Tron recipients to USDT before sending, or update their chain.",
+        variant: "destructive",
+      })
+      return
+    }
+
+    if (tronRecipients.length > 0 && !wallets.TRON) {
+      toast({
+        title: "Tron wallet required",
+        description: "Connect TronLink before sending payments to Tron recipients.",
+        variant: "destructive",
+      })
+      return
+    }
+
+    if (evmRecipients.length > 0 && !wallets.EVM) {
+      toast({
+        title: "EVM wallet required",
+        description: "Connect an EVM wallet (e.g., MetaMask) before sending EVM payments.",
+        variant: "destructive",
+      })
+      return
+    }
+
+    const deriveEvmChainSlug = (id: number): string => {
+      switch (id) {
+        case CHAIN_IDS.BASE:
+          return "base"
+        case CHAIN_IDS.ARBITRUM:
+          return "arbitrum"
+        case CHAIN_IDS.SEPOLIA:
+          return "sepolia"
+        case CHAIN_IDS.MAINNET:
+          return "ethereum"
+        case CHAIN_IDS.HASHKEY:
+          return "hashkey"
+        case CHAIN_IDS.BSC:
+          return "bsc"
+        default:
+          return "evm"
       }
     }
 
     setIsProcessing(true)
 
+    const initialChain = selectedPaymentChain
+    const hadManualOverride = manualChainOverrideRef.current
+    let runtimeChain = selectedPaymentChain
+    let successCount = 0
+    let failCount = 0
+    let shouldRefreshHistory = false
+
     try {
       if (supportsMultisig && useMultisig && selectedMultisig) {
-        // Create multi-sig transaction proposal instead of direct payment
         const totalAmount = validRecipients.reduce((sum, r) => sum + Number.parseFloat(r.amount), 0)
 
         await multisigService.createTransaction({
@@ -839,88 +946,108 @@ export default function BatchPaymentPage() {
           description: `Batch payment to ${validRecipients.length} recipients`,
           tokenSymbol: validRecipients[0].token,
           amountUsd: totalAmount,
-          createdBy: currentWallet,
+          createdBy: currentWallet || wallets.EVM || wallets.TRON || "",
         })
 
         toast({
           title: "Transaction Proposed",
           description: `Batch payment submitted for multi-sig approval (${multisigWallets.find((w) => w.id === selectedMultisig)?.threshold} signatures required)`,
         })
-      } else {
-        // Sequential transfers (legacy approach)
-        let successCount = 0
-        let failCount = 0
+        return
+      }
 
-        for (const recipient of validRecipients) {
-          try {
-            // Use sendToken to execute each transfer
-            const txHash = await sendToken(recipient.address, recipient.amount, recipient.token || 'USDT')
-            successCount++
+      for (const recipient of validRecipients) {
+        const targetChain: "EVM" | "TRON" = (recipient.chain || selectedPaymentChain) === "TRON" ? "TRON" : "EVM"
 
-            // Persist payment record through API
-            if (txHash) {
-              try {
-                const paymentData = {
-                  tx_hash: txHash,
-                  from_address: currentWallet.toLowerCase(),
-                  to_address: recipient.address.toLowerCase(),
-                  vendor_id: recipient.vendorId || null,
-                  token_symbol: recipient.token || 'USDT',
-                  token_address: '0x0000000000000000000000000000000000000000',
-                  amount: recipient.amount,
-                  amount_usd: parseFloat(recipient.amount),
-                  status: 'completed',
-                  timestamp: new Date().toISOString(),
-                  notes: recipient.vendorName ? `Payment to ${recipient.vendorName}` : undefined,
-                }
+        if (runtimeChain !== targetChain) {
+          await handlePaymentChainChange(targetChain, { source: "auto" })
+          runtimeChain = targetChain
+        }
 
-                const saveRes = await fetch('/api/payments', {
-                  method: 'POST',
-                  headers: {
-                    'Content-Type': 'application/json',
-                    ...authHeaders(currentWallet),
-                  },
-                  body: JSON.stringify(paymentData),
-                })
+        const fromAddress = targetChain === "TRON" ? wallets.TRON : wallets.EVM
+        if (!fromAddress) {
+          throw new Error(targetChain === "TRON" ? "Tron wallet not connected" : "EVM wallet not connected")
+        }
 
-                if (!saveRes.ok) {
-                  console.error('[IndividualPayment] Failed to save payment record:', await saveRes.text())
-                } else {
-                  await loadPaymentHistory()
-                }
-              } catch (dbErr: any) {
-                console.error('[IndividualPayment] Database exception:', {
-                  error: dbErr,
-                  message: dbErr.message,
-                })
-              }
+        try {
+          const tokenSymbol = (recipient.token || "USDT").toUpperCase()
+          const txHash = await sendToken(recipient.address, recipient.amount, tokenSymbol)
+          successCount++
+
+          if (txHash) {
+            const canonicalFrom = targetChain === "TRON" ? fromAddress : fromAddress.toLowerCase()
+            const canonicalTo = targetChain === "TRON" ? recipient.address : recipient.address.toLowerCase()
+            const chainSlug = targetChain === "TRON" ? "tron" : deriveEvmChainSlug(chainId)
+
+            const paymentData = {
+              tx_hash: txHash,
+              from_address: canonicalFrom,
+              to_address: canonicalTo,
+              vendor_id: recipient.vendorId || null,
+              token: tokenSymbol,
+              token_symbol: tokenSymbol,
+              token_address: '0x0000000000000000000000000000000000000000',
+              amount: recipient.amount,
+              amount_usd: Number.parseFloat(recipient.amount),
+              status: 'completed',
+              type: 'sent' as const,
+              network_type: targetChain,
+              chain: chainSlug,
+              chain_id: targetChain === "EVM" ? chainId : undefined,
+              timestamp: new Date().toISOString(),
+              notes: recipient.vendorName ? `Payment to ${recipient.vendorName}` : undefined,
             }
 
-            toast({
-              title: "Transfer Successful",
-              description: `Sent ${recipient.amount} ${recipient.token} to ${recipient.vendorName || recipient.address.slice(0, 10)}${recipient.vendorName ? "" : "..."}`,
+            const saveRes = await fetch('/api/payments', {
+              method: 'POST',
+              headers: authHeaders(canonicalFrom, { 'Content-Type': 'application/json' }),
+              body: JSON.stringify(paymentData),
             })
-          } catch (err: any) {
-            failCount++
-            console.error(`[IndividualPayment] Failed to send to ${recipient.address}:`, err)
 
-            toast({
-              title: "Transfer Failed",
-              description: `Failed to send to ${recipient.address.slice(0, 10)}...: ${err.message}`,
-              variant: "destructive",
-            })
+            if (!saveRes.ok) {
+              console.error('[IndividualPayment] Failed to save payment record:', await saveRes.text())
+            } else {
+              shouldRefreshHistory = true
+            }
           }
-        }
 
-        toast({
-          title: "Transfer Complete",
-          description: `Success: ${successCount}, Failed: ${failCount}`,
-        })
+          toast({
+            title: "Transfer Successful",
+            description: `Sent ${recipient.amount} ${tokenSymbol} to ${recipient.vendorName || recipient.address.slice(0, 10)}${recipient.vendorName ? "" : "..."}`,
+          })
+        } catch (err: any) {
+          failCount++
+          console.error(`[IndividualPayment] Failed to send to ${recipient.address}:`, err)
 
-        if (successCount > 0) {
-          // Reset form state
-          setRecipients([{ id: "1", address: "", amount: "", vendorName: "", vendorId: "", token: "USDT" }])
+          toast({
+            title: "Transfer Failed",
+            description: `Failed to send to ${recipient.address.slice(0, 10)}...: ${err.message}`,
+            variant: "destructive",
+          })
         }
+      }
+
+      toast({
+        title: "Transfer Complete",
+        description: `Success: ${successCount}, Failed: ${failCount}`,
+      })
+
+      if (successCount > 0) {
+        setRecipients([
+          {
+            id: "1",
+            address: "",
+            amount: "",
+            vendorName: "",
+            vendorId: "",
+            token: "USDT",
+            chain: selectedPaymentChain,
+          },
+        ])
+      }
+
+      if (shouldRefreshHistory) {
+        await loadPaymentHistory()
       }
     } catch (err: any) {
       console.error("[IndividualPayment] Error:", err)
@@ -930,6 +1057,9 @@ export default function BatchPaymentPage() {
         variant: "destructive",
       })
     } finally {
+      if (runtimeChain !== initialChain) {
+        await handlePaymentChainChange(initialChain, { source: hadManualOverride ? "user" : "auto" })
+      }
       setIsProcessing(false)
     }
   }
@@ -959,6 +1089,15 @@ export default function BatchPaymentPage() {
       toast({
         title: "Batch transfers require EVM",
         description: "Switch to an EVM chain to send a batched transaction, or use sequential transfers instead.",
+        variant: "destructive",
+      })
+      return
+    }
+
+    if (hasTronRecipients) {
+      toast({
+        title: "Tron recipients detected",
+        description: "Remove Tron recipients or switch them to EVM before running an on-chain batch transaction.",
         variant: "destructive",
       })
       return
@@ -1100,7 +1239,17 @@ export default function BatchPaymentPage() {
         })
 
         // Reset form
-        setRecipients([{ id: "1", address: "", amount: "", vendorName: "", vendorId: "", token: "USDT" }])
+        setRecipients([
+          {
+            id: "1",
+            address: "",
+            amount: "",
+            vendorName: "",
+            vendorId: "",
+            token: "USDT",
+            chain: selectedPaymentChain,
+          },
+        ])
       } else {
         setBatchTransferStep('error')
         setBatchErrorMessage(result.errorMessage || 'Batch transfer failed')
@@ -1250,12 +1399,14 @@ export default function BatchPaymentPage() {
                       </div>
                     )}
                   </div>
-                  {!supportsBatchTransfers && (
+                  {(!supportsBatchTransfers || hasTronRecipients) && (
                     <Alert variant="default" className="border-amber-500/40 bg-amber-500/5">
                       <AlertCircle className="h-4 w-4" />
                       <AlertTitle className="text-sm">Manual transfer mode</AlertTitle>
                       <AlertDescription className="text-xs sm:text-sm">
-                        Tron payouts run sequentially per recipient. To execute an on-chain batch transaction, switch back to an EVM network.
+                        {selectedPaymentChain === "TRON"
+                          ? "Tron payouts run sequentially per recipient. To execute an on-chain batch transaction, switch back to an EVM network."
+                          : "Recipients assigned to Tron run sequentially even when the settlement network is EVM. Remove or switch them to enable on-chain batch execution."}
                       </AlertDescription>
                     </Alert>
                   )}
@@ -1332,7 +1483,7 @@ export default function BatchPaymentPage() {
             </GlassCard>
           )}
 
-          {multisigWallets.length > 0 && supportsMultisig && (
+          {multisigWallets.length > 0 && supportsMultisig && !hasTronRecipients && (
             <GlassCard className="border-cyan-500/20">
               <GlassCardHeader className="pb-3">
                 <div className="flex items-center gap-2">
@@ -1429,6 +1580,7 @@ export default function BatchPaymentPage() {
                       <TableRow>
                         <TableHead className="w-[200px]">Vendor / Contact</TableHead>
                         <TableHead className="w-[280px]">Address</TableHead>
+                        <TableHead className="w-[140px]">Chain</TableHead>
                         <TableHead className="w-[100px]">Token</TableHead>
                         <TableHead className="w-[120px]">Amount</TableHead>
                         <TableHead className="w-[50px]"></TableHead>
@@ -1475,9 +1627,14 @@ export default function BatchPaymentPage() {
                                             {vendor.wallet_address.slice(0, 10)}...
                                           </div>
                                         </div>
-                                        <Badge variant="outline" className="text-xs shrink-0">
-                                          {vendor.type || vendor.category || "Vendor"}
-                                        </Badge>
+                                        <div className="flex items-center gap-2 shrink-0">
+                                          <Badge variant="outline" className="text-xs">
+                                            {vendor.type || vendor.category || "Vendor"}
+                                          </Badge>
+                                          <Badge variant="secondary" className="text-xs">
+                                            {normalizeVendorChain(vendor.chain) === "TRON" ? "Tron" : (vendor.chain || "EVM")}
+                                          </Badge>
+                                        </div>
                                       </div>
                                     </DropdownMenuItem>
                                   ))}
@@ -1518,6 +1675,24 @@ export default function BatchPaymentPage() {
                           </TableCell>
                           <TableCell>
                             <Select
+                              value={(recipient.chain || selectedPaymentChain) as "EVM" | "TRON"}
+                              onValueChange={(value) => handleRecipientChainChange(recipient.id, value as "EVM" | "TRON")}
+                            >
+                              <SelectTrigger className="w-[120px]">
+                                <SelectValue placeholder="Select chain" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="EVM">
+                                  {wallets.EVM ? "EVM" : "EVM (connect wallet)"}
+                                </SelectItem>
+                                <SelectItem value="TRON">
+                                  {wallets.TRON ? "Tron" : "Tron (connect Tron)"}
+                                </SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </TableCell>
+                          <TableCell>
+                            <Select
                               value={recipient.token}
                               onValueChange={(v) => updateRecipient(recipient.id, "token", v)}
                             >
@@ -1526,10 +1701,16 @@ export default function BatchPaymentPage() {
                               </SelectTrigger>
                               <SelectContent>
                                 <SelectItem value="USDT">USDT</SelectItem>
-                                <SelectItem value="USDC" disabled={selectedPaymentChain === "TRON"}>
+                                <SelectItem
+                                  value="USDC"
+                                  disabled={(recipient.chain || selectedPaymentChain) === "TRON"}
+                                >
                                   USDC
                                 </SelectItem>
-                                <SelectItem value="DAI" disabled={selectedPaymentChain === "TRON"}>
+                                <SelectItem
+                                  value="DAI"
+                                  disabled={(recipient.chain || selectedPaymentChain) === "TRON"}
+                                >
                                   DAI
                                 </SelectItem>
                               </SelectContent>
@@ -1618,7 +1799,8 @@ export default function BatchPaymentPage() {
                 isBatchTransferProcessing ||
                 isApproving ||
                 recipients.filter((r) => r.address && r.amount).length === 0 ||
-                !supportsBatchTransfers
+                !supportsBatchTransfers ||
+                hasTronRecipients
               }
               className="bg-cyan-500 hover:bg-cyan-600"
             >
@@ -1636,6 +1818,11 @@ export default function BatchPaymentPage() {
                 <>
                   <AlertCircle className="h-4 w-4 mr-2" />
                   Switch to EVM for Batch
+                </>
+              ) : hasTronRecipients ? (
+                <>
+                  <AlertCircle className="h-4 w-4 mr-2" />
+                  Remove Tron Recipients
                 </>
               ) : useMultisig ? (
                 <>

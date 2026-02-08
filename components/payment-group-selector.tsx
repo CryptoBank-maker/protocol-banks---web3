@@ -15,6 +15,7 @@ import { Label } from "@/components/ui/label"
 import { PurposeTagSelector } from "@/components/purpose-tag-selector"
 import { Plus, FolderOpen } from "lucide-react"
 import type { PaymentGroup } from "@/types/payment"
+import { authHeaders } from "@/lib/authenticated-fetch"
 
 interface PaymentGroupSelectorProps {
   ownerAddress: string
@@ -34,7 +35,9 @@ export function PaymentGroupSelector({ ownerAddress, value, onChange }: PaymentG
     if (!ownerAddress) return
     setLoading(true)
     try {
-      const res = await fetch(`/api/payment-groups?owner=${ownerAddress}`)
+      const res = await fetch(`/api/payment-groups?owner=${ownerAddress}`, {
+        headers: authHeaders(ownerAddress),
+      })
       if (res.ok) {
         const data = await res.json()
         setGroups(data.groups || [])
@@ -51,12 +54,12 @@ export function PaymentGroupSelector({ ownerAddress, value, onChange }: PaymentG
   }, [fetchGroups])
 
   const handleCreate = async () => {
-    if (!newGroupName.trim()) return
+    if (!newGroupName.trim() || !ownerAddress) return
     setCreating(true)
     try {
       const res = await fetch("/api/payment-groups", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: authHeaders(ownerAddress, { "Content-Type": "application/json" }),
         body: JSON.stringify({
           name: newGroupName.trim(),
           owner_address: ownerAddress,
