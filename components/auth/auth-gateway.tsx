@@ -6,7 +6,6 @@ import { useUnifiedWallet } from "@/hooks/use-unified-wallet"
 import { useUserType } from "@/contexts/user-type-context"
 import { useAuth } from "@/contexts/auth-provider"
 import { useAppKit, useAppKitAccount } from "@reown/appkit/react"
-import { useSonicBranding } from "@/lib/sonic-branding"
 import { AuthModal } from "./auth-modal"
 import { AuthModeSwitcher, type AuthMode } from "./auth-mode-switcher"
 import { PersonalLogin, type PersonalLoginMethod } from "./personal-login"
@@ -39,8 +38,6 @@ export function AuthGateway({ isOpen, onClose, onSuccess }: AuthGatewayProps) {
   const { isConnected: isReownConnected } = useAppKitAccount()
   const { isAuthenticated, hasWallet, needsPinSetup, sendMagicLink, createWallet, refreshSession } = useAuth()
 
-  const { play } = useSonicBranding()
-
   // Check for successful login redirect
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -56,22 +53,20 @@ export function AuthGateway({ isOpen, onClose, onSuccess }: AuthGatewayProps) {
   // Handle successful connection
   useEffect(() => {
     if (isOpen && (isWeb3Connected || isReownConnected)) {
-      play("personal-success")
       onSuccess?.()
       onClose()
     }
-  }, [isWeb3Connected, isReownConnected, isOpen, onSuccess, onClose, play])
+  }, [isWeb3Connected, isReownConnected, isOpen, onSuccess, onClose])
 
   // Handle auth state changes
   useEffect(() => {
     if (isAuthenticated && needsPinSetup) {
       setStep("pin-setup")
     } else if (isAuthenticated && hasWallet) {
-      play("personal-success")
       onSuccess?.()
       onClose()
     }
-  }, [isAuthenticated, hasWallet, needsPinSetup, onSuccess, onClose, play])
+  }, [isAuthenticated, hasWallet, needsPinSetup, onSuccess, onClose])
 
   // Reset step when modal closes
   useEffect(() => {
@@ -97,7 +92,6 @@ export function AuthGateway({ isOpen, onClose, onSuccess }: AuthGatewayProps) {
     try {
       const result = await sendMagicLink(email)
       if (!result.success) {
-        play("error")
         throw new Error(result.error)
       }
     } finally {
@@ -110,11 +104,8 @@ export function AuthGateway({ isOpen, onClose, onSuccess }: AuthGatewayProps) {
     try {
       const result = await createWallet(pin)
       if (!result.success) {
-        play("error")
         throw new Error(result.error)
       }
-
-      play("personal-success")
 
       // Show backup screen
       setBackupData({
@@ -140,22 +131,18 @@ export function AuthGateway({ isOpen, onClose, onSuccess }: AuthGatewayProps) {
 
     try {
       if (type === "hardware") {
-        play("business-connect")
         openAppKit({ view: "Connect" })
       } else if (type === "email") {
         // Use our custom email auth for business too
         setStep("email")
       } else if (type === "tron") {
-        play("business-connect")
         await connectWallet("TRON")
       } else {
-        play("business-connect")
         await connectWallet("EVM")
       }
     } catch (error: any) {
       if (error?.code !== 4001 && !error?.message?.includes("rejected")) {
         console.error("Connection error:", error)
-        play("error")
       }
     } finally {
       setIsLoading(false)

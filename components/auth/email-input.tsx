@@ -82,7 +82,7 @@ export function EmailInput({ onSubmit, onBack, isLoading = false }: EmailInputPr
             placeholder="you@example.com"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            className="bg-white/5 border-white/10 text-white placeholder:text-white/30 h-12"
+            className="h-12 border border-white/15 bg-white/5 text-white placeholder:text-white/30 backdrop-blur-sm focus-visible:ring-2 focus-visible:ring-cyan-400/40"
             disabled={isLoading}
             autoFocus
           />
@@ -91,7 +91,7 @@ export function EmailInput({ onSubmit, onBack, isLoading = false }: EmailInputPr
 
         <Button
           type="submit"
-          className="w-full h-12 bg-cyan-500 hover:bg-cyan-600 text-black font-semibold"
+          className="h-12 w-full rounded-xl bg-gradient-to-r from-cyan-400 via-cyan-500 to-sky-500 font-semibold text-slate-950 shadow-[0_14px_32px_rgba(6,182,212,0.35)] transition-all hover:from-cyan-300 hover:to-sky-400"
           disabled={isLoading || !email}
         >
           {isLoading ? (

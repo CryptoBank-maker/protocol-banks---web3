@@ -29,17 +29,18 @@ export function BusinessLogin({ onConnect, isLoading = false }: BusinessLoginPro
       <div className="space-y-3">
         {/* Hardware Wallet - Primary */}
         <button
-          className="w-full bg-gradient-to-br from-amber-500/20 to-amber-500/5 hover:from-amber-500/30 hover:to-amber-500/10 rounded-2xl p-4 transition-all group border border-amber-500/20 text-left disabled:opacity-50"
+          className="group relative w-full overflow-hidden rounded-2xl border border-amber-400/30 bg-gradient-to-br from-amber-500/15 via-transparent to-amber-500/5 p-5 text-left shadow-[0_20px_48px_rgba(120,66,18,0.28)] backdrop-blur-sm transition-all hover:-translate-y-0.5 hover:border-amber-300/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400/50 disabled:opacity-50"
           onClick={() => onConnect("hardware")}
           disabled={isLoading}
         >
-          <div className="flex items-center gap-4">
-            <div className="h-14 w-14 rounded-xl bg-amber-500/30 flex items-center justify-center flex-shrink-0">
+          <span className="pointer-events-none absolute inset-0 bg-gradient-to-br from-white/10 via-transparent to-amber-500/10 opacity-0 transition-opacity duration-300 group-hover:opacity-70" />
+          <div className="relative z-10 flex items-center gap-4">
+            <div className="flex h-14 w-14 flex-shrink-0 items-center justify-center rounded-xl border border-amber-400/40 bg-amber-500/25 shadow-[0_0_32px_rgba(251,191,36,0.35)]">
               <Key className="h-7 w-7 text-amber-400" />
             </div>
             <div className="flex-1 min-w-0">
-              <p className="font-semibold text-white text-lg">Hardware Wallet</p>
-              <p className="text-sm text-white/60">Ledger, Trezor, GridPlus</p>
+              <p className="text-lg font-semibold text-white">Hardware Wallet</p>
+              <p className="text-sm text-white/70">Ledger, Trezor, GridPlus</p>
             </div>
             <ArrowRight className="h-6 w-6 text-amber-400/50 group-hover:text-amber-400 transition-colors flex-shrink-0" />
           </div>
@@ -53,12 +54,13 @@ export function BusinessLogin({ onConnect, isLoading = false }: BusinessLoginPro
         <div className="grid grid-cols-2 gap-3">
           {/* Business Email */}
           <button
-            className="bg-white/5 hover:bg-white/10 rounded-2xl p-4 transition-colors group text-center disabled:opacity-50"
+            className="group relative rounded-2xl border border-white/10 bg-white/5 p-4 text-center shadow-[0_16px_32px_rgba(8,12,31,0.3)] backdrop-blur-sm transition-all hover:-translate-y-0.5 hover:border-white/20 hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/30 disabled:opacity-50"
             onClick={() => onConnect("email")}
             disabled={isLoading}
           >
-            <div className="flex flex-col items-center gap-2">
-              <div className="h-12 w-12 rounded-xl bg-blue-500/20 flex items-center justify-center">
+            <span className="pointer-events-none absolute inset-0 bg-gradient-to-br from-white/10 via-transparent to-white/10 opacity-0 transition-opacity duration-300 group-hover:opacity-80" />
+            <div className="relative z-10 flex flex-col items-center gap-2">
+              <div className="flex h-12 w-12 items-center justify-center rounded-xl border border-blue-400/30 bg-blue-500/20 shadow-[0_0_24px_rgba(59,130,246,0.35)]">
                 <Mail className="h-6 w-6 text-blue-400" />
               </div>
               <div>
@@ -70,12 +72,13 @@ export function BusinessLogin({ onConnect, isLoading = false }: BusinessLoginPro
 
           {/* Software Wallet */}
           <button
-            className="bg-white/5 hover:bg-white/10 rounded-2xl p-4 transition-colors group text-center disabled:opacity-50"
+            className="group relative rounded-2xl border border-white/10 bg-white/5 p-4 text-center shadow-[0_16px_32px_rgba(8,12,31,0.3)] backdrop-blur-sm transition-all hover:-translate-y-0.5 hover:border-white/20 hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/30 disabled:opacity-50"
             onClick={() => onConnect("wallet")}
             disabled={isLoading}
           >
-            <div className="flex flex-col items-center gap-2">
-              <div className="h-12 w-12 rounded-xl bg-purple-500/20 flex items-center justify-center">
+            <span className="pointer-events-none absolute inset-0 bg-gradient-to-br from-white/10 via-transparent to-white/10 opacity-0 transition-opacity duration-300 group-hover:opacity-80" />
+            <div className="relative z-10 flex flex-col items-center gap-2">
+              <div className="flex h-12 w-12 items-center justify-center rounded-xl border border-purple-400/35 bg-purple-500/20 shadow-[0_0_24px_rgba(168,85,247,0.35)]">
                 <Wallet className="h-6 w-6 text-purple-400" />
               </div>
               <div>
@@ -88,13 +91,14 @@ export function BusinessLogin({ onConnect, isLoading = false }: BusinessLoginPro
 
         {/* Tron Wallet Option */}
         <button
-          className="w-full bg-red-500/10 hover:bg-red-500/20 rounded-2xl p-3 transition-colors group text-left disabled:opacity-50 mt-3"
+          className="group relative mt-3 w-full overflow-hidden rounded-2xl border border-red-500/30 bg-red-500/10 p-4 text-left shadow-[0_16px_36px_rgba(127,29,29,0.35)] backdrop-blur-sm transition-all hover:-translate-y-0.5 hover:border-red-400/50 hover:bg-red-500/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-400/50 disabled:opacity-50"
           onClick={() => onConnect("tron" as BusinessConnectType)}
           disabled={isLoading}
         >
-          <div className="flex items-center gap-3">
-             <div className="h-10 w-10 rounded-xl bg-red-500/20 flex items-center justify-center flex-shrink-0">
-               <span className="font-bold text-red-500 text-xs">TRX</span>
+          <span className="pointer-events-none absolute inset-0 bg-gradient-to-br from-white/10 via-transparent to-red-500/15 opacity-0 transition-opacity duration-300 group-hover:opacity-80" />
+          <div className="relative z-10 flex items-center gap-3">
+             <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl border border-red-500/40 bg-red-500/25">
+               <span className="text-xs font-bold text-red-400">TRX</span>
              </div>
              <div>
                 <p className="font-medium text-white text-sm">Tron Network</p>
