@@ -18,6 +18,7 @@ export function useUnifiedWallet() {
     wallet,
     wallets,
     activeChain,
+    setActiveChain,
     connectWallet,
     disconnectWallet,
     chainId,
@@ -56,6 +57,7 @@ export function useUnifiedWallet() {
     // Pass-through from Web3Context
     wallets,
     activeChain,
+    setActiveChain,
     connectWallet,
     disconnectWallet,
     chainId,

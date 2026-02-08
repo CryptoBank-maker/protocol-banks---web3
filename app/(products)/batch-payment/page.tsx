@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useCallback } from "react"
+import { useState, useEffect, useCallback, useRef } from "react"
 import { useUnifiedWallet } from "@/hooks/use-unified-wallet"
 import { useDemo } from "@/contexts/demo-context"
 import { Button } from "@/components/ui/button"
@@ -67,7 +67,19 @@ import { getVendorDisplayName, getVendorInitials } from "@/lib/utils"
 import { CHAIN_IDS } from "@/lib/web3"
 
 export default function BatchPaymentPage() {
-  const { wallets, address: unifiedAddress, sendToken, signERC3009Authorization, isConnected, chainId, switchNetwork } = useUnifiedWallet()
+  const {
+    wallets,
+    address: unifiedAddress,
+    sendToken,
+    signERC3009Authorization,
+    isConnected,
+    chainId,
+    switchNetwork,
+    connectWallet,
+    activeChain,
+    setActiveChain,
+    isConnecting,
+  } = useUnifiedWallet()
   const { isDemoMode } = useDemo()
   const { toast } = useToast()
 
@@ -124,10 +136,60 @@ export default function BatchPaymentPage() {
   const [batchGroupId, setBatchGroupId] = useState<string | undefined>()
   const [batchMemo, setBatchMemo] = useState("")
   const [isProcessing, setIsProcessing] = useState(false)
+  const [isChainSwitching, setIsChainSwitching] = useState(false)
   const [currentBatchId, setCurrentBatchId] = useState<string | null>(null)
   const [vendors, setVendors] = useState<Vendor[]>([])
-  const activeChain = "EVM"
-  const currentWallet = unifiedAddress || wallets[activeChain]
+  const selectedPaymentChain = activeChain === "TRON" ? "TRON" : "EVM"
+  const currentWallet =
+    (selectedPaymentChain === "TRON" ? wallets.TRON : wallets.EVM) ||
+    unifiedAddress ||
+    wallets.EVM ||
+    wallets.TRON ||
+    null
+  const supportsMultisig = selectedPaymentChain === "EVM"
+  const supportsBatchTransfers = selectedPaymentChain === "EVM"
+  const manualChainOverrideRef = useRef(false)
+
+  useEffect(() => {
+    if (!supportsMultisig && useMultisig) {
+      setUseMultisig(false)
+      setSelectedMultisig(null)
+    }
+  }, [supportsMultisig, useMultisig])
+
+  const handlePaymentChainChange = useCallback(
+    async (value: string, options?: { source?: "user" | "auto" }) => {
+      if (options?.source === "user") {
+        manualChainOverrideRef.current = true
+      }
+
+      const targetChain = value === "TRON" ? "TRON" : "EVM"
+      if (targetChain === selectedPaymentChain) return
+
+      setIsChainSwitching(true)
+      try {
+        if (targetChain === "TRON") {
+          if (!wallets.TRON) {
+            await connectWallet("TRON")
+          }
+        } else if (!wallets.EVM) {
+          await connectWallet("EVM")
+        }
+
+        setActiveChain(targetChain)
+      } catch (error) {
+        const message = error instanceof Error ? error.message : "Wallet connection was interrupted."
+        toast({
+          title: "Unable to switch chain",
+          description: message,
+          variant: "destructive",
+        })
+      } finally {
+        setIsChainSwitching(false)
+      }
+    },
+    [connectWallet, selectedPaymentChain, setActiveChain, toast, wallets]
+  )
 
   // Batch transfer progress state
   const [batchProgressOpen, setBatchProgressOpen] = useState(false)
@@ -436,7 +498,11 @@ export default function BatchPaymentPage() {
   }, [loadPaymentHistory])
 
   const loadMultisigWallets = useCallback(async () => {
-    if (isDemoMode || !currentWallet) return
+    if (isDemoMode || !currentWallet || !supportsMultisig) {
+      setMultisigWallets([])
+      setSelectedMultisig(null)
+      return
+    }
 
     try {
       const wallets = await multisigService.getWallets(currentWallet)
@@ -444,11 +510,32 @@ export default function BatchPaymentPage() {
     } catch (err) {
       console.error("[v0] Error loading multisig wallets:", err)
     }
-  }, [isDemoMode, currentWallet])
+  }, [currentWallet, isDemoMode, supportsMultisig])
 
   useEffect(() => {
     loadMultisigWallets()
   }, [loadMultisigWallets])
+
+  useEffect(() => {
+    if (!wallets.EVM && !wallets.TRON) {
+      manualChainOverrideRef.current = false
+    }
+  }, [wallets.EVM, wallets.TRON])
+
+  useEffect(() => {
+    if (manualChainOverrideRef.current || isChainSwitching || isConnecting) {
+      return
+    }
+
+    const hasTron = Boolean(wallets.TRON)
+    const hasEvm = Boolean(wallets.EVM)
+
+    if (hasTron && !hasEvm && selectedPaymentChain !== "TRON") {
+      handlePaymentChainChange("TRON", { source: "auto" })
+    } else if (hasEvm && !hasTron && selectedPaymentChain !== "EVM") {
+      handlePaymentChainChange("EVM", { source: "auto" })
+    }
+  }, [handlePaymentChainChange, isChainSwitching, isConnecting, selectedPaymentChain, wallets.EVM, wallets.TRON])
 
   const openTagDialog = (recipientId?: string, address?: string) => {
     setEditingRecipientId(recipientId || null)
@@ -726,10 +813,22 @@ export default function BatchPaymentPage() {
       return
     }
 
+    if (selectedPaymentChain === "TRON") {
+      const unsupportedToken = validRecipients.find((r) => (r.token || "USDT").toUpperCase() !== "USDT")
+      if (unsupportedToken) {
+        toast({
+          title: "Tron only supports USDT",
+          description: "Switch all recipients to USDT before sending on Tron, or change the settlement network.",
+          variant: "destructive",
+        })
+        return
+      }
+    }
+
     setIsProcessing(true)
 
     try {
-      if (useMultisig && selectedMultisig) {
+      if (supportsMultisig && useMultisig && selectedMultisig) {
         // Create multi-sig transaction proposal instead of direct payment
         const totalAmount = validRecipients.reduce((sum, r) => sum + Number.parseFloat(r.amount), 0)
 
@@ -851,6 +950,15 @@ export default function BatchPaymentPage() {
       toast({
         title: "Error",
         description: "Please add at least one valid recipient.",
+        variant: "destructive",
+      })
+      return
+    }
+
+    if (!supportsBatchTransfers) {
+      toast({
+        title: "Batch transfers require EVM",
+        description: "Switch to an EVM chain to send a batched transaction, or use sequential transfers instead.",
         variant: "destructive",
       })
       return
@@ -1109,6 +1217,51 @@ export default function BatchPaymentPage() {
                 </GlassCardContent>
               </GlassCard>
 
+              <GlassCard className="border-border">
+                <GlassCardHeader className="pb-3">
+                  <div className="flex items-center justify-between gap-2">
+                    <div>
+                      <GlassCardTitle className="text-base">Settlement Network</GlassCardTitle>
+                      <GlassCardDescription>Select Tron for TRC20 payouts or stay on EVM to use batch transfers.</GlassCardDescription>
+                    </div>
+                    <Badge variant="outline">{selectedPaymentChain === "TRON" ? "Tron" : "EVM"}</Badge>
+                  </div>
+                </GlassCardHeader>
+                <GlassCardContent className="space-y-3">
+                  <div className="space-y-2">
+                    <Label>Choose network</Label>
+                    <Select
+                      value={selectedPaymentChain}
+                      onValueChange={(value) => handlePaymentChainChange(value, { source: "user" })}
+                      disabled={isChainSwitching || isConnecting}
+                    >
+                      <SelectTrigger className="sm:w-[260px]">
+                        <SelectValue placeholder="Select settlement network" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="EVM">EVM (Base, Arbitrum)</SelectItem>
+                        <SelectItem value="TRON">Tron (TRC20)</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    {(isChainSwitching || isConnecting) && (
+                      <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                        <Loader2 className="h-3 w-3 animate-spin" />
+                        Preparing wallet connection...
+                      </div>
+                    )}
+                  </div>
+                  {!supportsBatchTransfers && (
+                    <Alert variant="default" className="border-amber-500/40 bg-amber-500/5">
+                      <AlertCircle className="h-4 w-4" />
+                      <AlertTitle className="text-sm">Manual transfer mode</AlertTitle>
+                      <AlertDescription className="text-xs sm:text-sm">
+                        Tron payouts run sequentially per recipient. To execute an on-chain batch transaction, switch back to an EVM network.
+                      </AlertDescription>
+                    </Alert>
+                  )}
+                </GlassCardContent>
+              </GlassCard>
+
           {/* Async Batch Job Monitor */}
           {(isAsyncUploading || asyncJobStatus) && (
             <GlassCard className="border-blue-500/20 bg-blue-500/5 mb-6">
@@ -1179,7 +1332,7 @@ export default function BatchPaymentPage() {
             </GlassCard>
           )}
 
-          {multisigWallets.length > 0 && (
+          {multisigWallets.length > 0 && supportsMultisig && (
             <GlassCard className="border-cyan-500/20">
               <GlassCardHeader className="pb-3">
                 <div className="flex items-center gap-2">
@@ -1373,8 +1526,12 @@ export default function BatchPaymentPage() {
                               </SelectTrigger>
                               <SelectContent>
                                 <SelectItem value="USDT">USDT</SelectItem>
-                                <SelectItem value="USDC">USDC</SelectItem>
-                                <SelectItem value="DAI">DAI</SelectItem>
+                                <SelectItem value="USDC" disabled={selectedPaymentChain === "TRON"}>
+                                  USDC
+                                </SelectItem>
+                                <SelectItem value="DAI" disabled={selectedPaymentChain === "TRON"}>
+                                  DAI
+                                </SelectItem>
                               </SelectContent>
                             </Select>
                           </TableCell>
@@ -1438,7 +1595,7 @@ export default function BatchPaymentPage() {
                   </Button>
                 </div>
 
-                <Button className="w-full" size="lg" onClick={processIndividualPayments} disabled={isProcessing}>
+                <Button className="w-full" size="lg" onClick={processIndividualPayments} disabled={isProcessing || isChainSwitching}>
                   {isProcessing ? (
                     <>
                       <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -1457,7 +1614,12 @@ export default function BatchPaymentPage() {
           <div className="flex justify-end gap-4">
             <Button
               onClick={processBatchPayment}
-              disabled={isBatchTransferProcessing || isApproving || recipients.filter((r) => r.address && r.amount).length === 0}
+              disabled={
+                isBatchTransferProcessing ||
+                isApproving ||
+                recipients.filter((r) => r.address && r.amount).length === 0 ||
+                !supportsBatchTransfers
+              }
               className="bg-cyan-500 hover:bg-cyan-600"
             >
               {isApproving ? (
@@ -1469,6 +1631,11 @@ export default function BatchPaymentPage() {
                 <>
                   <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                   Processing...
+                </>
+              ) : !supportsBatchTransfers ? (
+                <>
+                  <AlertCircle className="h-4 w-4 mr-2" />
+                  Switch to EVM for Batch
                 </>
               ) : useMultisig ? (
                 <>
@@ -1666,6 +1833,7 @@ export default function BatchPaymentPage() {
                   <SelectItem value="Arbitrum">Arbitrum</SelectItem>
                   <SelectItem value="Base">Base</SelectItem>
                   <SelectItem value="Optimism">Optimism</SelectItem>
+                  <SelectItem value="Tron">Tron</SelectItem>
                 </SelectContent>
               </Select>
             </div>
