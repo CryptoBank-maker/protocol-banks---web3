@@ -8,6 +8,20 @@ export type ChainType = "EVM" | "SOLANA" | "BITCOIN" | "TRON"
 declare global {
   interface Window {
     tronWeb: any
+    tokenpocket?: any
+    solana?: {
+      isPhantom?: boolean
+      connect: (opts?: { onlyIfTrusted?: boolean }) => Promise<{ publicKey: { toString: () => string } }>
+      disconnect: () => Promise<void>
+      request: (args: { method: string; params?: any }) => Promise<any>
+    }
+    unisat?: {
+      requestAccounts: () => Promise<string[]>
+      getAccounts: () => Promise<string[]>
+      getNetwork: () => Promise<string>
+      switchNetwork: (network: string) => Promise<void>
+      getBalance: () => Promise<{ total: number; confirmed: number; unconfirmed: number }>
+    }
   }
 }
 
@@ -113,26 +127,6 @@ export const ERC20_ABI = [
 export const CCTP_ABI = [
   "function depositForBurn(uint256 amount, uint32 destinationDomain, bytes32 mintRecipient, address burnToken) external returns (uint64)",
 ]
-
-declare global {
-  interface Window {
-    ethereum?: any
-    tokenpocket?: any
-    solana?: {
-      isPhantom?: boolean
-      connect: (opts?: { onlyIfTrusted?: boolean }) => Promise<{ publicKey: { toString: () => string } }>
-      disconnect: () => Promise<void>
-      request: (args: { method: string; params?: any }) => Promise<any>
-    }
-    unisat?: {
-      requestAccounts: () => Promise<string[]>
-      getAccounts: () => Promise<string[]>
-      getNetwork: () => Promise<string>
-      switchNetwork: (network: string) => Promise<void>
-      getBalance: () => Promise<{ total: number; confirmed: number; unconfirmed: number }>
-    }
-  }
-}
 
 export function isMetaMaskAvailable(): boolean {
   if (typeof window === "undefined") return false
