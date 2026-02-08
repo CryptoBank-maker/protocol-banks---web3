@@ -1,15 +1,15 @@
 {
   "network": "TRON Nile Testnet",
-  "contractAddress": "TSrRLNoyJ9mVNZMg6jA8hUzABxHA1ZBFGM",
-  "deployer": "TPcAqMfC9Ujm3SfStSnqzudVA3D4veeMwq",
-  "transactionHash": "291ee7bddfccccad9c04f6e7102cf3791e70591569df992c9a48a9b2e89273fe",
-  "timestamp": "2026-02-08T11:43:08.013Z",
-  "config": {
+  "fullNode": "https://nile.trongrid.io",
+  "contractAddress": "4133e3d31e5b4c52994792b9b4f6fd241fc9309ac4",
+  "deployer": "TMdaXsTVMZQYW5tAvAhapRDVcsKHhoHXjt",
+  "timestamp": "2026-02-08T20:32:25.682Z",
+  "parameters": {
     "initialSigners": [
-      "TPcAqMfC9Ujm3SfStSnqzudVA3D4veeMwq"
+      "TMdaXsTVMZQYW5tAvAhapRDVcsKHhoHXjt"
     ],
     "threshold": 1,
-    "guardian": "TPcAqMfC9Ujm3SfStSnqzudVA3D4veeMwq",
+    "guardian": "TMdaXsTVMZQYW5tAvAhapRDVcsKHhoHXjt",
     "supportedTokens": [
       "TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t"
     ],

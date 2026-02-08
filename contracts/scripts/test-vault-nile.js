@@ -7,7 +7,7 @@
  * 3. Contract funded with test USDT
  */
 
-require('dotenv').config();
+require('dotenv').config({ path: require('path').join(__dirname, '../../.env') });
 const { TronWeb } = require('tronweb');
 
 async function main() {

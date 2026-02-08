@@ -7,7 +7,7 @@
  * 3. Use Base58 address format (T-prefix)
  */
 
-require('dotenv').config();
+require('dotenv').config({ path: require('path').join(__dirname, '../../.env') });
 const { TronWeb } = require('tronweb');
 
 async function main() {
@@ -58,12 +58,10 @@ async function main() {
     // Deployment parameters
     // NOTE: Use Base58 address format for TRON (T-prefix addresses)
     const initialSigners = [
-        'TYourSigner1AddressHere', // Replace with actual signer address
-        'TYourSigner2AddressHere', // Replace with actual signer address
-        'TYourSigner3AddressHere'  // Replace with actual signer address
+        deployerAddress // Use deployer as the only signer for testing
     ];
 
-    const threshold = 2; // Require 2 of 3 signatures
+    const threshold = 1; // Require 1 signature for testing
     const guardian = deployerAddress; // Use deployer as guardian
     const supportedTokens = [
         'TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t' // USDT on Nile Testnet (or use mock address)
@@ -92,18 +90,13 @@ async function main() {
     console.log('   This may take 1-2 minutes...\n');
 
     try {
-        // Encode constructor parameters
-        const tronWebInstance = new TronWeb({
-            fullNode: 'https://nile.trongrid.io',
-            solidityNode: 'https://nile.trongrid.io',
-            eventServer: 'https://nile.trongrid.io'
-        });
-
+        // Use the already configured tronWeb instance with private key
         // Create contract instance with deployed constructor
-        const contract = await tronWebInstance.contract().new({
+        const contract = await tronWeb.contract().new({
             abi: abi,
             bytecode: bytecode,
-            from: deployerAddress,
+            feeLimit: 1000000000, // 1000 TRX fee limit
+            callValue: 0,
             parameters: [
                 initialSigners,
                 threshold,
