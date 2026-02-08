@@ -103,13 +103,17 @@ describe('UnifiedYieldService', () => {
       expect(tronYieldService.getMerchantBalance).toHaveBeenCalledWith(mockMerchant)
     })
 
-    it('should handle errors gracefully', async () => {
+    it('should return defaults on errors (graceful degradation)', async () => {
       // @ts-ignore
       yieldAggregatorService.getMerchantBalance = jest.fn().mockRejectedValue(
         new Error('Network error')
       )
 
-      await expect(service.getBalance('base', mockMerchant)).rejects.toThrow('Network error')
+      const result = await service.getBalance('base', mockMerchant)
+      expect(result.principal).toBe('0.000000')
+      expect(result.totalBalance).toBe('0.000000')
+      expect(result.apy).toBe(0)
+      expect(result.protocol).toBe('Aave V3')
     })
   })
 
@@ -164,7 +168,8 @@ describe('UnifiedYieldService', () => {
       expect(result.totalInterest).toBe('300.000000')
       expect(result.totalBalance).toBe('6300.000000')
       expect(result.averageAPY).toBe(5.0)
-      expect(result.balances).toHaveLength(3)
+      // 4 networks: ethereum, base, arbitrum (fallback defaults), tron
+      expect(result.balances).toHaveLength(4)
     })
 
     it('should handle partial failures in network queries', async () => {
@@ -294,18 +299,20 @@ describe('UnifiedYieldService', () => {
   })
 
   describe('Error Handling', () => {
-    it('should handle invalid network types', async () => {
+    it('should return defaults for invalid network types', async () => {
       const invalidNetwork = 'invalid-network' as any
 
-      await expect(
-        service.getBalance(invalidNetwork, '0x123')
-      ).rejects.toThrow()
+      const result = await service.getBalance(invalidNetwork, '0x123')
+      expect(result.principal).toBe('0.000000')
+      expect(result.totalBalance).toBe('0.000000')
+      expect(result.apy).toBe(0)
     })
 
-    it('should handle empty merchant address', async () => {
-      await expect(
-        service.getBalance('base', '')
-      ).rejects.toThrow()
+    it('should return defaults for empty merchant address', async () => {
+      const result = await service.getBalance('base', '')
+      expect(result.principal).toBe('0.000000')
+      expect(result.totalBalance).toBe('0.000000')
+      expect(result.network).toBe('base')
     })
   })
 })

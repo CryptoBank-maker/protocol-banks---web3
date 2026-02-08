@@ -361,8 +361,42 @@ export class TronYieldService {
    * @param merchant - 商户地址
    * @returns 余额信息
    */
+  /**
+   * 检查 TronWeb 是否为 mock (无法调用合约)
+   */
+  private isMockTronWeb(): boolean {
+    return !this.tronWeb?.trx && !this.tronWeb?.defaultAddress
+  }
+
   async getMerchantBalance(merchant: string): Promise<TronYieldBalance> {
     this.ensureTronWeb()
+
+    // TronWeb 为 mock 时从数据库返回降级数据
+    if (this.isMockTronWeb()) {
+      logger.warn('TronWeb is mock, returning DB fallback for balance', {
+        component: 'tron-yield',
+        network: this.network,
+        action: 'get_balance_fallback',
+        metadata: { merchant }
+      })
+
+      const deposits = await prisma.yieldDeposit.findMany({
+        where: { merchant_id: merchant, status: 'active' }
+      })
+      const principal = deposits.reduce((sum, d) => sum + parseFloat(d.principal.toString()), 0)
+
+      return {
+        merchant,
+        network: this.network,
+        principal: principal.toFixed(6),
+        interest: '0.000000',
+        totalBalance: principal.toFixed(6),
+        jTokenBalance: '0',
+        exchangeRate: '0',
+        apy: 0
+      }
+    }
+
     try {
       const addresses = JUSTLEND_ADDRESSES[this.network]
 
@@ -460,6 +494,30 @@ export class TronYieldService {
    */
   async getJustLendStats() {
     this.ensureTronWeb()
+
+    // TronWeb 为 mock 时从数据库返回降级数据
+    if (this.isMockTronWeb()) {
+      logger.warn('TronWeb is mock, returning DB fallback for stats', {
+        component: 'tron-yield',
+        network: this.network,
+        action: 'get_stats_fallback'
+      })
+
+      const deposits = await prisma.yieldDeposit.findMany({
+        where: { status: 'active' }
+      })
+      const totalPrincipal = deposits.reduce((sum, d) => sum + parseFloat(d.principal.toString()), 0)
+
+      return {
+        network: this.network,
+        exchangeRate: '0',
+        supplyRatePerBlock: '0',
+        apy: 0,
+        totalPrincipal: totalPrincipal.toFixed(6),
+        activeDeposits: deposits.length
+      }
+    }
+
     try {
       const addresses = JUSTLEND_ADDRESSES[this.network]
       const jUSDTContract = await this.tronWeb.contract(JUSTLEND_ABI, addresses.jUSDT)

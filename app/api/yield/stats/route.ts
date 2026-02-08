@@ -49,16 +49,31 @@ export async function GET(request: NextRequest) {
 
       let stats
 
-      if (network === 'ethereum' || network === 'base' || network === 'arbitrum') {
-        // EVM 网络
-        stats = await yieldAggregatorService.getContractStats(network)
-      } else if (network === 'tron') {
-        // TRON 主网
-        stats = await tronYieldService.getJustLendStats()
-      } else if (network === 'tron-nile') {
-        // TRON 测试网
-        stats = await tronYieldServiceNile.getJustLendStats()
-      } // Network validated by Zod enum
+      try {
+        if (network === 'ethereum' || network === 'base' || network === 'arbitrum') {
+          // EVM 网络
+          stats = await yieldAggregatorService.getContractStats(network)
+        } else if (network === 'tron') {
+          // TRON 主网
+          stats = await tronYieldService.getJustLendStats()
+        } else if (network === 'tron-nile') {
+          // TRON 测试网
+          stats = await tronYieldServiceNile.getJustLendStats()
+        } // Network validated by Zod enum
+      } catch (error) {
+        logger.warn(`Failed to fetch stats for ${network}, returning empty`, {
+          component: 'yield-api',
+          network,
+          metadata: { error: String(error) }
+        })
+        stats = {
+          network,
+          totalBalance: '0.000000',
+          totalInterest: '0.000000',
+          apy: 0,
+          message: `Stats unavailable for ${network} - contracts not deployed`
+        }
+      }
 
       logger.logApiRequest(
         'GET',

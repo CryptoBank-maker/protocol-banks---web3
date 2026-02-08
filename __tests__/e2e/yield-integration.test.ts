@@ -405,7 +405,7 @@ describe('E2E: Payment to Yield Pipeline', () => {
     // Weighted APY: (20000*3.5 + 15000*5.0 + 10000*4.0) / 45000 ≈ 4.0
     expect(portfolio.averageAPY).toBeCloseTo(4.0, 0)
 
-    // Should have 3 network entries
-    expect(portfolio.balances).toHaveLength(3)
+    // Should have 4 network entries (ethereum, base, arbitrum fallback, tron)
+    expect(portfolio.balances).toHaveLength(4)
   })
 })

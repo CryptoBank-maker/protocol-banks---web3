@@ -359,7 +359,28 @@ export class YieldAggregatorService {
   ): Promise<MerchantYieldBalance> {
     const contract = this.contracts.get(network)
     if (!contract) {
-      throw new Error(`Contract not initialized for ${network}`)
+      // 合约未部署时从数据库返回降级数据
+      logger.warn(`Contract not initialized for ${network}, returning DB fallback`, {
+        component: 'yield-aggregator',
+        network,
+        action: 'get_balance_fallback',
+        metadata: { merchant }
+      })
+
+      const deposits = await prisma.yieldDeposit.findMany({
+        where: { merchant_id: merchant, status: 'active' }
+      })
+      const principal = deposits.reduce((sum, d) => sum + parseFloat(d.principal.toString()), 0)
+
+      return {
+        merchant,
+        network,
+        principal: principal.toFixed(6),
+        interest: '0.000000',
+        totalBalance: principal.toFixed(6),
+        apy: 0,
+        lastOperationTime: deposits[0]?.deposited_at || new Date()
+      }
     }
 
     try {
@@ -400,7 +421,27 @@ export class YieldAggregatorService {
   async getContractStats(network: YieldNetwork) {
     const contract = this.contracts.get(network)
     if (!contract) {
-      throw new Error(`Contract not initialized for ${network}`)
+      // 合约未部署时从数据库返回降级数据
+      logger.warn(`Contract not initialized for ${network}, returning DB fallback`, {
+        component: 'yield-aggregator',
+        network,
+        action: 'get_stats_fallback'
+      })
+
+      const deposits = await prisma.yieldDeposit.findMany({
+        where: { status: 'active' }
+      })
+      const totalPrincipal = deposits.reduce((sum, d) => sum + parseFloat(d.principal.toString()), 0)
+
+      return {
+        network,
+        totalBalance: totalPrincipal.toFixed(6),
+        totalInterest: '0.000000',
+        totalDeposits: totalPrincipal.toFixed(6),
+        totalWithdrawals: '0.000000',
+        platformFeeRate: 0,
+        netDeposits: totalPrincipal.toFixed(6)
+      }
     }
 
     try {

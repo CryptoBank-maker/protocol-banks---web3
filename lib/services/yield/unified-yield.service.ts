@@ -152,36 +152,55 @@ export class UnifiedYieldService {
   ): Promise<UnifiedYieldBalance> {
     const networkType = this.getNetworkType(network)
 
-    if (networkType === 'EVM') {
-      const balance = await yieldAggregatorService.getMerchantBalance(
-        network as YieldNetwork,
-        merchant
-      )
+    try {
+      if (networkType === 'EVM') {
+        const balance = await yieldAggregatorService.getMerchantBalance(
+          network as YieldNetwork,
+          merchant
+        )
 
-      return {
-        merchant: balance.merchant,
-        network: balance.network,
-        networkType: 'EVM',
-        principal: balance.principal,
-        interest: balance.interest,
-        totalBalance: balance.totalBalance,
-        apy: balance.apy,
-        protocol: 'Aave V3'
+        return {
+          merchant: balance.merchant,
+          network: balance.network,
+          networkType: 'EVM',
+          principal: balance.principal,
+          interest: balance.interest,
+          totalBalance: balance.totalBalance,
+          apy: balance.apy,
+          protocol: 'Aave V3'
+        }
+      } else {
+        // TRON
+        const service = network === 'tron' ? tronYieldService : tronYieldServiceNile
+        const balance = await service.getMerchantBalance(merchant)
+
+        return {
+          merchant: balance.merchant,
+          network: balance.network,
+          networkType: 'TRON',
+          principal: balance.principal,
+          interest: balance.interest,
+          totalBalance: balance.totalBalance,
+          apy: balance.apy,
+          protocol: 'JustLend'
+        }
       }
-    } else {
-      // TRON
-      const service = network === 'tron' ? tronYieldService : tronYieldServiceNile
-      const balance = await service.getMerchantBalance(merchant)
+    } catch (error) {
+      logger.warn(`Failed to fetch balance for ${network}, returning defaults`, {
+        component: 'unified-yield',
+        network,
+        metadata: { merchant, error: String(error) }
+      })
 
       return {
-        merchant: balance.merchant,
-        network: balance.network,
-        networkType: 'TRON',
-        principal: balance.principal,
-        interest: balance.interest,
-        totalBalance: balance.totalBalance,
-        apy: balance.apy,
-        protocol: 'JustLend'
+        merchant,
+        network,
+        networkType,
+        principal: '0.000000',
+        interest: '0.000000',
+        totalBalance: '0.000000',
+        apy: 0,
+        protocol: networkType === 'EVM' ? 'Aave V3' : 'JustLend'
       }
     }
   }
