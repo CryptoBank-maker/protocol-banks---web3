@@ -91,6 +91,30 @@ export async function POST(request: NextRequest) {
       finalChainId = finalChainId || 8453
     }
 
+    // Validate ALL recipients match the batch network type
+    const mismatchedRecipients: string[] = []
+    for (let i = 0; i < items.length; i++) {
+      const addrVal = validateAddress(items[i].recipient)
+      if (!addrVal.isValid) {
+        return NextResponse.json(
+          { error: `Invalid recipient address at index ${i}: ${items[i].recipient}` },
+          { status: 400 }
+        )
+      }
+      const recipientType = addrVal.type === "TRON" ? "TRON" : "EVM"
+      if (recipientType !== finalNetworkType) {
+        mismatchedRecipients.push(`#${i + 1} (${items[i].recipient.slice(0, 10)}... is ${recipientType})`)
+      }
+    }
+    if (mismatchedRecipients.length > 0) {
+      return NextResponse.json(
+        {
+          error: `Network mismatch: batch is ${finalNetworkType} but these recipients are on a different network: ${mismatchedRecipients.join(", ")}`,
+        },
+        { status: 400 }
+      )
+    }
+
     // Calculate totals
     const totals = calculateBatchTotals(items)
 

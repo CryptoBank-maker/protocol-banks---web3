@@ -266,6 +266,16 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    // Validate sender and recipient are on the same network type
+    const fromType = fromValidation.type === "TRON" ? "TRON" : "EVM"
+    const toType = toValidation.type === "TRON" ? "TRON" : "EVM"
+    if (fromType !== toType) {
+      return NextResponse.json(
+        { error: `Network mismatch: sender is ${fromType} but recipient is ${toType}. Cross-chain transfers require the bridge.` },
+        { status: 400 }
+      )
+    }
+
     // Auto-detect network if not provided
     let finalChain = chain
     let finalNetworkType = network_type

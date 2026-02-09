@@ -65,6 +65,7 @@ import { createWalletClient, createPublicClient, http, custom } from "viem"
 import { arbitrum } from "viem/chains"
 import { getVendorDisplayName, getVendorInitials } from "@/lib/utils"
 import { CHAIN_IDS } from "@/lib/web3"
+import { detectAddressType } from "@/lib/address-utils"
 
 export default function BatchPaymentPage() {
   const {
@@ -831,7 +832,25 @@ export default function BatchPaymentPage() {
   }
 
   const updateRecipient = (id: string, field: keyof PaymentRecipient, value: any) => {
-    setRecipients(recipients.map((r) => (r.id === id ? { ...r, [field]: value } : r)))
+    setRecipients(recipients.map((r) => {
+      if (r.id !== id) return r
+      const updated = { ...r, [field]: value }
+
+      // Auto-detect chain from address and warn on mismatch
+      if (field === "address" && value) {
+        const detectedType = detectAddressType(value)
+        if (detectedType === "TRON" && (r.chain || selectedPaymentChain) !== "TRON") {
+          updated.chain = "TRON"
+          updated.token = "USDT"
+          toast({ title: "TRON address detected", description: `Recipient chain auto-switched to TRON for ${value.slice(0, 10)}...` })
+        } else if (detectedType === "EVM" && (r.chain || selectedPaymentChain) === "TRON") {
+          updated.chain = "EVM"
+          toast({ title: "EVM address detected", description: `Recipient chain auto-switched to EVM for ${value.slice(0, 10)}...` })
+        }
+      }
+
+      return updated
+    }))
   }
 
   const handleRecipientChainChange = (id: string, chain: "EVM" | "TRON") => {
@@ -1677,9 +1696,9 @@ export default function BatchPaymentPage() {
                           <TableCell>
                             <div className="flex gap-1">
                               <Input
-                                placeholder="0x..."
+                                placeholder="0x... or T..."
                                 value={recipient.address}
-                                onChange={(e) => updateRecipient(recipient.id, "address", e.target.value)}
+                                onChange={(e) => updateRecipient(recipient.id, "address", e.target.value.trim())}
                                 className="font-mono"
                               />
                               {recipient.address && !recipient.vendorId && (
